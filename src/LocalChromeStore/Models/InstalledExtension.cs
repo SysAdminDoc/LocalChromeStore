@@ -8,6 +8,9 @@ public sealed class InstalledExtension
     public required string InstallPath { get; set; }
     public required string ManifestPath { get; set; }
     public DateTimeOffset InstalledAt { get; set; }
+    public bool ChecksumVerified { get; set; }
+    public string? ChecksumAlgorithm { get; set; }
+    public string? ChecksumValue { get; set; }
     public string Key => $"{RepoOwner}/{RepoName}";
 }
 

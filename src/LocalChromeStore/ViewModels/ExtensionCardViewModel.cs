@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using LocalChromeStore.Models;
 using LocalChromeStore.Services;
+using LocalChromeStore.Views;
 
 namespace LocalChromeStore.ViewModels;
 
@@ -46,6 +47,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         OpenRepoCommand = new RelayCommand(_ => OpenUrl(Info.RepoUrl));
         OpenInstallDirCommand = new RelayCommand(_ => OpenDir(), _ => CanOpenInstallDir);
         HideRepositoryCommand = new RelayCommand(_ => hideRepository(this), _ => !Busy);
+        InspectCommand = new RelayCommand(_ => InspectAsync(), _ => !Busy);
         _ = LoadIconAsync();
     }
 
@@ -154,6 +156,43 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         ? string.Empty
         : Info.Warnings.Count == 1 ? Info.Warnings[0] : $"{Info.Warnings.Count} warnings — see Why";
 
+    // Trust + risk surfacing — F007/F009/F058/F059.
+    public TrustTier Trust
+    {
+        get
+        {
+            if (_installed?.ChecksumVerified == true) return TrustTier.ChecksumVerified;
+            if (!string.IsNullOrEmpty(Info.ChecksumUrl)) return TrustTier.ChecksumVerifiable;
+            if (HasAsset) return TrustTier.ConfiguredRelease;
+            return TrustTier.SourceOnly;
+        }
+    }
+    public string TrustBadge => FrameworkLabels.TrustLabel(Trust);
+    public bool IsTrustVerified => Trust == TrustTier.ChecksumVerified;
+    public bool IsTrustVerifiable => Trust == TrustTier.ChecksumVerifiable;
+    public bool IsTrustSourceOnly => Trust == TrustTier.SourceOnly;
+
+    public int PermissionCount => Info.Permissions.Count + Info.OptionalPermissions.Count
+        + Info.HostPermissions.Count + Info.OptionalHostPermissions.Count;
+    public PermissionRisk MaxPermissionRisk =>
+        PermissionCatalog.Aggregate(
+            Info.Permissions.Select(p => PermissionCatalog.Describe(p))
+                .Concat(Info.OptionalPermissions.Select(p => PermissionCatalog.Describe(p, isOptional: true)))
+                .Concat(Info.HostPermissions.Select(h => PermissionCatalog.DescribeHost(h)))
+                .Concat(Info.OptionalHostPermissions.Select(h => PermissionCatalog.DescribeHost(h, isOptional: true))));
+    public bool HasHighRiskPermissions => MaxPermissionRisk == PermissionRisk.High;
+    public string PermissionSummary
+    {
+        get
+        {
+            if (PermissionCount == 0) return "No permissions declared.";
+            var parts = new List<string> { $"{PermissionCount} permission{(PermissionCount == 1 ? "" : "s")}" };
+            if (HasHighRiskPermissions) parts.Add("includes high-risk");
+            else if (MaxPermissionRisk == PermissionRisk.Medium) parts.Add("includes sensitive");
+            return string.Join(" · ", parts);
+        }
+    }
+
     public BitmapImage? Icon
     {
         get => _icon;
@@ -185,6 +224,16 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public ICommand OpenRepoCommand { get; }
     public ICommand OpenInstallDirCommand { get; }
     public ICommand HideRepositoryCommand { get; }
+    public ICommand InspectCommand { get; }
+
+    private void InspectAsync()
+    {
+        var owner = Application.Current?.MainWindow;
+        if (owner is null) return;
+        ManifestRiskWindow.Show(owner, Info, out var requested);
+        if (requested && CanInstall)
+            _ = InstallAsync(null);
+    }
 
     private async Task InstallAsync(object? _)
     {
@@ -304,6 +353,11 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsUpdateAvailable));
         OnPropertyChanged(nameof(CanOpenInstallDir));
         OnPropertyChanged(nameof(InstalledDetail));
+        OnPropertyChanged(nameof(Trust));
+        OnPropertyChanged(nameof(TrustBadge));
+        OnPropertyChanged(nameof(IsTrustVerified));
+        OnPropertyChanged(nameof(IsTrustVerifiable));
+        OnPropertyChanged(nameof(IsTrustSourceOnly));
     }
 
     private static string FormatSize(long bytes)

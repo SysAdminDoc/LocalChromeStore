@@ -30,6 +30,14 @@ public sealed class ExtensionInfo
     public bool IsArchived { get; set; }
     public List<string> Warnings { get; set; } = new();
 
+    // Trust + risk metadata
+    public string? ChecksumUrl { get; set; }
+    public string? ChecksumName { get; set; }
+    public List<string> Permissions { get; set; } = new();
+    public List<string> OptionalPermissions { get; set; } = new();
+    public List<string> HostPermissions { get; set; } = new();
+    public List<string> OptionalHostPermissions { get; set; } = new();
+
     public string DisplayName => string.IsNullOrWhiteSpace(ManifestName) ? RepoName : ManifestName!;
     public string DisplayVersion => ManifestVersion ?? LatestVersion ?? "—";
     public string DisplayDescription =>

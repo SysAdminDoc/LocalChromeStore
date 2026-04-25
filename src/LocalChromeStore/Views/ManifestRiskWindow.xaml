@@ -1,0 +1,254 @@
+<Window x:Class="LocalChromeStore.Views.ManifestRiskWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:LocalChromeStore.ViewModels"
+        xmlns:conv="clr-namespace:LocalChromeStore.Converters"
+        d:DataContext="{d:DesignInstance vm:ManifestRiskViewModel}"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="Inspect extension"
+        Height="640" Width="780"
+        MinHeight="520" MinWidth="640"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <Window.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+
+    <Grid Background="{StaticResource BaseBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="{StaticResource CrustBrush}"
+                BorderBrush="{StaticResource Surface0Brush}"
+                BorderThickness="0,0,0,1"
+                Padding="22,16">
+            <StackPanel>
+                <TextBlock Text="{Binding Title}" Style="{StaticResource HeadingText}" />
+                <TextBlock Text="{Binding Repo}" Style="{StaticResource MuteText}" />
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Border CornerRadius="6" Padding="9,3" Margin="0,0,8,0"
+                            Background="{StaticResource Surface0Brush}"
+                            BorderBrush="{StaticResource Surface1Brush}"
+                            BorderThickness="1">
+                        <TextBlock Text="{Binding ManifestVersionLabel}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource SapphireBrush}" />
+                    </Border>
+                    <Border CornerRadius="6" Padding="9,3" Margin="0,0,8,0"
+                            Background="{StaticResource Surface0Brush}"
+                            BorderBrush="{StaticResource Surface1Brush}"
+                            BorderThickness="1">
+                        <TextBlock Text="{Binding FrameworkLabel}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource MauveBrush}" />
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1"
+                Background="{StaticResource MantleBrush}"
+                Padding="22,12"
+                BorderBrush="{StaticResource Surface0Brush}"
+                BorderThickness="0,0,0,1">
+            <StackPanel>
+                <TextBlock Text="{Binding SourceLabel}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding AssetLabel}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                <TextBlock Text="{Binding ChecksumLabel}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Padding="22,16">
+            <StackPanel>
+                <Border CornerRadius="8" Padding="14,10"
+                        BorderThickness="1"
+                        Margin="0,0,0,12">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="{StaticResource SapphireSoftBrush}" />
+                            <Setter Property="BorderBrush" Value="{StaticResource SapphireBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding OverallRisk}" Value="Medium">
+                                    <Setter Property="Background" Value="{StaticResource YellowSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource YellowBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding OverallRisk}" Value="High">
+                                    <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource RedBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding OverallRiskLabel}"
+                               FontWeight="SemiBold"
+                               TextWrapping="Wrap"
+                               Foreground="{StaticResource TextBrush}" />
+                </Border>
+
+                <TextBlock Text="Permissions"
+                           Style="{StaticResource SectionTitle}"
+                           Margin="0,0,0,8" />
+                <ItemsControl ItemsSource="{Binding Permissions}"
+                              Visibility="{Binding HasNoPermissions, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="6"
+                                    BorderThickness="1"
+                                    Padding="10,7"
+                                    Margin="0,0,0,6"
+                                    Background="{StaticResource MantleBrush}"
+                                    BorderBrush="{StaticResource Surface0Brush}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0"
+                                            CornerRadius="5"
+                                            Padding="7,2"
+                                            Margin="0,0,10,0"
+                                            VerticalAlignment="Center"
+                                            BorderThickness="1">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
+                                                <Setter Property="BorderBrush" Value="{StaticResource Surface1Brush}" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsHigh}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource RedBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsMedium}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource YellowSoftBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource YellowBrush}" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsLow}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource GreenSoftBrush}" />
+                                                        <Setter Property="BorderBrush" Value="{StaticResource GreenBrush}" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding RiskLabel}" FontSize="11" FontWeight="SemiBold">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="{StaticResource SubtextBrush}" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsHigh}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource RedBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsMedium}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource YellowBrush}" />
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding IsLow}" Value="True">
+                                                            <Setter Property="Foreground" Value="{StaticResource GreenBrush}" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TextBrush}"
+                                                       FontFamily="Cascadia Mono, Consolas"
+                                                       FontSize="12" />
+                                            <TextBlock Text="{Binding Suffix}"
+                                                       Style="{StaticResource MuteText}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,1,0,0" />
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Description}"
+                                                   Style="{StaticResource SubtleText}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Text="Host permissions"
+                           Style="{StaticResource SectionTitle}"
+                           Margin="0,12,0,8" />
+                <ItemsControl ItemsSource="{Binding HostPermissions}"
+                              Visibility="{Binding HasNoPermissions, Converter={StaticResource BoolToVis}, ConverterParameter=invert}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="6"
+                                    BorderThickness="1"
+                                    Padding="10,7"
+                                    Margin="0,0,0,6"
+                                    Background="{StaticResource MantleBrush}"
+                                    BorderBrush="{StaticResource Surface0Brush}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}"
+                                               FontFamily="Cascadia Mono, Consolas"
+                                               FontWeight="SemiBold"
+                                               FontSize="12"
+                                               Foreground="{StaticResource TextBrush}" />
+                                    <TextBlock Text="{Binding Description}"
+                                               Style="{StaticResource SubtleText}"
+                                               TextWrapping="Wrap"
+                                               Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Border CornerRadius="6"
+                        Padding="12"
+                        BorderThickness="1"
+                        Background="{StaticResource MantleBrush}"
+                        BorderBrush="{StaticResource Surface0Brush}"
+                        Visibility="{Binding HasNoPermissions, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="No permissions or host permissions are declared in the manifest."
+                               Style="{StaticResource SubtleText}" />
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Grid.Row="3"
+                Background="{StaticResource CrustBrush}"
+                BorderBrush="{StaticResource Surface0Brush}"
+                BorderThickness="0,1,0,0"
+                Padding="22,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0"
+                        Content="Open repo on GitHub"
+                        Command="{Binding OpenRepoCommand}" />
+                <Button Grid.Column="2"
+                        Content="Install"
+                        Style="{StaticResource AccentButton}"
+                        Command="{Binding InstallCommand}"
+                        IsEnabled="{Binding CanInstall}"
+                        MinWidth="110"
+                        Margin="0,0,8,0" />
+                <Button Grid.Column="3"
+                        Content="Close"
+                        Command="{Binding CloseCommand}" />
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

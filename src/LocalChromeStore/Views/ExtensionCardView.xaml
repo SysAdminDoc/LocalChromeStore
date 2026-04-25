@@ -7,7 +7,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             Width="378" Height="332">
+             Width="378" Height="356">
     <UserControl.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
         <conv:NullToVisibilityConverter x:Key="NullToVis" />
@@ -165,6 +165,44 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </Border>
+                <Border ToolTip="Source trust tier — based on configured owner, release asset shape, and SHA256 sidecar verification.">
+                    <Border.Style>
+                        <Style TargetType="Border" BasedOn="{StaticResource MetaBadge}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsTrustVerified}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource GreenSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource GreenBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsTrustVerifiable}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource SapphireSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource SapphireBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsTrustSourceOnly}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource YellowSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource YellowBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding TrustBadge}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource MetaBadgeText}">
+                                <Setter Property="Foreground" Value="{StaticResource SubtextBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsTrustVerified}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource GreenBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsTrustVerifiable}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource SapphireBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsTrustSourceOnly}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource YellowBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
                 <Border Visibility="{Binding HasFreshnessBadge, Converter={StaticResource BoolToVis}}"
                         ToolTip="Repository freshness from GitHub push activity">
                     <Border.Style>
@@ -210,6 +248,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -233,7 +272,25 @@
                            Style="{StaticResource MuteText}"
                            Foreground="{StaticResource OverlayBrush}"
                            TextTrimming="CharacterEllipsis" />
-                <ProgressBar Grid.Row="2"
+                <TextBlock Grid.Row="2"
+                           Grid.Column="0"
+                           Grid.ColumnSpan="2"
+                           Margin="0,2,0,0"
+                           Text="{Binding PermissionSummary}"
+                           TextTrimming="CharacterEllipsis">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource MuteText}">
+                            <Setter Property="Foreground" Value="{StaticResource OverlayBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasHighRiskPermissions}" Value="True">
+                                    <Setter Property="Foreground" Value="{StaticResource RedBrush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <ProgressBar Grid.Row="3"
                              Grid.Column="0"
                              Grid.ColumnSpan="2"
                              IsIndeterminate="True"
@@ -298,6 +355,11 @@
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             Margin="0,7,0,0">
+                    <Button Content="Inspect"
+                            Style="{StaticResource LinkButton}"
+                            Command="{Binding InspectCommand}"
+                            ToolTip="Open the manifest risk panel — permissions, host access, and trust signals before install."
+                            Margin="0,0,4,0" />
                     <Button Content="Why"
                             Style="{StaticResource LinkButton}"
                             ToolTipService.InitialShowDelay="200"

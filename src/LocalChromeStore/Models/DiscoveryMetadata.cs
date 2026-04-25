@@ -36,6 +36,15 @@ public enum RepoFreshness
     Archived
 }
 
+public enum TrustTier
+{
+    Unknown,
+    SourceOnly,
+    ConfiguredRelease,
+    ChecksumVerifiable,
+    ChecksumVerified
+}
+
 public enum GitHubServiceStatus
 {
     Ok,
@@ -99,5 +108,14 @@ public static class FrameworkLabels
         RepoFreshness.Stale => "Stale",
         RepoFreshness.Archived => "Archived",
         _ => "Unknown"
+    };
+
+    public static string TrustLabel(TrustTier t) => t switch
+    {
+        TrustTier.SourceOnly => "Source only",
+        TrustTier.ConfiguredRelease => "Configured release",
+        TrustTier.ChecksumVerifiable => "Checksum available",
+        TrustTier.ChecksumVerified => "Checksum verified",
+        _ => "Unknown source"
     };
 }

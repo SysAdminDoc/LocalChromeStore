@@ -160,6 +160,27 @@ public sealed class GitHubService
         return found;
     }
 
+    /// <summary>
+    /// Finds a SHA256 sidecar asset in the same release. Recognises the shapes
+    /// the project's own release workflow emits as well as the common conventions
+    /// upstream projects use (`<asset>.sha256`, `<asset>.sha256.txt`, separate
+    /// `SHA256SUMS` text files mentioning the asset name).
+    /// </summary>
+    private static ReleaseAsset? FindChecksumSidecar(IEnumerable<ReleaseAsset> assets, string assetName)
+    {
+        var direct = assets.FirstOrDefault(a =>
+            a.Name.Equals(assetName + ".sha256", StringComparison.OrdinalIgnoreCase) ||
+            a.Name.Equals(assetName + ".sha256.txt", StringComparison.OrdinalIgnoreCase) ||
+            a.Name.Equals(assetName + ".SHA256SUMS", StringComparison.OrdinalIgnoreCase));
+        if (direct != null) return direct;
+
+        // Aggregate sidecars covering multiple artifacts.
+        return assets.FirstOrDefault(a =>
+            a.Name.EndsWith("SHA256SUMS", StringComparison.OrdinalIgnoreCase) ||
+            a.Name.EndsWith("checksums.txt", StringComparison.OrdinalIgnoreCase) ||
+            a.Name.EndsWith(".sha256sum", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static async Task<List<string>?> SafeGetTopics(GitHubClient client, Repository repo)
     {
         try
@@ -179,6 +200,7 @@ public sealed class GitHubService
 
         ReleaseAsset? asset = null;
         AssetKind assetKind = AssetKind.None;
+        ReleaseAsset? checksum = null;
         if (release != null)
         {
             asset = release.Assets
@@ -188,7 +210,10 @@ public sealed class GitHubService
                 .ThenByDescending(a => a.Size)
                 .FirstOrDefault();
             if (asset != null)
+            {
                 assetKind = asset.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ? AssetKind.Zip : AssetKind.Crx;
+                checksum = FindChecksumSidecar(release.Assets, asset.Name);
+            }
         }
 
         var manifestSourcePath = await FindManifestPathAsync(client, repo, ct);
@@ -213,7 +238,9 @@ public sealed class GitHubService
                 : DiscoverySource.RepoManifest,
             ManifestSourcePath = asset != null ? null : manifestSourcePath,
             RepoLastPushedAt = repo.PushedAt ?? repo.UpdatedAt,
-            IsArchived = repo.Archived
+            IsArchived = repo.Archived,
+            ChecksumUrl = checksum?.BrowserDownloadUrl,
+            ChecksumName = checksum?.Name
         };
 
         info.Freshness = ClassifyFreshness(info.IsArchived, info.RepoLastPushedAt);
@@ -315,6 +342,25 @@ public sealed class GitHubService
                 info.ManifestVersionNumber = mvParsed;
         }
 
+        // Permissions / host_permissions / optional_* — F009/F058/F059.
+        AppendStringArray(root, "permissions", info.Permissions);
+        AppendStringArray(root, "optional_permissions", info.OptionalPermissions);
+        AppendStringArray(root, "host_permissions", info.HostPermissions);
+        AppendStringArray(root, "optional_host_permissions", info.OptionalHostPermissions);
+
+        // MV2 stores host patterns inline with permissions; promote any URL-like entries
+        // into HostPermissions so the risk panel groups them sensibly.
+        if (info.ManifestVersionNumber == 2 && info.Permissions.Count > 0)
+        {
+            var hosts = info.Permissions.Where(LooksLikeHostPattern).ToList();
+            foreach (var h in hosts)
+            {
+                info.Permissions.Remove(h);
+                if (!info.HostPermissions.Contains(h, StringComparer.OrdinalIgnoreCase))
+                    info.HostPermissions.Add(h);
+            }
+        }
+
         // Icon: pick the largest available
         if (root.TryGetProperty("icons", out var icons) && icons.ValueKind == JsonValueKind.Object)
         {
@@ -332,6 +378,31 @@ public sealed class GitHubService
             if (bestPath != null)
                 info.IconUrl = $"https://raw.githubusercontent.com/{info.RepoOwner}/{info.RepoName}/HEAD/{bestPath.TrimStart('/')}";
         }
+    }
+
+    private static void AppendStringArray(JsonElement root, string property, List<string> sink)
+    {
+        if (!root.TryGetProperty(property, out var arr) || arr.ValueKind != JsonValueKind.Array) return;
+        foreach (var item in arr.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String) continue;
+            var v = item.GetString();
+            if (string.IsNullOrWhiteSpace(v)) continue;
+            if (!sink.Contains(v, StringComparer.OrdinalIgnoreCase)) sink.Add(v!);
+        }
+    }
+
+    private static bool LooksLikeHostPattern(string permission)
+    {
+        if (string.IsNullOrWhiteSpace(permission)) return false;
+        return permission == "<all_urls>"
+            || permission.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || permission.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            || permission.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
+            || permission.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase)
+            || permission.StartsWith("ws://", StringComparison.OrdinalIgnoreCase)
+            || permission.StartsWith("wss://", StringComparison.OrdinalIgnoreCase)
+            || permission.StartsWith("*://", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task DetectFrameworkAsync(GitHubClient client, Repository repo, ExtensionInfo info, CancellationToken ct)
@@ -483,6 +554,17 @@ public sealed class GitHubService
             using var resp = await _http.GetAsync(url, ct);
             if (!resp.IsSuccessStatusCode) return null;
             return await resp.Content.ReadAsByteArrayAsync(ct);
+        }
+        catch { return null; }
+    }
+
+    public async Task<string?> TryDownloadTextAsync(string url, CancellationToken ct = default)
+    {
+        try
+        {
+            using var resp = await _http.GetAsync(url, ct);
+            if (!resp.IsSuccessStatusCode) return null;
+            return await resp.Content.ReadAsStringAsync(ct);
         }
         catch { return null; }
     }

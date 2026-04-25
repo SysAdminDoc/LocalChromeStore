@@ -2,11 +2,13 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using LocalChromeStore.Models;
 using LocalChromeStore.Services;
+using Microsoft.Win32;
 
 namespace LocalChromeStore.ViewModels;
 
@@ -48,6 +50,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand AddExtraOwnerCommand { get; }
     public ICommand RemoveExtraOwnerCommand { get; }
     public ICommand OpenBrowserExtensionsPageCommand { get; }
+    public ICommand ExportDiagnosticsCommand { get; }
 
     public MainViewModel()
     {
@@ -85,10 +88,17 @@ public sealed class MainViewModel : ViewModelBase
         AddExtraOwnerCommand = new RelayCommand(_ => AddExtraOwner(), _ => !string.IsNullOrWhiteSpace(NewOwnerInput));
         RemoveExtraOwnerCommand = new RelayCommand(o => RemoveExtraOwner(o as string ?? SelectedExtraOwner), o => (o as string ?? SelectedExtraOwner) is { Length: > 0 });
         OpenBrowserExtensionsPageCommand = new RelayCommand(_ => OpenBrowserExtensionsPage(), _ => SelectedBrowser != null);
+        ExportDiagnosticsCommand = new RelayCommand(_ => ExportDiagnostics());
 
         DetectBrowsers();
         Log($"LocalChromeStore v{App.ResourceAssembly.GetName().Version} ready.");
         Log($"Extensions install root: {_settingsService.ExtensionsRoot}");
+        if (_settingsService.TokenWasMigratedFromPlaintext)
+        {
+            Log("Migrating legacy plaintext GitHub token to DPAPI on next save.");
+            _settingsService.Save(_settings);
+            Log("GitHub token re-saved under DPAPI for the current Windows user.");
+        }
         Log($"Run Refresh to discover extensions for '{_settings.GitHubUser}'.");
     }
 
@@ -525,6 +535,104 @@ public sealed class MainViewModel : ViewModelBase
     {
         try { Process.Start(new ProcessStartInfo("explorer.exe", $"\"{_settingsService.ExtensionsRoot}\"") { UseShellExecute = true }); }
         catch (Exception ex) { Log($"! {ex.Message}"); }
+    }
+
+    private void ExportDiagnostics()
+    {
+        var defaultName = $"LocalChromeStore-diagnostics-{DateTime.Now:yyyy-MM-dd-HHmm}.txt";
+        var dlg = new SaveFileDialog
+        {
+            FileName = defaultName,
+            DefaultExt = ".txt",
+            Filter = "Text file (*.txt)|*.txt|All files (*.*)|*.*",
+            InitialDirectory = _settingsService.LogsDir
+        };
+        var owner = Application.Current?.MainWindow;
+        var result = owner != null ? dlg.ShowDialog(owner) : dlg.ShowDialog();
+        if (result != true) return;
+
+        try
+        {
+            File.WriteAllText(dlg.FileName, BuildDiagnosticsBundle(), Encoding.UTF8);
+            StatusText = $"Diagnostics exported to {dlg.FileName}.";
+            Log($"Exported diagnostics bundle to {dlg.FileName}.");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Diagnostics export failed: {ex.Message}";
+            Log($"! Diagnostics export failed: {ex.Message}");
+        }
+    }
+
+    private string BuildDiagnosticsBundle()
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("LocalChromeStore diagnostics bundle");
+        sb.AppendLine($"Generated: {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
+        sb.AppendLine($"Version: {App.ResourceAssembly.GetName().Version}");
+        sb.AppendLine($"OS: {Environment.OSVersion}");
+        sb.AppendLine($".NET: {Environment.Version}");
+        sb.AppendLine();
+
+        sb.AppendLine("== Settings paths ==");
+        sb.AppendLine($"  Settings file:    {_settingsService.SettingsPath}");
+        sb.AppendLine($"  Installed manifest: {_settingsService.ManifestPath}");
+        sb.AppendLine($"  Extensions root:  {_settingsService.ExtensionsRoot}");
+        sb.AppendLine($"  Icon cache:       {_settingsService.IconCacheDir}");
+        sb.AppendLine($"  Log directory:    {_settingsService.LogsDir}");
+        sb.AppendLine();
+
+        sb.AppendLine("== GitHub state ==");
+        sb.AppendLine($"  Primary user:  {_settings.GitHubUser}");
+        sb.AppendLine($"  Token present: {(string.IsNullOrEmpty(_settings.GitHubToken) ? "no" : "yes (DPAPI on disk)")}");
+        sb.AppendLine($"  Extra owners:  {(ExtraOwners.Count == 0 ? "(none)" : string.Join(", ", ExtraOwners))}");
+        sb.AppendLine($"  Status:        {GitHubStatusSummary}");
+        sb.AppendLine($"  Rate limit:    {RateLimitSummary}");
+        sb.AppendLine($"  Topic filter:  {(_settings.UseTopicFilter ? _settings.TopicFilter : "(disabled)")}");
+        sb.AppendLine($"  Hidden repos:  {_settings.HiddenRepos.Count}");
+        sb.AppendLine();
+
+        sb.AppendLine("== Browsers detected ==");
+        if (Browsers.Count == 0) sb.AppendLine("  (none)");
+        foreach (var b in Browsers)
+            sb.AppendLine($"  {b.Kind,-8} {b.DisplayName,-18} {b.ExecutablePath}");
+        sb.AppendLine($"  Selected:      {SelectedBrowser?.DisplayName ?? "(none)"}");
+        sb.AppendLine();
+
+        sb.AppendLine("== Installed extensions ==");
+        if (_extensions.Installed.Count == 0) sb.AppendLine("  (none)");
+        foreach (var inst in _extensions.Installed)
+        {
+            sb.AppendLine($"  {inst.RepoOwner}/{inst.RepoName}@{inst.Version}");
+            sb.AppendLine($"    InstalledAt:      {inst.InstalledAt:yyyy-MM-dd HH:mm:ss zzz}");
+            sb.AppendLine($"    InstallPath:      {inst.InstallPath}");
+            sb.AppendLine($"    ChecksumVerified: {inst.ChecksumVerified}{(inst.ChecksumVerified ? $" ({inst.ChecksumAlgorithm})" : "")}");
+        }
+        sb.AppendLine();
+
+        sb.AppendLine("== Discovered catalog ==");
+        if (Extensions.Count == 0) sb.AppendLine("  (none — refresh first)");
+        foreach (var ext in Extensions)
+        {
+            var info = ext.Info;
+            sb.AppendLine($"  {info.RepoOwner}/{info.RepoName}");
+            sb.AppendLine($"    Framework:    {FrameworkLabels.Label(info.Framework)}");
+            sb.AppendLine($"    Source:       {FrameworkLabels.DiscoveryLabel(info.DiscoverySource)}{(info.ManifestSourcePath is null ? "" : $" ({info.ManifestSourcePath})")}");
+            sb.AppendLine($"    Asset:        {FrameworkLabels.AssetLabel(info.AssetKind)}{(info.AssetName is null ? "" : $" — {info.AssetName}")}");
+            sb.AppendLine($"    Manifest ver: {(info.ManifestVersionNumber.HasValue ? "MV" + info.ManifestVersionNumber : "unknown")}");
+            sb.AppendLine($"    Freshness:    {FrameworkLabels.FreshnessLabel(info.Freshness)}{(info.IsArchived ? " (archived)" : "")}");
+            sb.AppendLine($"    Permissions:  {info.Permissions.Count + info.OptionalPermissions.Count} ({info.HostPermissions.Count + info.OptionalHostPermissions.Count} host)");
+            sb.AppendLine($"    Checksum:     {(string.IsNullOrEmpty(info.ChecksumUrl) ? "no sidecar" : info.ChecksumName)}");
+            if (info.Warnings.Count > 0)
+                sb.AppendLine($"    Warnings:     {string.Join(" | ", info.Warnings)}");
+        }
+        sb.AppendLine();
+
+        sb.AppendLine("== Activity log ==");
+        if (LogLines.Count == 0) sb.AppendLine("  (empty)");
+        foreach (var line in LogLines) sb.AppendLine("  " + line);
+
+        return sb.ToString();
     }
 
     private void Log(string line) => _logSink.Append(line);

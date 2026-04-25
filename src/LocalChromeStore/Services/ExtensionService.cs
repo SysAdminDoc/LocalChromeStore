@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using LocalChromeStore.Models;
 
 namespace LocalChromeStore.Services;
@@ -31,6 +32,32 @@ public sealed class ExtensionService
 
         log?.Report($"Downloading {info.AssetName} ({Format(info.AssetSizeBytes)})...");
         var data = await _github.DownloadAssetAsync(info.AssetUrl, bytes, ct);
+
+        // F006 — verify SHA256 against sidecar before extraction. Fail closed on mismatch.
+        bool checksumVerified = false;
+        string? checksumValue = null;
+        if (!string.IsNullOrEmpty(info.ChecksumUrl))
+        {
+            log?.Report($"Verifying checksum from {info.ChecksumName ?? "sidecar"}...");
+            var sidecar = await _github.TryDownloadTextAsync(info.ChecksumUrl, ct);
+            if (string.IsNullOrWhiteSpace(sidecar))
+            {
+                throw new InvalidOperationException("Refusing to install: checksum sidecar is present but could not be downloaded. Try again or remove the sidecar from the release.");
+            }
+            var expected = ParseExpectedSha256(sidecar, info.AssetName);
+            if (expected is null)
+            {
+                throw new InvalidOperationException("Refusing to install: checksum sidecar is present but does not contain a SHA256 hash for this asset.");
+            }
+            var actual = Convert.ToHexStringLower(SHA256.HashData(data));
+            if (!string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Refusing to install: SHA256 mismatch.\nExpected: {expected}\nActual:   {actual}");
+            }
+            log?.Report($"Checksum OK (SHA256 {actual[..12]}…).");
+            checksumVerified = true;
+            checksumValue = actual;
+        }
 
         var version = info.DisplayVersion.Replace('/', '_').Replace('\\', '_');
         var targetDir = Path.Combine(_settings.ExtensionsRoot, info.RepoOwner, info.RepoName, version);
@@ -75,7 +102,10 @@ public sealed class ExtensionService
             Version = info.DisplayVersion,
             InstallPath = extensionRoot,
             ManifestPath = manifestPath,
-            InstalledAt = DateTimeOffset.UtcNow
+            InstalledAt = DateTimeOffset.UtcNow,
+            ChecksumVerified = checksumVerified,
+            ChecksumAlgorithm = checksumVerified ? "SHA256" : null,
+            ChecksumValue = checksumValue
         };
         _manifest.Extensions.Add(entry);
         _settings.SaveManifest(_manifest);
@@ -210,6 +240,64 @@ public sealed class ExtensionService
                 log?.Report($"! Could not prune {dir}: {ex.Message}");
             }
         }
+    }
+
+    /// <summary>
+    /// Pulls the SHA256 hex hash for a given asset out of a sidecar text file.
+    /// Accepts both single-hash sidecars (`<hash>` or `<hash>  <filename>`) and
+    /// multi-line SHA256SUMS-style files where the asset name is the disambiguator.
+    /// </summary>
+    private static string? ParseExpectedSha256(string sidecar, string? assetName)
+    {
+        // Strip BOM and normalise newlines.
+        sidecar = sidecar.Replace("\r\n", "\n");
+        var lines = sidecar.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        if (lines.Length == 0) return null;
+
+        // Single-line, hash-only.
+        if (lines.Length == 1)
+        {
+            var only = lines[0].Trim();
+            var hash = only.Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            return IsHexSha256(hash) ? hash : null;
+        }
+
+        // Multi-line SHA256SUMS — the line whose path matches the asset wins.
+        if (!string.IsNullOrEmpty(assetName))
+        {
+            foreach (var raw in lines)
+            {
+                var line = raw.Trim();
+                if (line.Length == 0) continue;
+                var parts = line.Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 2) continue;
+                var hash = parts[0].Trim();
+                var name = parts[1].Trim().TrimStart('*'); // GNU sha256sum binary marker
+                if (!IsHexSha256(hash)) continue;
+                if (string.Equals(name, assetName, StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith("/" + assetName, StringComparison.OrdinalIgnoreCase))
+                    return hash;
+            }
+        }
+
+        // Fallback: first hex SHA256 token in the file.
+        foreach (var raw in lines)
+        {
+            var first = raw.Trim().Split(new[] { ' ', '\t' }, 2, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+            if (IsHexSha256(first)) return first;
+        }
+        return null;
+    }
+
+    private static bool IsHexSha256(string? value)
+    {
+        if (value == null || value.Length != 64) return false;
+        foreach (var c in value)
+        {
+            var ok = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+            if (!ok) return false;
+        }
+        return true;
     }
 
     private static string Format(long bytes)

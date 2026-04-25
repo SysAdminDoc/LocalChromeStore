@@ -474,11 +474,16 @@
                                Style="{StaticResource MuteText}"
                                Margin="10,1,0,0" />
                 </StackPanel>
-                <Button Grid.Column="1"
-                        Content="Clear"
-                        Command="{Binding ClearLogCommand}"
-                        Style="{StaticResource LinkButton}"
-                        Margin="0,0,16,0" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,12,0" VerticalAlignment="Center">
+                    <Button Content="Export diagnostics"
+                            Command="{Binding ExportDiagnosticsCommand}"
+                            Style="{StaticResource LinkButton}"
+                            ToolTip="Save a text bundle with paths, GitHub state, browsers, installed extensions, and the activity log." />
+                    <Button Content="Clear"
+                            Command="{Binding ClearLogCommand}"
+                            Style="{StaticResource LinkButton}"
+                            Margin="4,0,0,0" />
+                </StackPanel>
             </Grid>
         </Border>
 
