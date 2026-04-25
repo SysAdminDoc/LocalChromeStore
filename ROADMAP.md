@@ -11,17 +11,17 @@ What it claims and delivers:
 - GitHub-sourced discovery for a primary owner plus JSON-backed extra owners.
 - Optional topic filtering, optional DPAPI-protected GitHub PAT, release ZIP/CRX detection, and fallback `manifest.json` probing.
 - Manifest enrichment for name, version, description, icon, MV2/MV3, permissions, host permissions, source shape, framework, freshness, and checksum sidecars.
-- Install, uninstall, hidden-repo curation, installed-only filtering, browser detection, browser launch, temporary-profile sessions, startup URLs, copyable launch arguments, settings drawer, and activity log.
+- Install, uninstall, hidden-repo curation, installed-only filtering, browser detection, browser launch, temporary-profile sessions, startup URLs, copyable launch arguments, export/import environment manifests, settings drawer, and activity log.
 - Framework-dependent Windows release workflow with ZIP plus SHA256 sidecar.
 - Focused xUnit test project, Windows CI build/test workflow, and Dependabot coverage for NuGet and GitHub Actions.
 
 What is incomplete or stubbed:
 
 - `LaunchBrowserAfterInstall` and `AutoUpdateOnRefresh` are persisted settings without a complete user-facing workflow.
-- Extra owners are supported by JSON and discovery code but not editable in the GUI.
+- Hidden repos are still restored as a single bulk action rather than through a per-repo management list.
 - Enterprise policy install, CRX3 signing, update XML, and auto-update are roadmap-only.
 - Test coverage is still narrow: broader manifest/extraction/version/settings migration cases and UI smoke automation remain open.
-- No permission diff, local source folder source, named profile/load-set model, or export/import environment manifest.
+- No permission diff, local source folder source, or named profile/load-set model.
 
 Philosophy inferred from README, code, and docs:
 
@@ -221,6 +221,7 @@ These items should land before the next public feature release because they impr
    - Implement F011, F012, F038, F060 groundwork where feasible.
    - Output: update badges, manual update/update-all, export/import of installed extension environment, and persisted manifest snapshots for future permission diffs.
    - Acceptance: installed version vs latest version is visible; export file can recreate the selected installed set on another machine.
+   - 2026-04-25 progress: F038 and F060 groundwork are implemented. Installed records now retain manifest/trust snapshots, and environment JSON export/import can carry installed extension targets, GitHub owner/topic settings, and launch options across machines. Exact historical-version restore and permission-diff enforcement remain open.
 
 4. **Profiles and better launch sessions**
    - Implement F013, F016, F019, F020.

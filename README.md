@@ -41,6 +41,7 @@ LocalChromeStore wraps path 2 with a real store UI and (in v0.2.0) wraps path 3 
 - **One-click uninstall** — wipes the local copy and removes it from the load list
 - **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with `--load-extension=...` pointing at every installed extension
 - **Auditable launch sessions** — optional startup URL, clean temporary profile mode, and a copyable launch command preview
+- **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
 - **Search and filter** — by name, repo, or description; toggle to show only installed
 - **Topic filter (optional)** — restrict discovery to repos tagged with a specific GitHub topic (default `chrome-extension`)
 - **Optional GitHub PAT** — unauthenticated GitHub API caps at 60 req/h; a personal access token raises that to 5,000/h, unlocks private repos, and is stored with Windows DPAPI
@@ -92,6 +93,8 @@ To load installed extensions into a browser:
 The browser opens with `--load-extension=<all installed paths>`. The browser will show its standard "developer mode extensions" banner — that is normal for `--load-extension` and not a sign anything is wrong. The extensions persist for that browsing session; close the browser and they unload (which is exactly what you want during dev/test).
 
 Use **Copy args** to copy the exact command LocalChromeStore will run. This is useful when debugging extension load failures or reproducing a launch session outside the app.
+
+Use **Export environment** to save the installed extension set, manifest trust snapshot, GitHub owner list, topic filter, and launch options as a portable JSON file. Use **Import environment** on another machine to apply those discovery settings, refresh GitHub, and install matching ZIP/CRX release assets. GitHub tokens are never written to the export file.
 
 ---
 

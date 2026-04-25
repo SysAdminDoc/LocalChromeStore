@@ -105,7 +105,15 @@ public sealed class ExtensionService
             InstalledAt = DateTimeOffset.UtcNow,
             ChecksumVerified = checksumVerified,
             ChecksumAlgorithm = checksumVerified ? "SHA256" : null,
-            ChecksumValue = checksumValue
+            ChecksumValue = checksumValue,
+            DisplayName = info.DisplayName,
+            RepoUrl = info.RepoUrl,
+            ManifestVersionNumber = info.ManifestVersionNumber,
+            Framework = info.Framework,
+            Permissions = info.Permissions.ToList(),
+            OptionalPermissions = info.OptionalPermissions.ToList(),
+            HostPermissions = info.HostPermissions.ToList(),
+            OptionalHostPermissions = info.OptionalHostPermissions.ToList()
         };
         _manifest.Extensions.Add(entry);
         _settings.SaveManifest(_manifest);

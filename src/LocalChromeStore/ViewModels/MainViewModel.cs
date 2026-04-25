@@ -53,6 +53,8 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand RemoveExtraOwnerCommand { get; }
     public ICommand OpenBrowserExtensionsPageCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
+    public ICommand ExportEnvironmentCommand { get; }
+    public ICommand ImportEnvironmentCommand { get; }
     public ICommand CopyLaunchArgumentsCommand { get; }
 
     public MainViewModel()
@@ -94,6 +96,8 @@ public sealed class MainViewModel : ViewModelBase
         RemoveExtraOwnerCommand = new RelayCommand(o => RemoveExtraOwner(o as string ?? SelectedExtraOwner), o => (o as string ?? SelectedExtraOwner) is { Length: > 0 });
         OpenBrowserExtensionsPageCommand = new RelayCommand(_ => OpenBrowserExtensionsPage(), _ => SelectedBrowser != null);
         ExportDiagnosticsCommand = new RelayCommand(_ => ExportDiagnostics());
+        ExportEnvironmentCommand = new RelayCommand(_ => ExportEnvironment());
+        ImportEnvironmentCommand = new AsyncRelayCommand(_ => ImportEnvironmentAsync(), _ => !Busy);
         CopyLaunchArgumentsCommand = new RelayCommand(_ => CopyLaunchArguments(), _ => SelectedBrowser != null);
 
         DetectBrowsers();
@@ -485,6 +489,7 @@ public sealed class MainViewModel : ViewModelBase
         _settings.ExtraOwners = ExtraOwners.ToList();
         _settingsService.Save(_settings);
         OnPropertyChanged(nameof(TopicFilter));
+        SyncSettingsInputs();
         Log("Settings saved locally.");
         StatusText = "Settings saved locally.";
         return true;
@@ -642,6 +647,150 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    private void ExportEnvironment()
+    {
+        var defaultName = $"LocalChromeStore-environment-{DateTime.Now:yyyy-MM-dd-HHmm}.json";
+        var dlg = new SaveFileDialog
+        {
+            FileName = defaultName,
+            DefaultExt = ".json",
+            Filter = "LocalChromeStore environment (*.json)|*.json|All files (*.*)|*.*",
+            InitialDirectory = _settingsService.SettingsDir
+        };
+        var owner = Application.Current?.MainWindow;
+        var result = owner != null ? dlg.ShowDialog(owner) : dlg.ShowDialog();
+        if (result != true) return;
+
+        try
+        {
+            var manifest = EnvironmentManifestService.Create(_settings, _extensions.Installed);
+            EnvironmentManifestService.Save(dlg.FileName, manifest);
+            StatusText = $"Environment exported to {dlg.FileName}.";
+            Log($"Exported environment manifest with {manifest.Extensions.Count} extension(s) to {dlg.FileName}.");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Environment export failed: {ex.Message}";
+            Log($"! Environment export failed: {ex.Message}");
+        }
+    }
+
+    private async Task ImportEnvironmentAsync()
+    {
+        var dlg = new OpenFileDialog
+        {
+            DefaultExt = ".json",
+            Filter = "LocalChromeStore environment (*.json)|*.json|All files (*.*)|*.*",
+            InitialDirectory = _settingsService.SettingsDir,
+            CheckFileExists = true
+        };
+        var owner = Application.Current?.MainWindow;
+        var result = owner != null ? dlg.ShowDialog(owner) : dlg.ShowDialog();
+        if (result != true) return;
+
+        EnvironmentManifest manifest;
+        try
+        {
+            manifest = EnvironmentManifestService.Load(dlg.FileName);
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Environment import failed: {ex.Message}";
+            Log($"! Environment import failed: {ex.Message}");
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            $"Import {manifest.Extensions.Count} extension(s) from this environment manifest?\n\nLocalChromeStore will update discovery settings, refresh GitHub, and install any matching release assets that are missing or outdated. Existing local installs are not removed.",
+            "Import environment",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes) return;
+
+        Busy = true;
+        try
+        {
+            StatusText = "Importing environment...";
+            _settings = EnvironmentManifestService.ApplySettings(_settings, manifest);
+            _settingsService.Save(_settings);
+            SyncSettingsInputs();
+            ReloadExtraOwnersFromSettings();
+            Log($"Imported environment settings from {dlg.FileName}.");
+
+            await RefreshCatalogForImportAsync();
+            await InstallEnvironmentTargetsAsync(manifest);
+            await RefreshCatalogForImportAsync();
+
+            StatusText = $"Environment import complete: {manifest.Extensions.Count} target extension(s) processed.";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Environment import failed: {ex.Message}";
+            Log($"! Environment import failed: {ex}");
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RefreshCatalogForImportAsync()
+    {
+        StatusText = "Refreshing catalog for import...";
+        var infos = await _github.DiscoverAsync(_settings, new Progress<string>(Log));
+        Extensions.Clear();
+        foreach (var info in infos)
+        {
+            Extensions.Add(new ExtensionCardViewModel(
+                info, _extensions, _github, _settingsService, Log, RefreshAfterChange, HideExtension));
+        }
+        RefreshExtensionView();
+        RefreshMetrics();
+        ApplyServiceState(_github.LastState, infos.Count);
+    }
+
+    private async Task InstallEnvironmentTargetsAsync(EnvironmentManifest manifest)
+    {
+        var cards = Extensions.ToDictionary(c => c.Repo, StringComparer.OrdinalIgnoreCase);
+        var installed = 0;
+        var skipped = 0;
+        var missing = 0;
+        foreach (var target in manifest.Extensions)
+        {
+            if (_extensions.Find(target.RepoOwner, target.RepoName) is { } existing
+                && existing.Version.Equals(target.Version, StringComparison.OrdinalIgnoreCase))
+            {
+                skipped++;
+                Log($"Import skip: {target.Key} is already installed at {target.Version}.");
+                continue;
+            }
+
+            if (!cards.TryGetValue(target.Key, out var card))
+            {
+                missing++;
+                Log($"! Import missing: {target.Key} was not returned by current GitHub discovery.");
+                continue;
+            }
+
+            if (!card.HasAsset)
+            {
+                missing++;
+                Log($"! Import missing asset: {target.Key} has no installable ZIP/CRX release asset.");
+                continue;
+            }
+
+            if (!card.Version.Equals(target.Version, StringComparison.OrdinalIgnoreCase))
+                Log($"Import version note: {target.Key} requested {target.Version}; installing current catalog version {card.Version}.");
+
+            await _extensions.InstallAsync(card.Info, new Progress<string>(Log));
+            installed++;
+        }
+
+        _extensions.Reload();
+        Log($"Environment import summary: {installed} installed, {skipped} already current, {missing} missing.");
+        RefreshAfterChange();
+    }
+
     private string BuildDiagnosticsBundle()
     {
         var sb = new StringBuilder();
@@ -688,6 +837,8 @@ public sealed class MainViewModel : ViewModelBase
             sb.AppendLine($"    InstalledAt:      {inst.InstalledAt:yyyy-MM-dd HH:mm:ss zzz}");
             sb.AppendLine($"    InstallPath:      {inst.InstallPath}");
             sb.AppendLine($"    ChecksumVerified: {inst.ChecksumVerified}{(inst.ChecksumVerified ? $" ({inst.ChecksumAlgorithm})" : "")}");
+            sb.AppendLine($"    ManifestVersion:  {(inst.ManifestVersionNumber.HasValue ? "MV" + inst.ManifestVersionNumber : "unknown")}");
+            sb.AppendLine($"    Permissions:      {inst.Permissions.Count + inst.OptionalPermissions.Count} ({inst.HostPermissions.Count + inst.OptionalHostPermissions.Count} host)");
         }
         sb.AppendLine();
 
@@ -726,6 +877,16 @@ public sealed class MainViewModel : ViewModelBase
         foreach (var o in _settings.ExtraOwners.Where(o => !string.IsNullOrWhiteSpace(o)))
             ExtraOwners.Add(o.Trim());
         OnPropertyChanged(nameof(HasExtraOwners));
+    }
+
+    private void SyncSettingsInputs()
+    {
+        GitHubUserInput = _settings.GitHubUser;
+        GitHubTokenInput = _settings.GitHubToken ?? string.Empty;
+        LaunchUrlInput = _settings.LaunchUrl ?? string.Empty;
+        LaunchWithTemporaryProfile = _settings.LaunchWithTemporaryProfile;
+        OnPropertyChanged(nameof(UseTopicFilter));
+        OnPropertyChanged(nameof(TopicFilter));
     }
 
     private void AddExtraOwner()

@@ -6,11 +6,13 @@ All notable changes to LocalChromeStore are documented here. Format roughly foll
 
 ### Added
 - Auditable launch sessions with startup URL, clean temporary Chromium profile mode, and copyable launch command preview.
+- Portable environment export/import for installed extension targets, discovery settings, launch options, and manifest trust snapshots.
 - Focused xUnit test project covering launch argument construction and SHA256 sidecar parsing.
 - Windows CI build/test workflow and Dependabot coverage for NuGet and GitHub Actions.
 
 ### Changed
 - Browser launch argument construction now uses raw `ProcessStartInfo.ArgumentList` values and only quotes the human-readable preview.
+- Installed extension records now persist manifest version, framework, permissions, host permissions, display name, and repo URL for future permission-diff and migration work.
 - README and roadmap now reflect DPAPI token storage, extra-owner UI, trust metadata, launch sessions, and the new quality gate.
 
 ## v0.1.0 — 2026-04-25

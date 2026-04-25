@@ -11,6 +11,14 @@ public sealed class InstalledExtension
     public bool ChecksumVerified { get; set; }
     public string? ChecksumAlgorithm { get; set; }
     public string? ChecksumValue { get; set; }
+    public string? DisplayName { get; set; }
+    public string? RepoUrl { get; set; }
+    public int? ManifestVersionNumber { get; set; }
+    public ExtensionFramework Framework { get; set; } = ExtensionFramework.Unknown;
+    public List<string> Permissions { get; set; } = new();
+    public List<string> OptionalPermissions { get; set; } = new();
+    public List<string> HostPermissions { get; set; } = new();
+    public List<string> OptionalHostPermissions { get; set; } = new();
     public string Key => $"{RepoOwner}/{RepoName}";
 }
 
