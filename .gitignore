@@ -1,0 +1,61 @@
+# Local working notes — never commit
+CLAUDE.md
+CODEX_CHANGELOG.md
+.claude/
+.codex/
+
+# Build output
+bin/
+obj/
+out/
+publish/
+*.user
+*.userprefs
+*.suo
+*.cache
+*.dbmdl
+*.opendb
+*.db
+*.dll.config
+*.pdb
+*.exe.config
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+*.swp
+*.swo
+
+# NuGet
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+.nuget/
+
+# JetBrains / Resharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+# Test results
+TestResults/
+[Tt]est[Rr]esult*/
+*.coverage
+*.coveragexml
+coverage*.json
+coverage*.xml
+
+# Backups
+*.bak
+
+# OS junk
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# Local installer / portable runtime artifacts
+publish-*/
+LocalChromeStore-*/

@@ -1,0 +1,18 @@
+namespace LocalChromeStore.Models;
+
+public sealed class InstalledExtension
+{
+    public required string RepoOwner { get; set; }
+    public required string RepoName { get; set; }
+    public required string Version { get; set; }
+    public required string InstallPath { get; set; }
+    public required string ManifestPath { get; set; }
+    public DateTimeOffset InstalledAt { get; set; }
+    public string Key => $"{RepoOwner}/{RepoName}";
+}
+
+public sealed class InstalledExtensionsManifest
+{
+    public int Version { get; set; } = 1;
+    public List<InstalledExtension> Extensions { get; set; } = new();
+}

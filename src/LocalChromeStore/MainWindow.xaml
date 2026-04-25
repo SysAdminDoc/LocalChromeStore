@@ -1,0 +1,228 @@
+<Window x:Class="LocalChromeStore.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:LocalChromeStore.ViewModels"
+        xmlns:views="clr-namespace:LocalChromeStore.Views"
+        xmlns:conv="clr-namespace:LocalChromeStore.Converters"
+        Title="LocalChromeStore" Height="820" Width="1280"
+        MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterScreen">
+    <Window.DataContext>
+        <vm:MainViewModel />
+    </Window.DataContext>
+    <Window.Resources>
+        <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="180" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="{StaticResource MantleBrush}" Padding="20,16">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="LocalChromeStore" Style="{StaticResource HeadingText}" />
+                    <TextBlock Text="Personal Chromium extension store — sourced from your GitHub releases."
+                               Style="{StaticResource SubtleText}" />
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock VerticalAlignment="Center" Margin="0,0,8,0" Style="{StaticResource SubtleText}">
+                        <Run Text="{Binding AvailableCount, Mode=OneWay}" />
+                        <Run Text=" available • " />
+                        <Run Text="{Binding InstalledCount, Mode=OneWay}" Foreground="{StaticResource GreenBrush}" />
+                        <Run Text=" installed" />
+                    </TextBlock>
+                    <Button Content="Refresh" Command="{Binding RefreshCommand}"
+                            Style="{StaticResource AccentButton}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Toolbar -->
+        <Border Grid.Row="1" Background="{StaticResource BaseBrush}" Padding="20,12"
+                BorderBrush="{StaticResource Surface0Brush}" BorderThickness="0,1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Column="0"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         Tag="Search by name, repo, or description..." MaxWidth="420"
+                         HorizontalAlignment="Left" MinWidth="240" />
+
+                <CheckBox Grid.Column="1" Content="Installed only"
+                          IsChecked="{Binding ShowInstalledOnly}"
+                          VerticalAlignment="Center" Margin="14,0,14,0"
+                          Foreground="{StaticResource SubtextBrush}" />
+
+                <ComboBox Grid.Column="2"
+                          ItemsSource="{Binding Browsers}"
+                          SelectedItem="{Binding SelectedBrowser}"
+                          DisplayMemberPath="DisplayName"
+                          MinWidth="160" Margin="0,0,8,0" />
+
+                <Button Grid.Column="3" Content="Launch"
+                        Command="{Binding LaunchBrowserCommand}"
+                        Style="{StaticResource AccentButton}"
+                        ToolTip="Launches the selected browser with all installed extensions loaded via --load-extension."
+                        Margin="0,0,6,0" />
+
+                <Button Grid.Column="4" Content="Open install dir"
+                        Command="{Binding OpenInstallDirCommand}" Margin="0,0,6,0" />
+
+                <Button Grid.Column="5" Content="Settings" x:Name="SettingsToggleButton"
+                        Click="ToggleSettings_Click" />
+            </Grid>
+        </Border>
+
+        <!-- Settings drawer -->
+        <Border x:Name="SettingsDrawer" Grid.Row="2" Background="{StaticResource MantleBrush}"
+                BorderBrush="{StaticResource Surface0Brush}" BorderThickness="0,0,0,1"
+                Padding="20,16" Visibility="Collapsed" VerticalAlignment="Top">
+            <StackPanel>
+                <TextBlock Text="Discovery sources" FontWeight="SemiBold"
+                           Foreground="{StaticResource MauveBrush}" Margin="0,0,0,8" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                        <TextBlock Text="GitHub user / org:" Style="{StaticResource SubtleText}" Margin="0,0,0,4" />
+                        <TextBox Text="{Binding GitHubUserInput, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Text="GitHub PAT (optional — raises rate limits, allows private repos):"
+                                   Style="{StaticResource SubtleText}" Margin="0,10,0,4" />
+                        <TextBox Text="{Binding GitHubTokenInput, UpdateSourceTrigger=PropertyChanged}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <CheckBox Content="Filter by topic"
+                                  IsChecked="{Binding UseTopicFilter}"
+                                  Foreground="{StaticResource SubtextBrush}" />
+                        <TextBox Text="{Binding TopicFilter, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,6,0,0" IsEnabled="{Binding UseTopicFilter}" />
+                        <TextBlock Style="{StaticResource MuteText}" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Text="When enabled, only repos tagged with this GitHub topic will be shown. Otherwise every repo with a manifest.json or release ZIP/CRX is listed." />
+                        <Button Content="Save settings" Command="{Binding SaveSettingsCommand}"
+                                HorizontalAlignment="Right" Margin="0,12,0,0"
+                                Style="{StaticResource AccentButton}" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Extension grid -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled" Padding="12">
+            <ItemsControl ItemsSource="{Binding ExtensionsView}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <views:ExtensionCardView />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Empty-state overlay -->
+        <Border Grid.Row="2" Background="Transparent" IsHitTestVisible="False">
+            <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center"
+                       Foreground="{StaticResource MuteBrush}" FontSize="14"
+                       TextAlignment="Center" TextWrapping="Wrap" MaxWidth="500">
+                <Run Text="Click " />
+                <Run Text="Refresh" FontWeight="SemiBold" Foreground="{StaticResource MauveBrush}" />
+                <Run Text=" to discover Chrome extensions across your GitHub repos." />
+                <LineBreak /><LineBreak />
+                <Run Text="Repos qualify when their latest release ships a .zip / .crx asset, or they have a manifest.json at the root."
+                     Foreground="{StaticResource SubtextBrush}" />
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding AvailableCount}" Value="0">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </Border>
+
+        <!-- Log header -->
+        <Border Grid.Row="3" Background="{StaticResource MantleBrush}"
+                BorderBrush="{StaticResource Surface0Brush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="Activity log" Foreground="{StaticResource SubtextBrush}"
+                           FontWeight="SemiBold" Margin="20,8,0,8" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="Clear" Command="{Binding ClearLogCommand}"
+                        Style="{StaticResource LinkButton}" Margin="0,0,16,0" />
+            </Grid>
+        </Border>
+
+        <!-- Log -->
+        <Border Grid.Row="4" Background="{StaticResource CrustBrush}" Padding="16,8">
+            <ListBox ItemsSource="{Binding LogLines}"
+                     Background="Transparent" BorderThickness="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     FontFamily="Consolas" FontSize="11"
+                     Foreground="{StaticResource SubtextBrush}"
+                     x:Name="LogList">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Margin" Value="0" />
+                        <Setter Property="BorderThickness" Value="0" />
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+            </ListBox>
+        </Border>
+
+        <!-- Status bar -->
+        <Border Grid.Row="5" Background="{StaticResource CrustBrush}" Padding="16,6"
+                BorderBrush="{StaticResource Surface0Brush}" BorderThickness="0,1,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding StatusText}" Style="{StaticResource SubtleText}" />
+                <TextBlock Grid.Column="1" Style="{StaticResource MuteText}">
+                    <Run Text="LocalChromeStore v0.1.0" />
+                </TextBlock>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

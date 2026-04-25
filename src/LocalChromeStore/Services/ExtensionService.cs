@@ -1,0 +1,224 @@
+using System.IO;
+using System.IO.Compression;
+using LocalChromeStore.Models;
+
+namespace LocalChromeStore.Services;
+
+public sealed class ExtensionService
+{
+    private readonly SettingsService _settings;
+    private readonly GitHubService _github;
+    private InstalledExtensionsManifest _manifest;
+
+    public ExtensionService(SettingsService settings, GitHubService github)
+    {
+        _settings = settings;
+        _github = github;
+        _manifest = settings.LoadManifest();
+    }
+
+    public IReadOnlyList<InstalledExtension> Installed => _manifest.Extensions;
+
+    public InstalledExtension? Find(string repoOwner, string repoName)
+        => _manifest.Extensions.FirstOrDefault(e =>
+            e.RepoOwner.Equals(repoOwner, StringComparison.OrdinalIgnoreCase) &&
+            e.RepoName.Equals(repoName, StringComparison.OrdinalIgnoreCase));
+
+    public async Task<InstalledExtension> InstallAsync(ExtensionInfo info, IProgress<string>? log = null, IProgress<long>? bytes = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(info.AssetUrl))
+            throw new InvalidOperationException("No release asset to install. The repo has no ZIP/CRX in its latest release yet.");
+
+        log?.Report($"Downloading {info.AssetName} ({Format(info.AssetSizeBytes)})...");
+        var data = await _github.DownloadAssetAsync(info.AssetUrl, bytes, ct);
+
+        var version = info.DisplayVersion.Replace('/', '_').Replace('\\', '_');
+        var targetDir = Path.Combine(_settings.ExtensionsRoot, info.RepoOwner, info.RepoName, version);
+
+        // Wipe any prior extraction at the same version path so we start clean.
+        if (Directory.Exists(targetDir))
+        {
+            log?.Report($"Removing previous extraction at {targetDir}");
+            Directory.Delete(targetDir, recursive: true);
+        }
+        Directory.CreateDirectory(targetDir);
+
+        var assetExt = Path.GetExtension(info.AssetName ?? "").ToLowerInvariant();
+        if (assetExt == ".zip")
+        {
+            log?.Report($"Extracting ZIP to {targetDir}");
+            ExtractZip(data, targetDir);
+        }
+        else if (assetExt == ".crx")
+        {
+            log?.Report($"Stripping CRX header and extracting to {targetDir}");
+            ExtractCrx(data, targetDir);
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unsupported asset type: {info.AssetName}");
+        }
+
+        var manifestPath = LocateManifest(targetDir)
+            ?? throw new InvalidOperationException("manifest.json not found in extracted asset.");
+        var extensionRoot = Path.GetDirectoryName(manifestPath)!;
+
+        // Replace any prior install row for this repo.
+        _manifest.Extensions.RemoveAll(e =>
+            e.RepoOwner.Equals(info.RepoOwner, StringComparison.OrdinalIgnoreCase) &&
+            e.RepoName.Equals(info.RepoName, StringComparison.OrdinalIgnoreCase));
+
+        var entry = new InstalledExtension
+        {
+            RepoOwner = info.RepoOwner,
+            RepoName = info.RepoName,
+            Version = info.DisplayVersion,
+            InstallPath = extensionRoot,
+            ManifestPath = manifestPath,
+            InstalledAt = DateTimeOffset.UtcNow
+        };
+        _manifest.Extensions.Add(entry);
+        _settings.SaveManifest(_manifest);
+        PruneOldVersions(info.RepoOwner, info.RepoName, version, log);
+        log?.Report($"Installed {info.DisplayName} v{info.DisplayVersion}");
+        return entry;
+    }
+
+    public void Uninstall(string repoOwner, string repoName, IProgress<string>? log = null)
+    {
+        var entry = Find(repoOwner, repoName);
+        if (entry == null) return;
+
+        var repoDir = Path.Combine(_settings.ExtensionsRoot, repoOwner, repoName);
+        try
+        {
+            if (Directory.Exists(repoDir))
+            {
+                Directory.Delete(repoDir, recursive: true);
+                log?.Report($"Removed {repoDir}");
+            }
+        }
+        catch (Exception ex)
+        {
+            log?.Report($"! Failed to delete {repoDir}: {ex.Message}");
+        }
+
+        _manifest.Extensions.RemoveAll(e =>
+            e.RepoOwner.Equals(repoOwner, StringComparison.OrdinalIgnoreCase) &&
+            e.RepoName.Equals(repoName, StringComparison.OrdinalIgnoreCase));
+        _settings.SaveManifest(_manifest);
+        log?.Report($"Uninstalled {repoOwner}/{repoName}");
+    }
+
+    public void Reload() => _manifest = _settings.LoadManifest();
+
+    private static void ExtractZip(byte[] data, string targetDir)
+    {
+        using var ms = new MemoryStream(data);
+        using var zip = new ZipArchive(ms, ZipArchiveMode.Read);
+        // Detect a single top-level folder so we can flatten — many of the user's
+        // release ZIPs ship as `<repo>-<version>/...`. Skip the wrapper if found.
+        string? wrapper = null;
+        var rootEntries = zip.Entries
+            .Select(e => e.FullName.Replace('\\', '/'))
+            .Where(n => n.Length > 0)
+            .ToList();
+        if (rootEntries.Count > 0)
+        {
+            var firstSegments = rootEntries.Select(n => n.Split('/').First()).Distinct().ToList();
+            if (firstSegments.Count == 1 && rootEntries.All(n => n.StartsWith(firstSegments[0] + "/", StringComparison.Ordinal) || n == firstSegments[0]))
+                wrapper = firstSegments[0];
+        }
+
+        foreach (var entry in zip.Entries)
+        {
+            if (entry.FullName.EndsWith("/", StringComparison.Ordinal) || entry.FullName.EndsWith("\\", StringComparison.Ordinal))
+                continue;
+            var rel = entry.FullName.Replace('\\', '/');
+            if (wrapper != null && rel.StartsWith(wrapper + "/", StringComparison.Ordinal))
+                rel = rel.Substring(wrapper.Length + 1);
+            if (string.IsNullOrEmpty(rel)) continue;
+
+            var dest = Path.GetFullPath(Path.Combine(targetDir, rel));
+            // Zip-slip guard
+            if (!dest.StartsWith(Path.GetFullPath(targetDir) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException($"Refusing to extract path outside target: {entry.FullName}");
+            Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+            using var es = entry.Open();
+            using var fs = File.Create(dest);
+            es.CopyTo(fs);
+        }
+    }
+
+    private static void ExtractCrx(byte[] data, string targetDir)
+    {
+        // CRX2: 'Cr24', version=2, pubkeyLen, sigLen, then ZIP.
+        // CRX3: 'Cr24', version=3, headerLen, then ZIP.
+        if (data.Length < 16 || data[0] != 'C' || data[1] != 'r' || data[2] != '2' || data[3] != '4')
+            throw new InvalidOperationException("Not a valid CRX file (magic mismatch).");
+
+        int version = BitConverter.ToInt32(data, 4);
+        int zipStart;
+        if (version == 2)
+        {
+            int pubKeyLen = BitConverter.ToInt32(data, 8);
+            int sigLen = BitConverter.ToInt32(data, 12);
+            zipStart = 16 + pubKeyLen + sigLen;
+        }
+        else if (version == 3)
+        {
+            int headerLen = BitConverter.ToInt32(data, 8);
+            zipStart = 12 + headerLen;
+        }
+        else throw new InvalidOperationException($"Unsupported CRX version: {version}");
+
+        if (zipStart >= data.Length) throw new InvalidOperationException("CRX header indicates zero-length payload.");
+        var zipBytes = new byte[data.Length - zipStart];
+        Buffer.BlockCopy(data, zipStart, zipBytes, 0, zipBytes.Length);
+        ExtractZip(zipBytes, targetDir);
+    }
+
+    private static string? LocateManifest(string root)
+    {
+        var direct = Path.Combine(root, "manifest.json");
+        if (File.Exists(direct)) return direct;
+        // Search one level deep (handles ZIPs with single wrapper folder we didn't strip).
+        foreach (var sub in Directory.EnumerateDirectories(root))
+        {
+            var nested = Path.Combine(sub, "manifest.json");
+            if (File.Exists(nested)) return nested;
+        }
+        // Fallback: deep search but bounded.
+        return Directory.EnumerateFiles(root, "manifest.json", SearchOption.AllDirectories).FirstOrDefault();
+    }
+
+    private void PruneOldVersions(string owner, string repo, string keepVersion, IProgress<string>? log)
+    {
+        var repoDir = Path.Combine(_settings.ExtensionsRoot, owner, repo);
+        if (!Directory.Exists(repoDir)) return;
+        foreach (var dir in Directory.EnumerateDirectories(repoDir))
+        {
+            var name = Path.GetFileName(dir);
+            if (name.Equals(keepVersion, StringComparison.OrdinalIgnoreCase)) continue;
+            try
+            {
+                Directory.Delete(dir, recursive: true);
+                log?.Report($"Pruned old version: {name}");
+            }
+            catch (Exception ex)
+            {
+                log?.Report($"! Could not prune {dir}: {ex.Message}");
+            }
+        }
+    }
+
+    private static string Format(long bytes)
+    {
+        if (bytes <= 0) return "?";
+        string[] units = ["B", "KB", "MB", "GB"];
+        double v = bytes;
+        int u = 0;
+        while (v >= 1024 && u < units.Length - 1) { v /= 1024; u++; }
+        return $"{v:0.##} {units[u]}";
+    }
+}
