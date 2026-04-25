@@ -10,16 +10,16 @@ What it claims and delivers:
 
 - GitHub-sourced discovery for a primary owner plus JSON-backed extra owners.
 - Optional topic filtering, optional DPAPI-protected GitHub PAT, release ZIP/CRX detection, and fallback `manifest.json` probing.
-- Manifest enrichment for name, version, description, icon, MV2/MV3, permissions, host permissions, source shape, framework, freshness, and checksum sidecars.
-- Install, uninstall, hidden-repo curation, installed-only filtering, browser detection, browser launch, temporary-profile sessions, startup URLs, copyable launch arguments, export/import environment manifests, settings drawer, and activity log.
+- Manifest enrichment for name, version, description, icon, MV2/MV3, permissions, host permissions, source shape, framework, freshness, update availability, and checksum sidecars.
+- Install, update, update-all, uninstall, hidden-repo curation, installed-only filtering, browser detection, browser launch, temporary-profile sessions, startup URLs, copyable launch arguments, export/import environment manifests, settings drawer, and activity log.
 - Framework-dependent Windows release workflow with ZIP plus SHA256 sidecar.
 - Focused xUnit test project, Windows CI build/test workflow, and Dependabot coverage for NuGet and GitHub Actions.
 
 What is incomplete or stubbed:
 
-- `LaunchBrowserAfterInstall` and `AutoUpdateOnRefresh` are persisted settings without a complete user-facing workflow.
+- Permission diff before update is still not enforced; updates currently replace local copies with the latest installable catalog release asset after the same manifest risk surfacing used for installs.
 - Hidden repos are still restored as a single bulk action rather than through a per-repo management list.
-- Enterprise policy install, CRX3 signing, update XML, and auto-update are roadmap-only.
+- Enterprise policy install, CRX3 signing, update XML, and browser-native hosted auto-update are roadmap-only.
 - Test coverage is still narrow: broader manifest/extraction/version/settings migration cases and UI smoke automation remain open.
 - No permission diff, local source folder source, or named profile/load-set model.
 
@@ -222,6 +222,7 @@ These items should land before the next public feature release because they impr
    - Output: update badges, manual update/update-all, export/import of installed extension environment, and persisted manifest snapshots for future permission diffs.
    - Acceptance: installed version vs latest version is visible; export file can recreate the selected installed set on another machine.
    - 2026-04-25 progress: F038 and F060 groundwork are implemented. Installed records now retain manifest/trust snapshots, and environment JSON export/import can carry installed extension targets, GitHub owner/topic settings, and launch options across machines. Exact historical-version restore and permission-diff enforcement remain open.
+   - 2026-04-25 progress: F011 and F012 are implemented for the local release-asset path. Cards expose update availability, the toolbar has **Update all**, settings now expose launch-after-install and auto-update-on-refresh, and diagnostics include those workflow flags. Permission-diff enforcement before update remains open under F010/F060.
 
 4. **Profiles and better launch sessions**
    - Implement F013, F016, F019, F020.

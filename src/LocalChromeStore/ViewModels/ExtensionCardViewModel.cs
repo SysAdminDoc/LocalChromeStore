@@ -17,6 +17,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     private readonly SettingsService _settings;
     private readonly Action<string> _log;
     private readonly Action _refreshParent;
+    private readonly Func<Task>? _afterInstall;
 
     private bool _busy;
     private string? _busyMessage;
@@ -32,6 +33,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         SettingsService settings,
         Action<string> log,
         Action refreshParent,
+        Func<Task>? afterInstall,
         Action<ExtensionCardViewModel> hideRepository)
     {
         Info = info;
@@ -40,6 +42,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         _settings = settings;
         _log = log;
         _refreshParent = refreshParent;
+        _afterInstall = afterInstall;
         _installed = extensions.Find(info.RepoOwner, info.RepoName);
 
         InstallCommand = new AsyncRelayCommand(InstallAsync, _ => CanInstall);
@@ -238,6 +241,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     private async Task InstallAsync(object? _)
     {
         if (!HasAsset) return;
+        var installed = false;
         Busy = true;
         try
         {
@@ -259,6 +263,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
             BusyMessage = "Installed";
             RaiseAllChanged();
             _refreshParent();
+            installed = true;
         }
         catch (Exception ex)
         {
@@ -268,6 +273,12 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         {
             Busy = false;
             BusyMessage = null;
+        }
+
+        if (installed && _afterInstall is not null)
+        {
+            try { await _afterInstall(); }
+            catch (Exception ex) { _log($"! Post-install action failed for {Repo}: {ex.Message}"); }
         }
     }
 

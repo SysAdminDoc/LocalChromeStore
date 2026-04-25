@@ -62,7 +62,9 @@ public sealed class EnvironmentManifestServiceTests
             GitHubUser = "old",
             GitHubToken = "secret-token",
             PreferredBrowserPath = "C:\\Browser\\chrome.exe",
-            HiddenRepos = ["primary/Imported", "someone/Other"]
+            HiddenRepos = ["primary/Imported", "someone/Other"],
+            LaunchBrowserAfterInstall = true,
+            AutoUpdateOnRefresh = true
         };
         var manifest = new EnvironmentManifest
         {
@@ -95,6 +97,8 @@ public sealed class EnvironmentManifestServiceTests
         Assert.Equal("primary", applied.GitHubUser);
         Assert.Equal("secret-token", applied.GitHubToken);
         Assert.Equal("C:\\Browser\\chrome.exe", applied.PreferredBrowserPath);
+        Assert.True(applied.LaunchBrowserAfterInstall);
+        Assert.True(applied.AutoUpdateOnRefresh);
         Assert.Equal(["extra"], applied.ExtraOwners);
         Assert.Equal(["someone/Other"], applied.HiddenRepos);
     }

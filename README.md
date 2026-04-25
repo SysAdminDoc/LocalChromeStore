@@ -33,7 +33,7 @@ LocalChromeStore wraps path 2 with a real store UI and (in v0.2.0) wraps path 3 
 
 ---
 
-## Features (v0.1.0)
+## Features
 
 - **GitHub-sourced discovery** — lists every repo with a `manifest.json` or a release ZIP / CRX asset for any user or org
 - **Store-style cards** — extension logo, name, version, description, install / uninstall buttons, link to repo
@@ -42,6 +42,7 @@ LocalChromeStore wraps path 2 with a real store UI and (in v0.2.0) wraps path 3 
 - **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with `--load-extension=...` pointing at every installed extension
 - **Auditable launch sessions** — optional startup URL, clean temporary profile mode, and a copyable launch command preview
 - **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
+- **Update workflow** — update-available badges, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
 - **Search and filter** — by name, repo, or description; toggle to show only installed
 - **Topic filter (optional)** — restrict discovery to repos tagged with a specific GitHub topic (default `chrome-extension`)
 - **Optional GitHub PAT** — unauthenticated GitHub API caps at 60 req/h; a personal access token raises that to 5,000/h, unlocks private repos, and is stored with Windows DPAPI
@@ -83,6 +84,8 @@ dotnet test LocalChromeStore.sln -c Release
 
 Every qualifying repo appears as a card. Click **Install** on a card — LocalChromeStore downloads the latest release ZIP/CRX, extracts it to `%LOCALAPPDATA%\LocalChromeStore\extensions\<owner>\<repo>\<version>\`, and registers it.
 
+When installed extensions have newer catalog versions, their cards show **Update available**. Use the card's update button for one extension, or **Update all** to replace every installable outdated local copy. The Settings drawer also includes optional **Auto-update on refresh** and **Launch browser after install** toggles for a faster dogfood loop.
+
 To load installed extensions into a browser:
 
 1. Pick the browser from the dropdown
@@ -116,7 +119,7 @@ Repos with no manifest and no release ZIP/CRX are skipped — they won't clutter
 
 | Path | Purpose |
 | --- | --- |
-| `%APPDATA%\LocalChromeStore\settings.json` | User settings (GitHub user, DPAPI-protected token, preferred browser, launch options) |
+| `%APPDATA%\LocalChromeStore\settings.json` | User settings (GitHub user, DPAPI-protected token, preferred browser, launch/update options) |
 | `%APPDATA%\LocalChromeStore\installed.json` | Installed-extension manifest |
 | `%LOCALAPPDATA%\LocalChromeStore\extensions\<owner>\<repo>\<version>\` | Extracted extension files |
 | `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\` | Clean temporary Chromium profiles created for launch sessions |
@@ -146,7 +149,7 @@ CRX files are unpacked by stripping the CRX2/CRX3 header and extracting the inne
 See [ROADMAP.md](ROADMAP.md). Highlights:
 
 - **v0.2.0** — Enterprise Policy install path: write `HKLM\Software\Policies\Google\Chrome\ExtensionInstallForcelist` (and Brave / Edge equivalents) plus a self-hosted `update.xml` on GitHub Pages, so extensions auto-install at next browser launch with no `--load-extension` flag and no developer-mode banner
-- **v0.3.0** — Auto-update: on refresh, detect new releases for installed extensions and show an "Update available" badge
+- **v0.3.0** — Update safety: permission diffs before update, stronger manifest/extraction tests, and policy-ready package checks
 - **v0.4.0** — Light theme + accent color picker
 - **v0.5.0** — Local folder source, custom update-feed source, and richer named launch profiles
 

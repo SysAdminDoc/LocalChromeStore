@@ -42,6 +42,7 @@ public sealed class MainViewModel : ViewModelBase
     public ObservableCollection<string> ExtraOwners { get; } = new();
 
     public ICommand RefreshCommand { get; }
+    public ICommand UpdateAllCommand { get; }
     public ICommand SaveSettingsCommand { get; }
     public ICommand SaveAndRefreshCommand { get; }
     public ICommand LaunchBrowserCommand { get; }
@@ -77,6 +78,9 @@ public sealed class MainViewModel : ViewModelBase
         ExtensionsView.SortDescriptions.Add(new SortDescription(nameof(ExtensionCardViewModel.Title), ListSortDirection.Ascending));
 
         RefreshCommand = new AsyncRelayCommand(_ => RefreshAsync(), _ => !Busy);
+        UpdateAllCommand = new AsyncRelayCommand(
+            _ => UpdateAvailableExtensionsAsync(confirmFirst: true, operationName: "Manual update"),
+            _ => !Busy && HasInstallableUpdates);
         SaveSettingsCommand = new RelayCommand(_ => { SaveSettings(); });
         SaveAndRefreshCommand = new AsyncRelayCommand(async _ =>
         {
@@ -123,6 +127,8 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(RefreshButtonLabel));
                 OnPropertyChanged(nameof(CanLaunchBrowser));
                 OnPropertyChanged(nameof(HasHiddenRepos));
+                OnPropertyChanged(nameof(HasInstallableUpdates));
+                OnPropertyChanged(nameof(UpdateAllLabel));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -235,6 +241,34 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    public bool LaunchBrowserAfterInstall
+    {
+        get => _settings.LaunchBrowserAfterInstall;
+        set
+        {
+            if (_settings.LaunchBrowserAfterInstall != value)
+            {
+                _settings.LaunchBrowserAfterInstall = value;
+                _settingsService.Save(_settings);
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool AutoUpdateOnRefresh
+    {
+        get => _settings.AutoUpdateOnRefresh;
+        set
+        {
+            if (_settings.AutoUpdateOnRefresh != value)
+            {
+                _settings.AutoUpdateOnRefresh = value;
+                _settingsService.Save(_settings);
+                OnPropertyChanged();
+            }
+        }
+    }
+
     public bool UseTopicFilter
     {
         get => _settings.UseTopicFilter;
@@ -263,12 +297,22 @@ public sealed class MainViewModel : ViewModelBase
 
     public int InstalledCount => _extensions.Installed.Count;
     public int AvailableCount => Extensions.Count;
+    public int UpdateAvailableCount => Extensions.Count(e => e.IsUpdateAvailable);
+    public int InstallableUpdateCount => Extensions.Count(e => e.IsUpdateAvailable && e.HasAsset);
     public int VisibleCount => ExtensionsView.Cast<object>().Count();
     public int HiddenRepoCount => _settings.HiddenRepos.Count;
     public bool HasInstalledExtensions => InstalledCount > 0;
+    public bool HasUpdates => UpdateAvailableCount > 0;
+    public bool HasInstallableUpdates => InstallableUpdateCount > 0;
     public bool HasHiddenRepos => HiddenRepoCount > 0;
     public bool CanLaunchBrowser => !Busy && SelectedBrowser != null && HasInstalledExtensions;
     public string RefreshButtonLabel => Busy ? "Refreshing..." : "Refresh";
+    public string UpdateAllLabel => InstallableUpdateCount == 0 ? "Update all" : $"Update all ({InstallableUpdateCount})";
+    public string UpdateStatusSummary => UpdateAvailableCount == 0
+        ? "No installed extensions have newer catalog versions."
+        : InstallableUpdateCount == UpdateAvailableCount
+            ? $"{UpdateAvailableCount} installed extension(s) can be updated."
+            : $"{InstallableUpdateCount} of {UpdateAvailableCount} update(s) have installable release assets.";
     public string BrowserSummary => Browsers.Count == 0
         ? "No supported Chromium browser detected."
         : $"{Browsers.Count} browser(s) detected.";
@@ -354,16 +398,16 @@ public sealed class MainViewModel : ViewModelBase
         try
         {
             var logProgress = new Progress<string>(Log);
-            var infos = await _github.DiscoverAsync(_settings, logProgress);
-            Extensions.Clear();
-            foreach (var info in infos)
-            {
-                Extensions.Add(new ExtensionCardViewModel(
-                    info, _extensions, _github, _settingsService, Log, RefreshAfterChange, HideExtension));
-            }
-            RefreshExtensionView();
-            RefreshMetrics();
+            var infos = (await _github.DiscoverAsync(_settings, logProgress)).ToList();
+            RebuildExtensionCards(infos);
             ApplyServiceState(_github.LastState, infos.Count);
+            if (_settings.AutoUpdateOnRefresh && HasInstallableUpdates)
+            {
+                await UpdateAvailableExtensionsAsync(
+                    catalogSnapshot: infos,
+                    confirmFirst: false,
+                    operationName: "Auto-update on refresh");
+            }
         }
         catch (Exception ex)
         {
@@ -377,6 +421,25 @@ public sealed class MainViewModel : ViewModelBase
             Busy = false;
         }
     }
+
+    private void RebuildExtensionCards(IEnumerable<ExtensionInfo> infos)
+    {
+        Extensions.Clear();
+        foreach (var info in infos)
+            Extensions.Add(CreateExtensionCard(info));
+        RefreshExtensionView();
+        RefreshMetrics();
+    }
+
+    private ExtensionCardViewModel CreateExtensionCard(ExtensionInfo info) => new(
+        info,
+        _extensions,
+        _github,
+        _settingsService,
+        Log,
+        RefreshAfterChange,
+        OnExtensionInstalledAsync,
+        HideExtension);
 
     private void ApplyServiceState(GitHubServiceState state, int count)
     {
@@ -485,6 +548,8 @@ public sealed class MainViewModel : ViewModelBase
         _settings.TopicFilter = topic;
         _settings.LaunchUrl = NormalizeLaunchUrl(LaunchUrlInput);
         _settings.LaunchWithTemporaryProfile = LaunchWithTemporaryProfile;
+        _settings.LaunchBrowserAfterInstall = LaunchBrowserAfterInstall;
+        _settings.AutoUpdateOnRefresh = AutoUpdateOnRefresh;
         // Persist current ExtraOwners ordering — already kept in sync with the ObservableCollection.
         _settings.ExtraOwners = ExtraOwners.ToList();
         _settingsService.Save(_settings);
@@ -493,6 +558,92 @@ public sealed class MainViewModel : ViewModelBase
         Log("Settings saved locally.");
         StatusText = "Settings saved locally.";
         return true;
+    }
+
+    private async Task UpdateAvailableExtensionsAsync(
+        IReadOnlyList<ExtensionInfo>? catalogSnapshot = null,
+        bool confirmFirst = false,
+        string operationName = "Update")
+    {
+        var updateCards = Extensions.Where(c => c.IsUpdateAvailable).ToList();
+        var installableCards = updateCards.Where(c => c.HasAsset).ToList();
+        if (updateCards.Count == 0)
+        {
+            StatusText = "No extension updates are available.";
+            Log("No extension updates are available.");
+            return;
+        }
+
+        if (installableCards.Count == 0)
+        {
+            StatusText = "Updates were detected, but none have installable release assets.";
+            Log("Updates were detected, but none have installable release assets.");
+            return;
+        }
+
+        if (confirmFirst)
+        {
+            var confirm = MessageBox.Show(
+                $"Update {installableCards.Count} installed extension(s)?\n\nLocalChromeStore will replace each local copy with the current catalog release asset. Existing installs remain registered if an update fails.",
+                "Update extensions",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+        }
+
+        var catalog = catalogSnapshot ?? Extensions.Select(c => c.Info).ToList();
+        var updated = 0;
+        var failed = 0;
+        var skippedNoAsset = updateCards.Count - installableCards.Count;
+        StatusText = $"{operationName}: updating {installableCards.Count} extension(s)...";
+        Log($"{operationName}: updating {installableCards.Count} extension(s).");
+
+        foreach (var card in installableCards)
+        {
+            try
+            {
+                StatusText = $"Updating {card.Repo}...";
+                await _extensions.InstallAsync(card.Info, new Progress<string>(Log));
+                updated++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                Log($"! {operationName} failed for {card.Repo}: {ex.Message}");
+            }
+        }
+
+        _extensions.Reload();
+        RebuildExtensionCards(catalog);
+        var summary = $"{operationName} summary: {updated} updated, {failed} failed";
+        if (skippedNoAsset > 0)
+            summary += $", {skippedNoAsset} skipped without installable assets";
+        summary += ".";
+        Log(summary);
+        StatusText = summary;
+
+        if (updated > 0)
+            MaybeLaunchAfterInstall($"{updated} updated extension(s)");
+    }
+
+    private Task OnExtensionInstalledAsync()
+    {
+        MaybeLaunchAfterInstall("an installed extension");
+        return Task.CompletedTask;
+    }
+
+    private void MaybeLaunchAfterInstall(string reason)
+    {
+        if (!_settings.LaunchBrowserAfterInstall) return;
+        if (SelectedBrowser is null)
+        {
+            StatusText = "Install complete; launch after install skipped because no browser is selected.";
+            Log("! Launch after install skipped: no supported Chromium browser is selected.");
+            return;
+        }
+
+        Log($"Launch after install is enabled after {reason}.");
+        LaunchBrowser(installedOnly: false);
     }
 
     private void DetectBrowsers()
@@ -738,14 +889,7 @@ public sealed class MainViewModel : ViewModelBase
     {
         StatusText = "Refreshing catalog for import...";
         var infos = await _github.DiscoverAsync(_settings, new Progress<string>(Log));
-        Extensions.Clear();
-        foreach (var info in infos)
-        {
-            Extensions.Add(new ExtensionCardViewModel(
-                info, _extensions, _github, _settingsService, Log, RefreshAfterChange, HideExtension));
-        }
-        RefreshExtensionView();
-        RefreshMetrics();
+        RebuildExtensionCards(infos);
         ApplyServiceState(_github.LastState, infos.Count);
     }
 
@@ -817,6 +961,8 @@ public sealed class MainViewModel : ViewModelBase
         sb.AppendLine($"  Rate limit:    {RateLimitSummary}");
         sb.AppendLine($"  Topic filter:  {(_settings.UseTopicFilter ? _settings.TopicFilter : "(disabled)")}");
         sb.AppendLine($"  Hidden repos:  {_settings.HiddenRepos.Count}");
+        sb.AppendLine($"  Auto-update on refresh: {_settings.AutoUpdateOnRefresh}");
+        sb.AppendLine($"  Launch after install:   {_settings.LaunchBrowserAfterInstall}");
         sb.AppendLine();
 
         sb.AppendLine("== Browsers detected ==");
@@ -885,6 +1031,8 @@ public sealed class MainViewModel : ViewModelBase
         GitHubTokenInput = _settings.GitHubToken ?? string.Empty;
         LaunchUrlInput = _settings.LaunchUrl ?? string.Empty;
         LaunchWithTemporaryProfile = _settings.LaunchWithTemporaryProfile;
+        OnPropertyChanged(nameof(LaunchBrowserAfterInstall));
+        OnPropertyChanged(nameof(AutoUpdateOnRefresh));
         OnPropertyChanged(nameof(UseTopicFilter));
         OnPropertyChanged(nameof(TopicFilter));
     }
@@ -944,8 +1092,14 @@ public sealed class MainViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(InstalledCount));
         OnPropertyChanged(nameof(AvailableCount));
+        OnPropertyChanged(nameof(UpdateAvailableCount));
+        OnPropertyChanged(nameof(InstallableUpdateCount));
         OnPropertyChanged(nameof(HasInstalledExtensions));
+        OnPropertyChanged(nameof(HasUpdates));
+        OnPropertyChanged(nameof(HasInstallableUpdates));
         OnPropertyChanged(nameof(CanLaunchBrowser));
+        OnPropertyChanged(nameof(UpdateAllLabel));
+        OnPropertyChanged(nameof(UpdateStatusSummary));
         OnPropertyChanged(nameof(VisibleCount));
         OnPropertyChanged(nameof(ShowEmptyState));
         OnPropertyChanged(nameof(EmptyStateTitle));
