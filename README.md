@@ -1,9 +1,18 @@
-# LocalChromeStore
+<p align="center">
+  <img src="banner.png" alt="LocalChromeStore" />
+</p>
 
-[![Version](https://img.shields.io/badge/version-0.1.0-cba6f7?style=for-the-badge)](https://github.com/SysAdminDoc/LocalChromeStore/releases)
-[![License](https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge)](https://github.com/SysAdminDoc/LocalChromeStore)
-[![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge)](https://dotnet.microsoft.com/)
+<h1 align="center">
+  <img src="logo.png" alt="" width="36" align="center" />
+  &nbsp;LocalChromeStore
+</h1>
+
+<p align="center">
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.1.0-cba6f7?style=for-the-badge" alt="Version" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
+  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
+</p>
 
 > **A personal store for the Chromium extensions you build yourself.**
 > Lists every extension across your GitHub repos, downloads the latest release ZIP/CRX, and loads them into Chrome / Brave / Edge with a single click. Install. Uninstall. Move on.
