@@ -29,7 +29,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         GitHubService github,
         SettingsService settings,
         Action<string> log,
-        Action refreshParent)
+        Action refreshParent,
+        Action<ExtensionCardViewModel> hideRepository)
     {
         Info = info;
         _extensions = extensions;
@@ -43,6 +44,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         UninstallCommand = new RelayCommand(_ => Uninstall(), _ => IsInstalled && !Busy);
         OpenRepoCommand = new RelayCommand(_ => OpenUrl(Info.RepoUrl));
         OpenInstallDirCommand = new RelayCommand(_ => OpenDir(), _ => CanOpenInstallDir);
+        HideRepositoryCommand = new RelayCommand(_ => hideRepository(this), _ => !Busy);
         _ = LoadIconAsync();
     }
 
@@ -105,6 +107,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public ICommand UninstallCommand { get; }
     public ICommand OpenRepoCommand { get; }
     public ICommand OpenInstallDirCommand { get; }
+    public ICommand HideRepositoryCommand { get; }
 
     private async Task InstallAsync(object? _)
     {

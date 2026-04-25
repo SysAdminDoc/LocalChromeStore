@@ -37,6 +37,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand LaunchBrowserCommand { get; }
     public ICommand LaunchInstalledOnlyCommand { get; }
     public ICommand OpenInstallDirCommand { get; }
+    public ICommand ClearHiddenReposCommand { get; }
     public ICommand ClearLogCommand { get; }
 
     public MainViewModel()
@@ -65,6 +66,11 @@ public sealed class MainViewModel : ViewModelBase
         LaunchBrowserCommand = new RelayCommand(_ => LaunchBrowser(installedOnly: false), _ => CanLaunchBrowser);
         LaunchInstalledOnlyCommand = new RelayCommand(_ => LaunchBrowser(installedOnly: true), _ => SelectedBrowser != null && _extensions.Installed.Any());
         OpenInstallDirCommand = new RelayCommand(_ => OpenInstallDir());
+        ClearHiddenReposCommand = new AsyncRelayCommand(async _ =>
+        {
+            if (ClearHiddenRepos())
+                await RefreshAsync();
+        }, _ => HasHiddenRepos && !Busy);
         ClearLogCommand = new RelayCommand(_ => LogLines.Clear());
 
         DetectBrowsers();
@@ -83,6 +89,7 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(ShowEmptyState));
                 OnPropertyChanged(nameof(RefreshButtonLabel));
                 OnPropertyChanged(nameof(CanLaunchBrowser));
+                OnPropertyChanged(nameof(HasHiddenRepos));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -174,12 +181,17 @@ public sealed class MainViewModel : ViewModelBase
     public int InstalledCount => _extensions.Installed.Count;
     public int AvailableCount => Extensions.Count;
     public int VisibleCount => ExtensionsView.Cast<object>().Count();
+    public int HiddenRepoCount => _settings.HiddenRepos.Count;
     public bool HasInstalledExtensions => InstalledCount > 0;
+    public bool HasHiddenRepos => HiddenRepoCount > 0;
     public bool CanLaunchBrowser => !Busy && SelectedBrowser != null && HasInstalledExtensions;
     public string RefreshButtonLabel => Busy ? "Refreshing..." : "Refresh";
     public string BrowserSummary => Browsers.Count == 0
         ? "No supported Chromium browser detected."
         : $"{Browsers.Count} browser(s) detected.";
+    public string HiddenRepoSummary => HiddenRepoCount == 0
+        ? "No repositories are hidden from discovery."
+        : $"{HiddenRepoCount} hidden repo(s) excluded from refresh.";
     public bool ShowEmptyState => !Busy && VisibleCount == 0;
     public string EmptyStateTitle
     {
@@ -196,7 +208,9 @@ public sealed class MainViewModel : ViewModelBase
         get
         {
             if (AvailableCount == 0)
-                return "Refresh to scan the configured GitHub account for repos with a manifest.json or release ZIP/CRX.";
+                return HiddenRepoCount == 0
+                    ? "Refresh to scan the configured GitHub account for repos with a manifest.json or release ZIP/CRX."
+                    : "Refresh scans the configured GitHub account while keeping hidden repositories excluded.";
             if (ShowInstalledOnly)
                 return "Clear the installed-only filter or install an extension from the full catalog.";
             if (!string.IsNullOrWhiteSpace(SearchText))
@@ -228,7 +242,7 @@ public sealed class MainViewModel : ViewModelBase
             foreach (var info in infos)
             {
                 Extensions.Add(new ExtensionCardViewModel(
-                    info, _extensions, _github, _settingsService, Log, RefreshAfterChange));
+                    info, _extensions, _github, _settingsService, Log, RefreshAfterChange, HideExtension));
             }
             RefreshExtensionView();
             RefreshMetrics();
@@ -294,6 +308,46 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanLaunchBrowser));
     }
 
+    private void HideExtension(ExtensionCardViewModel extension)
+    {
+        var message = extension.IsInstalled
+            ? $"Hide {extension.Repo} from the catalog?\n\nIts installed local copy will remain on disk and can still be launched. Restore hidden repositories from Settings to manage it again."
+            : $"Hide {extension.Repo} from future discovery?\n\nRestore hidden repositories from Settings if you want it back in the catalog.";
+
+        var confirm = MessageBox.Show(
+            message,
+            "Hide repository",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes) return;
+
+        if (!_settings.HiddenRepos.Contains(extension.Repo, StringComparer.OrdinalIgnoreCase))
+        {
+            _settings.HiddenRepos.Add(extension.Repo);
+            _settings.HiddenRepos.Sort(StringComparer.OrdinalIgnoreCase);
+            _settingsService.Save(_settings);
+        }
+
+        Extensions.Remove(extension);
+        RefreshExtensionView();
+        RefreshMetrics();
+        RefreshHiddenRepoProperties();
+        StatusText = $"{extension.Repo} hidden from discovery.";
+        Log($"Hidden {extension.Repo} from discovery.");
+    }
+
+    private bool ClearHiddenRepos()
+    {
+        if (_settings.HiddenRepos.Count == 0) return false;
+        var count = _settings.HiddenRepos.Count;
+        _settings.HiddenRepos.Clear();
+        _settingsService.Save(_settings);
+        RefreshHiddenRepoProperties();
+        StatusText = $"Restored {count} hidden repo(s).";
+        Log($"Restored {count} hidden repo(s) to discovery.");
+        return true;
+    }
+
     private void LaunchBrowser(bool installedOnly)
     {
         if (SelectedBrowser is null) return;
@@ -344,6 +398,15 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowEmptyState));
         OnPropertyChanged(nameof(EmptyStateTitle));
         OnPropertyChanged(nameof(EmptyStateMessage));
+        RefreshHiddenRepoProperties();
+    }
+
+    private void RefreshHiddenRepoProperties()
+    {
+        OnPropertyChanged(nameof(HiddenRepoCount));
+        OnPropertyChanged(nameof(HasHiddenRepos));
+        OnPropertyChanged(nameof(HiddenRepoSummary));
+        CommandManager.InvalidateRequerySuggested();
     }
 }
 

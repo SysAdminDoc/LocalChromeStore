@@ -156,37 +156,55 @@
                        Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
 
             <Grid Grid.Row="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <Button Grid.Column="1"
+                <Button Grid.Row="0"
+                        Grid.Column="1"
                         Content="{Binding InstallButtonLabel}"
                         Style="{StaticResource AccentButton}"
                         Command="{Binding InstallCommand}"
                         IsEnabled="{Binding CanInstall}"
                         MinWidth="96"
                         Margin="0,0,6,0" />
-                <Button Grid.Column="2"
+                <Button Grid.Row="0"
+                        Grid.Column="2"
                         Content="Uninstall"
                         Style="{StaticResource DangerButton}"
                         Command="{Binding UninstallCommand}"
                         Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}"
                         Margin="0,0,6,0" />
-                <Button Grid.Column="3"
+                <Button Grid.Row="0"
+                        Grid.Column="3"
                         Content="Folder"
                         Command="{Binding OpenInstallDirCommand}"
                         IsEnabled="{Binding CanOpenInstallDir}"
-                        Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}"
-                        Margin="0,0,6,0" />
-                <Button Grid.Column="4"
+                        Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}" />
+
+                <StackPanel Grid.Row="1"
+                            Grid.Column="0"
+                            Grid.ColumnSpan="4"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right"
+                            Margin="0,7,0,0">
+                    <Button
+                        Content="Hide"
+                        Style="{StaticResource LinkButton}"
+                        Command="{Binding HideRepositoryCommand}"
+                        Margin="0,0,4,0" />
+                    <Button
                         Content="Repo"
                         Style="{StaticResource LinkButton}"
                         Command="{Binding OpenRepoCommand}" />
+                </StackPanel>
             </Grid>
         </Grid>
     </Border>

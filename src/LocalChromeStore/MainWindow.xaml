@@ -239,6 +239,42 @@
                                    TextWrapping="Wrap"
                                    Margin="0,8,0,0"
                                    Text="When enabled, discovery only shows repos tagged with the selected topic. Otherwise any repo with a manifest.json or release ZIP/CRX can appear." />
+
+                        <Border Background="{StaticResource CrustBrush}"
+                                BorderBrush="{StaticResource Surface0Brush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="12"
+                                Margin="0,14,0,0">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,0">
+                                    <TextBlock Text="Hidden repositories" Style="{StaticResource InputLabel}" />
+                                    <TextBlock Text="{Binding HiddenRepoSummary}"
+                                               Style="{StaticResource MuteText}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button Grid.Row="0"
+                                        Grid.Column="1"
+                                        Content="Restore"
+                                        Command="{Binding ClearHiddenReposCommand}"
+                                        IsEnabled="{Binding HasHiddenRepos}"
+                                        VerticalAlignment="Center" />
+                                <TextBlock Grid.Row="1"
+                                           Grid.ColumnSpan="2"
+                                           Text="Use Hide on a card to keep noisy repos out of future refreshes without changing GitHub or local install files."
+                                           Style="{StaticResource MuteText}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,8,0,0" />
+                            </Grid>
+                        </Border>
                     </StackPanel>
 
                     <StackPanel Grid.Column="2"
