@@ -85,6 +85,28 @@ public sealed class BrowserLauncher
         return Process.Start(psi);
     }
 
+    /// <summary>
+    /// Opens the browser's native extension management page. Edge uses edge://extensions,
+    /// every other Chromium-family browser routes chrome://extensions to its own page.
+    /// </summary>
+    public Process? OpenExtensionsPage(BrowserInfo browser)
+    {
+        var url = ExtensionsPageUrl(browser.Kind);
+        var psi = new ProcessStartInfo
+        {
+            FileName = browser.ExecutablePath,
+            UseShellExecute = false,
+        };
+        psi.ArgumentList.Add(url);
+        return Process.Start(psi);
+    }
+
+    public static string ExtensionsPageUrl(BrowserKind kind) => kind switch
+    {
+        BrowserKind.Edge => "edge://extensions",
+        _ => "chrome://extensions"
+    };
+
     private static string ProgramFiles(string rel) =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), rel);
     private static string ProgramFiles86(string rel) =>

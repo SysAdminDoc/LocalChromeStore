@@ -25,11 +25,17 @@ public sealed class MainViewModel : ViewModelBase
     private BrowserInfo? _selectedBrowser;
     private string _githubUserInput = "";
     private string _githubTokenInput = "";
+    private string _newOwnerInput = "";
+    private string? _selectedExtraOwner;
+    private string _rateLimitSummary = "Rate limit: not yet measured.";
+    private string _githubStatusSummary = "GitHub: ready.";
+    private bool _isDegraded;
 
     public ObservableCollection<ExtensionCardViewModel> Extensions { get; } = new();
     public ICollectionView ExtensionsView { get; }
     public ObservableCollection<string> LogLines { get; } = new();
     public ObservableCollection<BrowserInfo> Browsers { get; } = new();
+    public ObservableCollection<string> ExtraOwners { get; } = new();
 
     public ICommand RefreshCommand { get; }
     public ICommand SaveSettingsCommand { get; }
@@ -39,6 +45,9 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand OpenInstallDirCommand { get; }
     public ICommand ClearHiddenReposCommand { get; }
     public ICommand ClearLogCommand { get; }
+    public ICommand AddExtraOwnerCommand { get; }
+    public ICommand RemoveExtraOwnerCommand { get; }
+    public ICommand OpenBrowserExtensionsPageCommand { get; }
 
     public MainViewModel()
     {
@@ -51,6 +60,7 @@ public sealed class MainViewModel : ViewModelBase
 
         _githubUserInput = _settings.GitHubUser;
         _githubTokenInput = _settings.GitHubToken ?? string.Empty;
+        ReloadExtraOwnersFromSettings();
 
         ExtensionsView = CollectionViewSource.GetDefaultView(Extensions);
         ExtensionsView.Filter = FilterExtension;
@@ -72,6 +82,9 @@ public sealed class MainViewModel : ViewModelBase
                 await RefreshAsync();
         }, _ => HasHiddenRepos && !Busy);
         ClearLogCommand = new RelayCommand(_ => LogLines.Clear());
+        AddExtraOwnerCommand = new RelayCommand(_ => AddExtraOwner(), _ => !string.IsNullOrWhiteSpace(NewOwnerInput));
+        RemoveExtraOwnerCommand = new RelayCommand(o => RemoveExtraOwner(o as string ?? SelectedExtraOwner), o => (o as string ?? SelectedExtraOwner) is { Length: > 0 });
+        OpenBrowserExtensionsPageCommand = new RelayCommand(_ => OpenBrowserExtensionsPage(), _ => SelectedBrowser != null);
 
         DetectBrowsers();
         Log($"LocalChromeStore v{App.ResourceAssembly.GetName().Version} ready.");
@@ -135,6 +148,7 @@ public sealed class MainViewModel : ViewModelBase
                 }
                 OnPropertyChanged(nameof(CanLaunchBrowser));
                 OnPropertyChanged(nameof(BrowserSummary));
+                OnPropertyChanged(nameof(ExtensionsPageLabel));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -150,6 +164,26 @@ public sealed class MainViewModel : ViewModelBase
     {
         get => _githubTokenInput;
         set => SetField(ref _githubTokenInput, value);
+    }
+
+    public string NewOwnerInput
+    {
+        get => _newOwnerInput;
+        set
+        {
+            if (SetField(ref _newOwnerInput, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public string? SelectedExtraOwner
+    {
+        get => _selectedExtraOwner;
+        set
+        {
+            if (SetField(ref _selectedExtraOwner, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
     }
 
     public bool UseTopicFilter
@@ -192,6 +226,24 @@ public sealed class MainViewModel : ViewModelBase
     public string HiddenRepoSummary => HiddenRepoCount == 0
         ? "No repositories are hidden from discovery."
         : $"{HiddenRepoCount} hidden repo(s) excluded from refresh.";
+    public string RateLimitSummary
+    {
+        get => _rateLimitSummary;
+        private set => SetField(ref _rateLimitSummary, value);
+    }
+    public string GitHubStatusSummary
+    {
+        get => _githubStatusSummary;
+        private set => SetField(ref _githubStatusSummary, value);
+    }
+    public bool IsDegraded
+    {
+        get => _isDegraded;
+        private set => SetField(ref _isDegraded, value);
+    }
+    public string ExtensionsPageLabel => SelectedBrowser is null
+        ? "Open browser extensions"
+        : $"Open {BrowserLauncher.ExtensionsPageUrl(SelectedBrowser.Kind)}";
     public bool ShowEmptyState => !Busy && VisibleCount == 0;
     public string EmptyStateTitle
     {
@@ -246,18 +298,96 @@ public sealed class MainViewModel : ViewModelBase
             }
             RefreshExtensionView();
             RefreshMetrics();
-            StatusText = $"Found {Extensions.Count} extension(s) — {InstalledCount} installed.";
-            Log(StatusText);
+            ApplyServiceState(_github.LastState, infos.Count);
         }
         catch (Exception ex)
         {
             StatusText = $"Refresh failed: {ex.Message}";
+            GitHubStatusSummary = "GitHub: refresh failed.";
+            IsDegraded = true;
             Log($"! {ex}");
         }
         finally
         {
             Busy = false;
         }
+    }
+
+    private void ApplyServiceState(GitHubServiceState state, int count)
+    {
+        // Rate-limit visibility — F072.
+        if (state.RateLimit is { Limit: > 0 } rl)
+        {
+            var resetIn = rl.Reset.HasValue ? rl.Reset.Value - DateTimeOffset.Now : TimeSpan.Zero;
+            var resetText = rl.Reset.HasValue && resetIn > TimeSpan.Zero
+                ? $", resets in {Format(resetIn)}"
+                : string.Empty;
+            var auth = rl.Authenticated ? "authenticated" : "anonymous";
+            RateLimitSummary = $"Rate limit: {rl.Remaining}/{rl.Limit} ({auth}{resetText}).";
+        }
+        else
+        {
+            RateLimitSummary = "Rate limit: GitHub did not return rate-limit headers.";
+        }
+
+        // Status / degraded state — F075.
+        switch (state.Status)
+        {
+            case GitHubServiceStatus.Ok:
+                GitHubStatusSummary = $"GitHub: connected ({(state.RateLimit?.Authenticated == true ? "token" : "public")}).";
+                IsDegraded = false;
+                StatusText = $"Found {count} extension(s) — {InstalledCount} installed.";
+                Log(StatusText);
+                break;
+            case GitHubServiceStatus.Empty:
+                GitHubStatusSummary = "GitHub: connected, but no extension-shaped repos were returned.";
+                IsDegraded = false;
+                StatusText = "No extension-shaped repos found for the configured owner(s).";
+                Log(state.Detail ?? StatusText);
+                break;
+            case GitHubServiceStatus.Unauthorized:
+                GitHubStatusSummary = "GitHub: token rejected (401). Falling back to anonymous access.";
+                IsDegraded = true;
+                StatusText = state.Detail ?? "GitHub token rejected.";
+                Log($"! {state.Detail}");
+                break;
+            case GitHubServiceStatus.RateLimited:
+                GitHubStatusSummary = "GitHub: rate limit exceeded.";
+                IsDegraded = true;
+                StatusText = state.Detail ?? "GitHub rate limit exceeded.";
+                Log($"! {StatusText}");
+                break;
+            case GitHubServiceStatus.Forbidden:
+                GitHubStatusSummary = "GitHub: forbidden (403).";
+                IsDegraded = true;
+                StatusText = state.Detail ?? "GitHub denied the request.";
+                Log($"! {StatusText}");
+                break;
+            case GitHubServiceStatus.OwnerNotFound:
+                GitHubStatusSummary = "GitHub: configured owner could not be found.";
+                IsDegraded = true;
+                StatusText = state.Detail ?? "GitHub owner not found.";
+                Log($"! {StatusText}");
+                break;
+            case GitHubServiceStatus.NetworkError:
+                GitHubStatusSummary = "GitHub: network error.";
+                IsDegraded = true;
+                StatusText = state.Detail ?? "Network error contacting GitHub.";
+                Log($"! {StatusText}");
+                break;
+            default:
+                GitHubStatusSummary = "GitHub: unknown state.";
+                IsDegraded = true;
+                StatusText = state.Detail ?? "Unknown GitHub state.";
+                break;
+        }
+    }
+
+    private static string Format(TimeSpan ts)
+    {
+        if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        if (ts.TotalMinutes >= 1) return $"{(int)ts.TotalMinutes}m {ts.Seconds}s";
+        return $"{(int)ts.TotalSeconds}s";
     }
 
     private void RefreshAfterChange()
@@ -288,6 +418,8 @@ public sealed class MainViewModel : ViewModelBase
         _settings.GitHubUser = user;
         _settings.GitHubToken = string.IsNullOrWhiteSpace(GitHubTokenInput) ? null : GitHubTokenInput.Trim();
         _settings.TopicFilter = topic;
+        // Persist current ExtraOwners ordering — already kept in sync with the ObservableCollection.
+        _settings.ExtraOwners = ExtraOwners.ToList();
         _settingsService.Save(_settings);
         OnPropertyChanged(nameof(TopicFilter));
         Log("Settings saved locally.");
@@ -306,6 +438,7 @@ public sealed class MainViewModel : ViewModelBase
         Log(Browsers.Count == 0 ? "! No supported browsers detected." : $"Detected browsers: {string.Join(", ", Browsers.Select(b => b.DisplayName))}");
         OnPropertyChanged(nameof(BrowserSummary));
         OnPropertyChanged(nameof(CanLaunchBrowser));
+        OnPropertyChanged(nameof(ExtensionsPageLabel));
     }
 
     private void HideExtension(ExtensionCardViewModel extension)
@@ -371,6 +504,23 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    private void OpenBrowserExtensionsPage()
+    {
+        if (SelectedBrowser is null) return;
+        try
+        {
+            _launcher.OpenExtensionsPage(SelectedBrowser);
+            var url = BrowserLauncher.ExtensionsPageUrl(SelectedBrowser.Kind);
+            StatusText = $"Opened {url} in {SelectedBrowser.DisplayName}.";
+            Log($"Opened {url} in {SelectedBrowser.DisplayName}.");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Could not open extensions page: {ex.Message}";
+            Log($"! Could not open extensions page: {ex.Message}");
+        }
+    }
+
     private void OpenInstallDir()
     {
         try { Process.Start(new ProcessStartInfo("explorer.exe", $"\"{_settingsService.ExtensionsRoot}\"") { UseShellExecute = true }); }
@@ -378,6 +528,58 @@ public sealed class MainViewModel : ViewModelBase
     }
 
     private void Log(string line) => _logSink.Append(line);
+
+    public bool HasExtraOwners => ExtraOwners.Count > 0;
+
+    private void ReloadExtraOwnersFromSettings()
+    {
+        ExtraOwners.Clear();
+        foreach (var o in _settings.ExtraOwners.Where(o => !string.IsNullOrWhiteSpace(o)))
+            ExtraOwners.Add(o.Trim());
+        OnPropertyChanged(nameof(HasExtraOwners));
+    }
+
+    private void AddExtraOwner()
+    {
+        var owner = NewOwnerInput.Trim();
+        if (string.IsNullOrWhiteSpace(owner)) return;
+        if (string.Equals(owner, _settings.GitHubUser, StringComparison.OrdinalIgnoreCase))
+        {
+            StatusText = $"'{owner}' is already the primary owner.";
+            Log($"! Skipped adding '{owner}': already primary owner.");
+            NewOwnerInput = string.Empty;
+            return;
+        }
+        if (ExtraOwners.Any(o => o.Equals(owner, StringComparison.OrdinalIgnoreCase)))
+        {
+            StatusText = $"'{owner}' is already in the extra owners list.";
+            Log($"! Skipped adding '{owner}': already in extra owners.");
+            NewOwnerInput = string.Empty;
+            return;
+        }
+        ExtraOwners.Add(owner);
+        _settings.ExtraOwners = ExtraOwners.ToList();
+        _settingsService.Save(_settings);
+        OnPropertyChanged(nameof(HasExtraOwners));
+        NewOwnerInput = string.Empty;
+        StatusText = $"Added '{owner}' to extra owners.";
+        Log($"Added extra owner '{owner}'. Run Refresh to discover its repos.");
+    }
+
+    private void RemoveExtraOwner(string? owner)
+    {
+        if (string.IsNullOrWhiteSpace(owner)) return;
+        var match = ExtraOwners.FirstOrDefault(o => o.Equals(owner, StringComparison.OrdinalIgnoreCase));
+        if (match is null) return;
+        ExtraOwners.Remove(match);
+        _settings.ExtraOwners = ExtraOwners.ToList();
+        _settingsService.Save(_settings);
+        OnPropertyChanged(nameof(HasExtraOwners));
+        if (string.Equals(SelectedExtraOwner, match, StringComparison.OrdinalIgnoreCase))
+            SelectedExtraOwner = null;
+        StatusText = $"Removed '{match}' from extra owners.";
+        Log($"Removed extra owner '{match}'.");
+    }
 
     private void RefreshExtensionView()
     {

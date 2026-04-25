@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using LocalChromeStore.Models;
@@ -13,6 +14,8 @@ public sealed class GitHubService
     private readonly HttpClient _http;
     private GitHubClient? _client;
     private string? _activeToken;
+
+    public GitHubServiceState LastState { get; private set; } = new();
 
     public GitHubService(SettingsService settings)
     {
@@ -47,13 +50,71 @@ public sealed class GitHubService
         owners.AddRange(cfg.ExtraOwners.Where(o => !string.IsNullOrWhiteSpace(o)).Select(o => o.Trim()));
         owners = owners.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
+        var state = new GitHubServiceState
+        {
+            Status = GitHubServiceStatus.Ok,
+            RateLimit = new GitHubRateLimitInfo { Authenticated = !string.IsNullOrWhiteSpace(cfg.GitHubToken) }
+        };
+
         var found = new List<ExtensionInfo>();
+        bool anyOwnerSucceeded = false;
         foreach (var owner in owners)
         {
             log?.Report($"Listing repos for {owner}...");
             IReadOnlyList<Repository> repos;
-            try { repos = await client.Repository.GetAllForUser(owner); }
-            catch (Exception ex) { log?.Report($"  ! {owner}: {ex.Message}"); continue; }
+            try
+            {
+                repos = await client.Repository.GetAllForUser(owner);
+                anyOwnerSucceeded = true;
+            }
+            catch (RateLimitExceededException ex)
+            {
+                state.Status = GitHubServiceStatus.RateLimited;
+                state.Detail = $"GitHub API rate limit exceeded for {owner}. Add a personal access token in Settings to raise the limit.";
+                log?.Report($"  ! rate limit hit for {owner}: resets {ex.Reset.LocalDateTime:HH:mm:ss}");
+                continue;
+            }
+            catch (AuthorizationException)
+            {
+                state.Status = GitHubServiceStatus.Unauthorized;
+                state.Detail = "GitHub token rejected. Re-enter the token or clear it to fall back to public access.";
+                log?.Report($"  ! auth rejected for {owner}: token invalid or scopes insufficient");
+                continue;
+            }
+            catch (NotFoundException)
+            {
+                state.Status = GitHubServiceStatus.OwnerNotFound;
+                state.Detail = $"GitHub user or organization '{owner}' could not be found.";
+                log?.Report($"  ! owner not found: {owner}");
+                continue;
+            }
+            catch (ForbiddenException ex)
+            {
+                state.Status = GitHubServiceStatus.Forbidden;
+                state.Detail = $"GitHub denied the request for {owner}: {ex.Message}";
+                log?.Report($"  ! forbidden for {owner}: {ex.Message}");
+                continue;
+            }
+            catch (Octokit.ApiException ex) when (ex.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                state.Status = GitHubServiceStatus.Unauthorized;
+                state.Detail = "GitHub token rejected. Re-enter the token or clear it to fall back to public access.";
+                log?.Report($"  ! auth rejected for {owner}: {ex.Message}");
+                continue;
+            }
+            catch (HttpRequestException ex)
+            {
+                state.Status = GitHubServiceStatus.NetworkError;
+                state.Detail = $"Network error while contacting GitHub: {ex.Message}";
+                log?.Report($"  ! network error for {owner}: {ex.Message}");
+                continue;
+            }
+            catch (Exception ex)
+            {
+                state.Detail ??= ex.Message;
+                log?.Report($"  ! {owner}: {ex.Message}");
+                continue;
+            }
 
             log?.Report($"  {repos.Count} repos returned");
             foreach (var repo in repos)
@@ -73,6 +134,29 @@ public sealed class GitHubService
                 if (info != null) found.Add(info);
             }
         }
+
+        // Capture latest rate-limit data for the UI. Best-effort — never fail discovery on this.
+        try
+        {
+            var rl = await client.RateLimit.GetRateLimits();
+            var core = rl?.Resources?.Core;
+            if (core != null && state.RateLimit != null)
+            {
+                state.RateLimit.Limit = core.Limit;
+                state.RateLimit.Remaining = core.Remaining;
+                state.RateLimit.Reset = core.Reset;
+                state.RateLimit.CapturedAt = DateTimeOffset.Now;
+            }
+        }
+        catch { /* ignore — rate-limit endpoint itself can fail under degraded states */ }
+
+        if (anyOwnerSucceeded && found.Count == 0 && state.Status == GitHubServiceStatus.Ok)
+        {
+            state.Status = GitHubServiceStatus.Empty;
+            state.Detail = "GitHub returned repos, but none of them looked like Chromium extensions.";
+        }
+
+        LastState = state;
         return found;
     }
 
@@ -94,6 +178,7 @@ public sealed class GitHubService
         catch (Exception ex) { log?.Report($"  ! release {repo.Name}: {ex.Message}"); }
 
         ReleaseAsset? asset = null;
+        AssetKind assetKind = AssetKind.None;
         if (release != null)
         {
             asset = release.Assets
@@ -102,9 +187,12 @@ public sealed class GitHubService
                 .OrderByDescending(a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
                 .ThenByDescending(a => a.Size)
                 .FirstOrDefault();
+            if (asset != null)
+                assetKind = asset.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ? AssetKind.Zip : AssetKind.Crx;
         }
 
-        var hasManifest = asset != null || await RepoHasManifestAsync(client, repo, ct);
+        var manifestSourcePath = await FindManifestPathAsync(client, repo, ct);
+        var hasManifest = asset != null || manifestSourcePath != null;
         if (!hasManifest) return null;
 
         var info = new ExtensionInfo
@@ -118,8 +206,18 @@ public sealed class GitHubService
             AssetUrl = asset?.BrowserDownloadUrl,
             AssetName = asset?.Name,
             AssetSizeBytes = asset?.Size ?? 0,
-            PublishedAt = release?.PublishedAt
+            PublishedAt = release?.PublishedAt,
+            AssetKind = assetKind,
+            DiscoverySource = asset != null
+                ? (assetKind == AssetKind.Zip ? DiscoverySource.ReleaseZipAsset : DiscoverySource.ReleaseCrxAsset)
+                : DiscoverySource.RepoManifest,
+            ManifestSourcePath = asset != null ? null : manifestSourcePath,
+            RepoLastPushedAt = repo.PushedAt ?? repo.UpdatedAt,
+            IsArchived = repo.Archived
         };
+
+        info.Freshness = ClassifyFreshness(info.IsArchived, info.RepoLastPushedAt);
+        AddFreshnessWarnings(info, release);
 
         // Try to enrich from manifest.json — best-effort, don't fail discovery if it errors.
         try
@@ -132,12 +230,22 @@ public sealed class GitHubService
             log?.Report($"  ~ manifest probe failed for {repo.Name}: {ex.Message}");
         }
 
+        // Framework detection — best-effort.
+        try
+        {
+            await DetectFrameworkAsync(client, repo, info, ct);
+        }
+        catch (Exception ex)
+        {
+            log?.Report($"  ~ framework probe failed for {repo.Name}: {ex.Message}");
+        }
+
         return info;
     }
 
     private static readonly string[] CommonManifestPaths = ["manifest.json", "extension/manifest.json", "src/manifest.json", "dist/manifest.json", "public/manifest.json"];
 
-    private static async Task<bool> RepoHasManifestAsync(GitHubClient client, Repository repo, CancellationToken ct)
+    private static async Task<string?> FindManifestPathAsync(GitHubClient client, Repository repo, CancellationToken ct)
     {
         foreach (var path in CommonManifestPaths)
         {
@@ -145,12 +253,12 @@ public sealed class GitHubService
             try
             {
                 var contents = await client.Repository.Content.GetAllContents(repo.Owner.Login, repo.Name, path);
-                if (contents.Count > 0) return true;
+                if (contents.Count > 0) return path;
             }
             catch (NotFoundException) { /* try next */ }
-            catch { return false; }
+            catch { return null; }
         }
-        return false;
+        return null;
     }
 
     private async Task<JsonDocument?> TryReadManifestAsync(GitHubClient client, Repository repo, ReleaseAsset? asset, CancellationToken ct)
@@ -199,6 +307,13 @@ public sealed class GitHubService
             info.ManifestVersion = ver.GetString();
         if (root.TryGetProperty("description", out var desc) && desc.ValueKind == JsonValueKind.String)
             info.ManifestDescription = desc.GetString();
+        if (root.TryGetProperty("manifest_version", out var mvEl))
+        {
+            if (mvEl.ValueKind == JsonValueKind.Number && mvEl.TryGetInt32(out var mvNum))
+                info.ManifestVersionNumber = mvNum;
+            else if (mvEl.ValueKind == JsonValueKind.String && int.TryParse(mvEl.GetString(), out var mvParsed))
+                info.ManifestVersionNumber = mvParsed;
+        }
 
         // Icon: pick the largest available
         if (root.TryGetProperty("icons", out var icons) && icons.ValueKind == JsonValueKind.Object)
@@ -217,6 +332,129 @@ public sealed class GitHubService
             if (bestPath != null)
                 info.IconUrl = $"https://raw.githubusercontent.com/{info.RepoOwner}/{info.RepoName}/HEAD/{bestPath.TrimStart('/')}";
         }
+    }
+
+    private async Task DetectFrameworkAsync(GitHubClient client, Repository repo, ExtensionInfo info, CancellationToken ct)
+    {
+        // Strategy 1 (cheap, high signal): read package.json dependencies/devDependencies.
+        var pkg = await TryReadRepoFileAsync(client, repo, "package.json", ct);
+        if (pkg != null)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(pkg, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+                var deps = CollectDependencyNames(doc.RootElement);
+                if (TryClassifyDeps(deps, out var fw, out var evidence))
+                {
+                    info.Framework = fw;
+                    info.FrameworkEvidence = evidence;
+                    return;
+                }
+            }
+            catch { /* malformed package.json — fall through to file probes */ }
+        }
+
+        // Strategy 2 (cheap-ish): probe the canonical config file for each framework.
+        // We only do this when package.json was missing or did not classify.
+        var configProbes = new (string Path, ExtensionFramework Fw, string Evidence)[]
+        {
+            ("wxt.config.ts",    ExtensionFramework.Wxt,         "wxt.config.ts present"),
+            ("wxt.config.js",    ExtensionFramework.Wxt,         "wxt.config.js present"),
+            ("plasmo.config.ts", ExtensionFramework.Plasmo,      "plasmo.config.ts present"),
+            ("plasmo.config.js", ExtensionFramework.Plasmo,      "plasmo.config.js present"),
+            ("extension.config.js", ExtensionFramework.ExtensionJs, "extension.config.js present"),
+            ("extension.config.ts", ExtensionFramework.ExtensionJs, "extension.config.ts present"),
+            ("web-ext-config.js", ExtensionFramework.WebExt,     "web-ext-config.js present")
+        };
+        foreach (var probe in configProbes)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var contents = await client.Repository.Content.GetAllContents(repo.Owner.Login, repo.Name, probe.Path);
+                if (contents.Count > 0)
+                {
+                    info.Framework = probe.Fw;
+                    info.FrameworkEvidence = probe.Evidence;
+                    return;
+                }
+            }
+            catch (NotFoundException) { /* keep probing */ }
+            catch { break; }
+        }
+
+        // Strategy 3: fall back to plain-mv2 / plain-mv3 from manifest_version, if known.
+        if (info.ManifestVersionNumber == 3)
+        {
+            info.Framework = ExtensionFramework.PlainMv3;
+            info.FrameworkEvidence = "manifest_version: 3 (no framework markers found)";
+        }
+        else if (info.ManifestVersionNumber == 2)
+        {
+            info.Framework = ExtensionFramework.PlainMv2;
+            info.FrameworkEvidence = "manifest_version: 2 (no framework markers found)";
+        }
+    }
+
+    private async Task<string?> TryReadRepoFileAsync(GitHubClient client, Repository repo, string path, CancellationToken ct)
+    {
+        try
+        {
+            var contents = await client.Repository.Content.GetAllContents(repo.Owner.Login, repo.Name, path);
+            return contents.FirstOrDefault()?.Content;
+        }
+        catch (NotFoundException) { return null; }
+        catch { return null; }
+    }
+
+    private static IEnumerable<string> CollectDependencyNames(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object) yield break;
+        foreach (var key in new[] { "dependencies", "devDependencies", "peerDependencies", "optionalDependencies" })
+        {
+            if (!root.TryGetProperty(key, out var section) || section.ValueKind != JsonValueKind.Object) continue;
+            foreach (var prop in section.EnumerateObject())
+                yield return prop.Name;
+        }
+    }
+
+    private static bool TryClassifyDeps(IEnumerable<string> deps, out ExtensionFramework fw, out string evidence)
+    {
+        var set = new HashSet<string>(deps, StringComparer.OrdinalIgnoreCase);
+        if (set.Contains("wxt")) { fw = ExtensionFramework.Wxt; evidence = "package.json depends on `wxt`"; return true; }
+        if (set.Contains("plasmo")) { fw = ExtensionFramework.Plasmo; evidence = "package.json depends on `plasmo`"; return true; }
+        if (set.Any(d => d.StartsWith("@extension-js/", StringComparison.OrdinalIgnoreCase) || d.Equals("extension-js", StringComparison.OrdinalIgnoreCase) || d.Equals("extension", StringComparison.OrdinalIgnoreCase)))
+        { fw = ExtensionFramework.ExtensionJs; evidence = "package.json depends on Extension.js packages"; return true; }
+        if (set.Contains("@crxjs/vite-plugin")) { fw = ExtensionFramework.Crxjs; evidence = "package.json depends on `@crxjs/vite-plugin`"; return true; }
+        if (set.Contains("web-ext")) { fw = ExtensionFramework.WebExt; evidence = "package.json depends on `web-ext`"; return true; }
+        fw = ExtensionFramework.Unknown;
+        evidence = string.Empty;
+        return false;
+    }
+
+    private static RepoFreshness ClassifyFreshness(bool archived, DateTimeOffset? lastPushedAt)
+    {
+        if (archived) return RepoFreshness.Archived;
+        if (!lastPushedAt.HasValue) return RepoFreshness.Unknown;
+        var age = DateTimeOffset.Now - lastPushedAt.Value;
+        if (age <= TimeSpan.FromDays(90)) return RepoFreshness.Fresh;
+        if (age <= TimeSpan.FromDays(365)) return RepoFreshness.Aging;
+        return RepoFreshness.Stale;
+    }
+
+    private static void AddFreshnessWarnings(ExtensionInfo info, Release? release)
+    {
+        if (info.IsArchived)
+            info.Warnings.Add("Repository is archived on GitHub.");
+        else if (info.Freshness == RepoFreshness.Stale)
+            info.Warnings.Add("No commits in over a year.");
+        else if (info.Freshness == RepoFreshness.Aging)
+            info.Warnings.Add("No commits in over 90 days.");
+
+        if (release == null)
+            info.Warnings.Add("No GitHub release found — discovery is using repo source files.");
+        else if (release.PublishedAt.HasValue && (DateTimeOffset.Now - release.PublishedAt.Value) > TimeSpan.FromDays(365))
+            info.Warnings.Add("Latest GitHub release is over a year old.");
     }
 
     public async Task<byte[]> DownloadAssetAsync(string url, IProgress<long>? progress = null, CancellationToken ct = default)

@@ -18,6 +18,18 @@ public sealed class ExtensionInfo
     public int Stars { get; set; }
     public string? Topics { get; set; }
 
+    // Catalog explainability metadata
+    public DiscoverySource DiscoverySource { get; set; } = DiscoverySource.Unknown;
+    public string? ManifestSourcePath { get; set; }
+    public AssetKind AssetKind { get; set; } = AssetKind.None;
+    public ExtensionFramework Framework { get; set; } = ExtensionFramework.Unknown;
+    public string? FrameworkEvidence { get; set; }
+    public int? ManifestVersionNumber { get; set; }
+    public DateTimeOffset? RepoLastPushedAt { get; set; }
+    public RepoFreshness Freshness { get; set; } = RepoFreshness.Unknown;
+    public bool IsArchived { get; set; }
+    public List<string> Warnings { get; set; } = new();
+
     public string DisplayName => string.IsNullOrWhiteSpace(ManifestName) ? RepoName : ManifestName!;
     public string DisplayVersion => ManifestVersion ?? LatestVersion ?? "—";
     public string DisplayDescription =>

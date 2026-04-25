@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -76,6 +77,82 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public string InstalledDetail => IsInstalled
         ? $"Local version {_installed!.Version}"
         : "Not installed locally";
+
+    // Catalog explainability ------------------------------------------------
+
+    public string FrameworkBadge => FrameworkLabels.Label(Info.Framework);
+    public bool HasFrameworkBadge => Info.Framework != ExtensionFramework.Unknown;
+
+    public string ManifestVersionBadge => Info.ManifestVersionNumber switch
+    {
+        3 => "MV3",
+        2 => "MV2",
+        _ => string.Empty
+    };
+    public bool HasManifestVersionBadge => Info.ManifestVersionNumber is 2 or 3;
+    public bool IsManifestV2 => Info.ManifestVersionNumber == 2;
+
+    public string FreshnessBadge => Info.Freshness switch
+    {
+        RepoFreshness.Fresh => "Active",
+        RepoFreshness.Aging => "Aging",
+        RepoFreshness.Stale => "Stale",
+        RepoFreshness.Archived => "Archived",
+        _ => string.Empty
+    };
+    public bool HasFreshnessBadge => Info.Freshness is RepoFreshness.Aging or RepoFreshness.Stale or RepoFreshness.Archived;
+    public bool IsFreshnessWarn => Info.Freshness is RepoFreshness.Aging;
+    public bool IsFreshnessAlert => Info.Freshness is RepoFreshness.Stale or RepoFreshness.Archived;
+
+    public string SourceSummary
+    {
+        get
+        {
+            var label = FrameworkLabels.DiscoveryLabel(Info.DiscoverySource);
+            if (Info.DiscoverySource == DiscoverySource.RepoManifest && !string.IsNullOrEmpty(Info.ManifestSourcePath))
+                return $"{label} ({Info.ManifestSourcePath})";
+            return label;
+        }
+    }
+
+    public string WhyShownDetail
+    {
+        get
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine($"Repo: {Repo}");
+            sb.AppendLine($"Discovery source: {FrameworkLabels.DiscoveryLabel(Info.DiscoverySource)}");
+            if (Info.DiscoverySource == DiscoverySource.RepoManifest && !string.IsNullOrEmpty(Info.ManifestSourcePath))
+                sb.AppendLine($"  Manifest path: {Info.ManifestSourcePath}");
+            if (Info.AssetKind != AssetKind.None)
+                sb.AppendLine($"Release asset: {FrameworkLabels.AssetLabel(Info.AssetKind)} ({Info.AssetName})");
+            else
+                sb.AppendLine("Release asset: none — install will be unavailable until the repo publishes a ZIP/CRX.");
+            sb.AppendLine($"Detected framework: {FrameworkLabels.Label(Info.Framework)}");
+            if (!string.IsNullOrEmpty(Info.FrameworkEvidence))
+                sb.AppendLine($"  Evidence: {Info.FrameworkEvidence}");
+            if (Info.ManifestVersionNumber.HasValue)
+                sb.AppendLine($"Manifest version: MV{Info.ManifestVersionNumber.Value}");
+            else
+                sb.AppendLine("Manifest version: unknown (manifest could not be parsed).");
+            if (Info.RepoLastPushedAt.HasValue)
+                sb.AppendLine($"Last push: {Info.RepoLastPushedAt.Value.LocalDateTime:yyyy-MM-dd} ({FrameworkLabels.FreshnessLabel(Info.Freshness)})");
+            if (Info.IsArchived)
+                sb.AppendLine("Archived: yes (read-only on GitHub).");
+            if (Info.Warnings.Count > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("Warnings:");
+                foreach (var w in Info.Warnings) sb.AppendLine($"  • {w}");
+            }
+            return sb.ToString().TrimEnd();
+        }
+    }
+
+    public bool HasWarnings => Info.Warnings.Count > 0;
+    public string WarningSummary => Info.Warnings.Count == 0
+        ? string.Empty
+        : Info.Warnings.Count == 1 ? Info.Warnings[0] : $"{Info.Warnings.Count} warnings — see Why";
 
     public BitmapImage? Icon
     {

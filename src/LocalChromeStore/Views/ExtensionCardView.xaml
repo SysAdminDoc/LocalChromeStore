@@ -7,10 +7,26 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             Width="378" Height="286">
+             Width="378" Height="332">
     <UserControl.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
         <conv:NullToVisibilityConverter x:Key="NullToVis" />
+
+        <Style x:Key="MetaBadge" TargetType="Border">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="7,2" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Background" Value="{StaticResource Surface0Brush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Surface1Brush}" />
+        </Style>
+
+        <Style x:Key="MetaBadgeText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{StaticResource SubtextBrush}" />
+        </Style>
     </UserControl.Resources>
 
     <Border Style="{StaticResource CardBorder}">
@@ -18,13 +34,15 @@
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid Grid.Row="0" Margin="0,0,0,10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -72,7 +90,7 @@
                            VerticalAlignment="Top" />
             </Grid>
 
-            <Grid Grid.Row="1" Margin="0,0,0,10">
+            <Grid Grid.Row="1" Margin="0,0,0,8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
@@ -113,15 +131,83 @@
                            TextTrimming="CharacterEllipsis" />
             </Grid>
 
-            <TextBlock Grid.Row="2"
+            <!-- Catalog explainability badges: framework, manifest version, repo freshness -->
+            <WrapPanel Grid.Row="2" Margin="0,0,0,8">
+                <Border Style="{StaticResource MetaBadge}"
+                        Visibility="{Binding HasFrameworkBadge, Converter={StaticResource BoolToVis}}"
+                        ToolTip="{Binding Info.FrameworkEvidence}">
+                    <TextBlock Style="{StaticResource MetaBadgeText}"
+                               Foreground="{StaticResource MauveBrush}"
+                               Text="{Binding FrameworkBadge}" />
+                </Border>
+                <Border Visibility="{Binding HasManifestVersionBadge, Converter={StaticResource BoolToVis}}"
+                        ToolTip="Manifest version detected from manifest.json">
+                    <Border.Style>
+                        <Style TargetType="Border" BasedOn="{StaticResource MetaBadge}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsManifestV2}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource RedBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding ManifestVersionBadge}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource MetaBadgeText}">
+                                <Setter Property="Foreground" Value="{StaticResource SapphireBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsManifestV2}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource RedBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+                <Border Visibility="{Binding HasFreshnessBadge, Converter={StaticResource BoolToVis}}"
+                        ToolTip="Repository freshness from GitHub push activity">
+                    <Border.Style>
+                        <Style TargetType="Border" BasedOn="{StaticResource MetaBadge}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsFreshnessWarn}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource YellowSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource YellowBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsFreshnessAlert}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource RedBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding FreshnessBadge}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource MetaBadgeText}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFreshnessWarn}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource YellowBrush}" />
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding IsFreshnessAlert}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource RedBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
+            </WrapPanel>
+
+            <TextBlock Grid.Row="3"
                        Text="{Binding Description}"
                        Style="{StaticResource SubtleText}"
                        TextWrapping="Wrap"
-                       MaxHeight="58"
+                       MaxHeight="48"
                        TextTrimming="CharacterEllipsis" />
 
-            <Grid Grid.Row="3" Margin="0,12,0,8">
+            <Grid Grid.Row="4" Margin="0,10,0,0">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
@@ -139,7 +225,15 @@
                            Text="{Binding ReleaseSummary}"
                            Style="{StaticResource MuteText}"
                            Margin="10,0,0,0" />
-                <ProgressBar Grid.Row="1"
+                <TextBlock Grid.Row="1"
+                           Grid.Column="0"
+                           Grid.ColumnSpan="2"
+                           Margin="0,3,0,0"
+                           Text="{Binding SourceSummary}"
+                           Style="{StaticResource MuteText}"
+                           Foreground="{StaticResource OverlayBrush}"
+                           TextTrimming="CharacterEllipsis" />
+                <ProgressBar Grid.Row="2"
                              Grid.Column="0"
                              Grid.ColumnSpan="2"
                              IsIndeterminate="True"
@@ -147,15 +241,24 @@
                              Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
             </Grid>
 
-            <TextBlock Grid.Row="4"
+            <TextBlock Grid.Row="5"
+                       Text="{Binding WarningSummary}"
+                       Foreground="{StaticResource YellowBrush}"
+                       FontSize="11"
+                       FontWeight="SemiBold"
+                       Margin="0,6,0,0"
+                       TextTrimming="CharacterEllipsis"
+                       Visibility="{Binding HasWarnings, Converter={StaticResource BoolToVis}}" />
+
+            <TextBlock Grid.Row="6"
                        Text="{Binding BusyMessage}"
                        Foreground="{StaticResource SapphireBrush}"
                        FontSize="11"
                        FontWeight="SemiBold"
-                       Margin="0,0,0,8"
+                       Margin="0,4,0,0"
                        Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
 
-            <Grid Grid.Row="5">
+            <Grid Grid.Row="7" Margin="0,10,0,0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -195,15 +298,27 @@
                             Orientation="Horizontal"
                             HorizontalAlignment="Right"
                             Margin="0,7,0,0">
-                    <Button
-                        Content="Hide"
-                        Style="{StaticResource LinkButton}"
-                        Command="{Binding HideRepositoryCommand}"
-                        Margin="0,0,4,0" />
-                    <Button
-                        Content="Repo"
-                        Style="{StaticResource LinkButton}"
-                        Command="{Binding OpenRepoCommand}" />
+                    <Button Content="Why"
+                            Style="{StaticResource LinkButton}"
+                            ToolTipService.InitialShowDelay="200"
+                            ToolTipService.ShowDuration="20000"
+                            Margin="0,0,4,0">
+                        <Button.ToolTip>
+                            <ToolTip MaxWidth="420">
+                                <TextBlock Text="{Binding WhyShownDetail}"
+                                           TextWrapping="Wrap"
+                                           FontFamily="Cascadia Mono, Consolas"
+                                           FontSize="11" />
+                            </ToolTip>
+                        </Button.ToolTip>
+                    </Button>
+                    <Button Content="Hide"
+                            Style="{StaticResource LinkButton}"
+                            Command="{Binding HideRepositoryCommand}"
+                            Margin="0,0,4,0" />
+                    <Button Content="Repo"
+                            Style="{StaticResource LinkButton}"
+                            Command="{Binding OpenRepoCommand}" />
                 </StackPanel>
             </Grid>
         </Grid>
