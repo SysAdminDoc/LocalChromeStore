@@ -7,7 +7,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             Width="360" Height="240">
+             Width="378" Height="286">
     <UserControl.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
         <conv:NullToVisibilityConverter x:Key="NullToVis" />
@@ -17,84 +17,159 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- Header: icon + name + version -->
-            <Grid Grid.Row="0" Margin="0,0,0,10">
+            <Grid Grid.Row="0" Margin="0,0,0,12">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <!-- Icon (or placeholder) -->
-                <Border Grid.Column="0" Width="48" Height="48"
-                        CornerRadius="8" Background="{StaticResource Surface0Brush}"
+                <Border Grid.Column="0"
+                        Width="52"
+                        Height="52"
+                        CornerRadius="8"
+                        Background="{StaticResource Surface0Brush}"
+                        BorderBrush="{StaticResource Surface1Brush}"
+                        BorderThickness="1"
                         Margin="0,0,12,0">
                     <Grid>
-                        <Image Source="{Binding Icon}" Stretch="Uniform" Margin="6"
+                        <Image Source="{Binding Icon}"
+                               Stretch="Uniform"
+                               Margin="7"
                                Visibility="{Binding Icon, Converter={StaticResource NullToVis}}" />
-                        <TextBlock Text="◧"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   FontSize="22"
+                        <TextBlock Text="EXT"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
                                    Foreground="{StaticResource MauveBrush}"
                                    Visibility="{Binding Icon, Converter={StaticResource NullToVis}, ConverterParameter=invert}" />
                     </Grid>
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding Title}" FontSize="15" FontWeight="SemiBold"
-                               Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{Binding Repo}" Style="{StaticResource MuteText}"
+                    <TextBlock Text="{Binding Title}"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding Repo}"
+                               Style="{StaticResource MuteText}"
                                TextTrimming="CharacterEllipsis" />
                 </StackPanel>
 
-                <TextBlock Grid.Column="2" Text="{Binding Stars}" Style="{StaticResource SubtleText}"
-                           VerticalAlignment="Top" Foreground="{StaticResource YellowBrush}" />
+                <TextBlock Grid.Column="2"
+                           Text="{Binding Stars}"
+                           Style="{StaticResource BadgeText}"
+                           Foreground="{StaticResource YellowBrush}"
+                           VerticalAlignment="Top" />
             </Grid>
 
-            <!-- Description -->
-            <TextBlock Grid.Row="1" Text="{Binding Description}"
+            <Grid Grid.Row="1" Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        CornerRadius="8"
+                        Padding="9,4"
+                        Margin="0,0,8,0">
+                    <Border.Style>
+                        <Style TargetType="Border">
+                            <Setter Property="Background" Value="{StaticResource SapphireSoftBrush}" />
+                            <Setter Property="BorderBrush" Value="{StaticResource SapphireBrush}" />
+                            <Setter Property="BorderThickness" Value="1" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsInstalled}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource GreenSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource GreenBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsUpdateAvailable}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource YellowSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource YellowBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasAsset}" Value="False">
+                                    <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource RedBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="{Binding StatusBadge}" Style="{StaticResource BadgeText}" />
+                </Border>
+
+                <TextBlock Grid.Column="1"
+                           Text="{Binding InstalledDetail}"
+                           Style="{StaticResource MuteText}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </Grid>
+
+            <TextBlock Grid.Row="2"
+                       Text="{Binding Description}"
                        Style="{StaticResource SubtleText}"
                        TextWrapping="Wrap"
-                       MaxHeight="60"
+                       MaxHeight="58"
                        TextTrimming="CharacterEllipsis" />
 
-            <!-- Status row -->
-            <Grid Grid.Row="2" Margin="0,8,0,8">
+            <Grid Grid.Row="3" Margin="0,12,0,8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding StatusBadge}"
-                           Foreground="{StaticResource GreenBrush}" FontSize="11" FontWeight="SemiBold"
-                           VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="{Binding AssetSummary}" Style="{StaticResource MuteText}"
-                           VerticalAlignment="Center" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="0"
+                           Text="{Binding AssetSummary}"
+                           Style="{StaticResource MuteText}"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="0"
+                           Grid.Column="1"
+                           Text="{Binding ReleaseSummary}"
+                           Style="{StaticResource MuteText}"
+                           Margin="10,0,0,0" />
+                <ProgressBar Grid.Row="1"
+                             Grid.Column="0"
+                             Grid.ColumnSpan="2"
+                             IsIndeterminate="True"
+                             Margin="0,8,0,0"
+                             Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
             </Grid>
 
-            <!-- Action row -->
-            <Grid Grid.Row="3">
+            <TextBlock Grid.Row="4"
+                       Text="{Binding BusyMessage}"
+                       Foreground="{StaticResource SapphireBrush}"
+                       FontSize="11"
+                       FontWeight="SemiBold"
+                       Margin="0,0,0,8"
+                       Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
+
+            <Grid Grid.Row="5">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <!-- Busy indicator OR install/uninstall buttons -->
-                <TextBlock Grid.Column="0" Text="{Binding BusyMessage}"
-                           Foreground="{StaticResource SapphireBrush}"
-                           FontSize="11" VerticalAlignment="Center"
-                           Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
 
                 <Button Grid.Column="1"
                         Content="{Binding InstallButtonLabel}"
                         Style="{StaticResource AccentButton}"
                         Command="{Binding InstallCommand}"
                         IsEnabled="{Binding CanInstall}"
+                        MinWidth="96"
                         Margin="0,0,6,0" />
                 <Button Grid.Column="2"
                         Content="Uninstall"
@@ -103,6 +178,12 @@
                         Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}"
                         Margin="0,0,6,0" />
                 <Button Grid.Column="3"
+                        Content="Folder"
+                        Command="{Binding OpenInstallDirCommand}"
+                        IsEnabled="{Binding CanOpenInstallDir}"
+                        Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}"
+                        Margin="0,0,6,0" />
+                <Button Grid.Column="4"
                         Content="Repo"
                         Style="{StaticResource LinkButton}"
                         Command="{Binding OpenRepoCommand}" />

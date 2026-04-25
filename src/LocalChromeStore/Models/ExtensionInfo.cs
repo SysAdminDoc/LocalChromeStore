@@ -23,5 +23,5 @@ public sealed class ExtensionInfo
     public string DisplayDescription =>
         !string.IsNullOrWhiteSpace(ManifestDescription) ? ManifestDescription! :
         !string.IsNullOrWhiteSpace(RepoDescription) ? RepoDescription! :
-        "(no description)";
+        "No description provided.";
 }

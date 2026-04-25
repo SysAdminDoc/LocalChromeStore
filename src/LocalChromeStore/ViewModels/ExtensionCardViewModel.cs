@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using LocalChromeStore.Models;
@@ -41,7 +42,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         InstallCommand = new AsyncRelayCommand(InstallAsync, _ => CanInstall);
         UninstallCommand = new RelayCommand(_ => Uninstall(), _ => IsInstalled && !Busy);
         OpenRepoCommand = new RelayCommand(_ => OpenUrl(Info.RepoUrl));
-        OpenInstallDirCommand = new RelayCommand(_ => OpenDir(), _ => IsInstalled);
+        OpenInstallDirCommand = new RelayCommand(_ => OpenDir(), _ => CanOpenInstallDir);
         _ = LoadIconAsync();
     }
 
@@ -52,18 +53,27 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public string Repo => $"{Info.RepoOwner}/{Info.RepoName}";
     public string AssetSummary => Info.AssetUrl != null
         ? $"{Info.AssetName} • {FormatSize(Info.AssetSizeBytes)}"
-        : "no release asset";
+        : "Add a ZIP or CRX release asset to enable install.";
+    public string ReleaseSummary => Info.PublishedAt.HasValue
+        ? $"Released {Info.PublishedAt.Value.LocalDateTime:MMM d, yyyy}"
+        : "Release date unavailable";
     public string Stars => Info.Stars > 0 ? $"★ {Info.Stars}" : string.Empty;
     public bool HasAsset => !string.IsNullOrEmpty(Info.AssetUrl);
     public bool IsInstalled => _installed != null;
+    public bool IsUpdateAvailable => IsInstalled
+        && !string.Equals(_installed!.Version, Info.DisplayVersion, StringComparison.OrdinalIgnoreCase);
     public bool CanInstall => HasAsset && !Busy;
+    public bool CanOpenInstallDir => IsInstalled && !Busy;
     public string InstallButtonLabel => IsInstalled
         ? (string.Equals(_installed!.Version, Info.DisplayVersion, StringComparison.OrdinalIgnoreCase)
-            ? "Reinstall" : $"Update → {Info.DisplayVersion}")
-        : "Install";
+            ? "Reinstall" : $"Update to {Info.DisplayVersion}")
+        : (HasAsset ? "Install" : "Unavailable");
     public string StatusBadge => IsInstalled
-        ? $"Installed • v{_installed!.Version}"
-        : (HasAsset ? "Available" : "No release");
+        ? (IsUpdateAvailable ? "Update available" : "Installed")
+        : (HasAsset ? "Ready to install" : "Release needed");
+    public string InstalledDetail => IsInstalled
+        ? $"Local version {_installed!.Version}"
+        : "Not installed locally";
 
     public BitmapImage? Icon
     {
@@ -79,6 +89,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
             if (SetField(ref _busy, value))
             {
                 OnPropertyChanged(nameof(CanInstall));
+                OnPropertyChanged(nameof(CanOpenInstallDir));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -101,7 +112,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         Busy = true;
         try
         {
-            BusyMessage = "Downloading...";
+            BusyMessage = "Preparing download...";
             var bytesProgress = new Progress<long>(b =>
             {
                 if (Info.AssetSizeBytes > 0)
@@ -116,6 +127,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
             });
             var logProgress = new Progress<string>(_log);
             _installed = await _extensions.InstallAsync(Info, logProgress, bytesProgress);
+            BusyMessage = "Installed";
             RaiseAllChanged();
             _refreshParent();
         }
@@ -132,9 +144,17 @@ public sealed class ExtensionCardViewModel : ViewModelBase
 
     private void Uninstall()
     {
+        var confirm = MessageBox.Show(
+            $"Remove the local copy of {Title}?\n\nThe GitHub repository and release assets are not changed.",
+            "Uninstall extension",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes) return;
+
         Busy = true;
         try
         {
+            BusyMessage = "Removing local copy...";
             var logProgress = new Progress<string>(_log);
             _extensions.Uninstall(Info.RepoOwner, Info.RepoName, logProgress);
             _installed = null;
@@ -148,6 +168,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         finally
         {
             Busy = false;
+            BusyMessage = null;
         }
     }
 
@@ -200,6 +221,9 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(InstallButtonLabel));
         OnPropertyChanged(nameof(StatusBadge));
         OnPropertyChanged(nameof(HasAsset));
+        OnPropertyChanged(nameof(IsUpdateAvailable));
+        OnPropertyChanged(nameof(CanOpenInstallDir));
+        OnPropertyChanged(nameof(InstalledDetail));
     }
 
     private static string FormatSize(long bytes)
