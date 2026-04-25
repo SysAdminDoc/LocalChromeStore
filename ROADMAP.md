@@ -4,24 +4,24 @@ Roadmap version: 2026-04-25-strategy-pass. This supersedes the earlier milestone
 
 ## State Of The Repo
 
-LocalChromeStore today is a WPF / .NET 9 Windows desktop app for discovering Chromium extension repositories from GitHub, installing ZIP/CRX release assets into local app data, hiding noisy repos, and launching Chrome-family browsers with `--load-extension`. It uses MVVM without a third-party MVVM toolkit, Octokit 13.0.1 as the only NuGet dependency, JSON files under `%APPDATA%` for settings/install state, and `%LOCALAPPDATA%` for extracted extensions, icons, and logs.
+LocalChromeStore today is a WPF / .NET 9 Windows desktop app for discovering Chromium extension repositories from GitHub, installing ZIP/CRX release assets into local app data, hiding noisy repos, and launching Chrome-family browsers with `--load-extension`. It uses MVVM without a third-party MVVM toolkit, Octokit 13.0.1 and `System.Security.Cryptography.ProtectedData` as runtime NuGet dependencies, JSON files under `%APPDATA%` for settings/install state, and `%LOCALAPPDATA%` for extracted extensions, icons, profiles, and logs.
 
 What it claims and delivers:
 
 - GitHub-sourced discovery for a primary owner plus JSON-backed extra owners.
-- Optional topic filtering, optional GitHub PAT, release ZIP/CRX detection, and fallback `manifest.json` probing.
-- Manifest enrichment for name, version, description, and icon.
-- Install, uninstall, hidden-repo curation, installed-only filtering, browser detection, browser launch, settings drawer, and activity log.
+- Optional topic filtering, optional DPAPI-protected GitHub PAT, release ZIP/CRX detection, and fallback `manifest.json` probing.
+- Manifest enrichment for name, version, description, icon, MV2/MV3, permissions, host permissions, source shape, framework, freshness, and checksum sidecars.
+- Install, uninstall, hidden-repo curation, installed-only filtering, browser detection, browser launch, temporary-profile sessions, startup URLs, copyable launch arguments, settings drawer, and activity log.
 - Framework-dependent Windows release workflow with ZIP plus SHA256 sidecar.
+- Focused xUnit test project, Windows CI build/test workflow, and Dependabot coverage for NuGet and GitHub Actions.
 
 What is incomplete or stubbed:
 
 - `LaunchBrowserAfterInstall` and `AutoUpdateOnRefresh` are persisted settings without a complete user-facing workflow.
 - Extra owners are supported by JSON and discovery code but not editable in the GUI.
 - Enterprise policy install, CRX3 signing, update XML, and auto-update are roadmap-only.
-- No test project, no CI build/test gate beyond release packaging, and no Dependabot/security scanning enabled in the repository.
-- GitHub PAT is hidden in the UI but still persisted as local JSON rather than protected with Windows DPAPI.
-- No manifest risk surface, permission diff, local source folder source, profile/load-set model, or export/import environment manifest.
+- Test coverage is still narrow: broader manifest/extraction/version/settings migration cases and UI smoke automation remain open.
+- No permission diff, local source folder source, named profile/load-set model, or export/import environment manifest.
 
 Philosophy inferred from README, code, and docs:
 
@@ -44,8 +44,8 @@ Local audit notes:
 - Source markers: no source `TODO`, `FIXME`, `HACK`, `XXX`, `@deprecated`, or `NotImplementedException` markers outside documentation examples.
 - GitHub issues for `SysAdminDoc/LocalChromeStore`: none returned.
 - Last 200 commits inspected; repository has 7 commits as of this pass.
-- Dependency audit: `dotnet list package --vulnerable --include-transitive` reported no vulnerable packages; `dotnet list package --outdated --include-transitive` reported Octokit 14.0.0 available over 13.0.1.
-- GitHub Dependabot alerts API returned that alerts are disabled or inaccessible for this repository.
+- Dependency audit: `dotnet list package --vulnerable --include-transitive` reported no vulnerable packages for the app and test project on 2026-04-25; an earlier outdated-package audit reported Octokit 14.0.0 available over 13.0.1.
+- GitHub Dependabot config now exists; repository alert visibility still depends on GitHub-side settings and permissions.
 
 ## External Research Summary
 
@@ -226,11 +226,13 @@ These items should land before the next public feature release because they impr
    - Implement F013, F016, F019, F020.
    - Output: named load sets, temporary browser profile launches, optional launch URLs, launch args preview.
    - Acceptance: user can launch `All installed`, a custom profile, or a clean temporary test session without editing JSON.
+   - 2026-04-25 progress: F016, F019, and F020 are implemented. Launch sessions now support a clean temporary Chromium profile, optional startup URL, and copyable command preview. F013 named load sets remain open.
 
 5. **Engineering quality gate**
    - Implement F076, F081, F084, F085.
    - Output: accessibility sweep, unit tests for manifest/extraction/version/settings migration, PR build/test workflow, Dependabot/security scanning enabled.
    - Acceptance: `dotnet build`, unit tests, and CI gate pass; focus/keyboard/screen-reader labels are audited.
+   - 2026-04-25 progress: F081, F084, and F085 groundwork are implemented with focused launch/checksum tests, a Windows CI build/test workflow, and Dependabot coverage for NuGet and GitHub Actions. F076 accessibility sweep and broader manifest/extraction/version/settings tests remain open.
 
 ## Next
 

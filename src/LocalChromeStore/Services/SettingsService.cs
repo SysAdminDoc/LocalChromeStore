@@ -88,7 +88,9 @@ public sealed class SettingsService
             ExtraOwners = settings.ExtraOwners.ToList(),
             HiddenRepos = settings.HiddenRepos.ToList(),
             LaunchBrowserAfterInstall = settings.LaunchBrowserAfterInstall,
-            AutoUpdateOnRefresh = settings.AutoUpdateOnRefresh
+            AutoUpdateOnRefresh = settings.AutoUpdateOnRefresh,
+            LaunchUrl = string.IsNullOrWhiteSpace(settings.LaunchUrl) ? null : settings.LaunchUrl.Trim(),
+            LaunchWithTemporaryProfile = settings.LaunchWithTemporaryProfile
         };
         var json = JsonSerializer.Serialize(copy, JsonOpts);
         File.WriteAllText(SettingsPath, json);

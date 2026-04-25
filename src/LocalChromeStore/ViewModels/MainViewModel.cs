@@ -32,6 +32,8 @@ public sealed class MainViewModel : ViewModelBase
     private string _rateLimitSummary = "Rate limit: not yet measured.";
     private string _githubStatusSummary = "GitHub: ready.";
     private bool _isDegraded;
+    private string _launchUrlInput = string.Empty;
+    private bool _launchWithTemporaryProfile;
 
     public ObservableCollection<ExtensionCardViewModel> Extensions { get; } = new();
     public ICollectionView ExtensionsView { get; }
@@ -51,6 +53,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand RemoveExtraOwnerCommand { get; }
     public ICommand OpenBrowserExtensionsPageCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
+    public ICommand CopyLaunchArgumentsCommand { get; }
 
     public MainViewModel()
     {
@@ -63,6 +66,8 @@ public sealed class MainViewModel : ViewModelBase
 
         _githubUserInput = _settings.GitHubUser;
         _githubTokenInput = _settings.GitHubToken ?? string.Empty;
+        _launchUrlInput = _settings.LaunchUrl ?? string.Empty;
+        _launchWithTemporaryProfile = _settings.LaunchWithTemporaryProfile;
         ReloadExtraOwnersFromSettings();
 
         ExtensionsView = CollectionViewSource.GetDefaultView(Extensions);
@@ -89,6 +94,7 @@ public sealed class MainViewModel : ViewModelBase
         RemoveExtraOwnerCommand = new RelayCommand(o => RemoveExtraOwner(o as string ?? SelectedExtraOwner), o => (o as string ?? SelectedExtraOwner) is { Length: > 0 });
         OpenBrowserExtensionsPageCommand = new RelayCommand(_ => OpenBrowserExtensionsPage(), _ => SelectedBrowser != null);
         ExportDiagnosticsCommand = new RelayCommand(_ => ExportDiagnostics());
+        CopyLaunchArgumentsCommand = new RelayCommand(_ => CopyLaunchArguments(), _ => SelectedBrowser != null);
 
         DetectBrowsers();
         Log($"LocalChromeStore v{App.ResourceAssembly.GetName().Version} ready.");
@@ -159,6 +165,7 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(CanLaunchBrowser));
                 OnPropertyChanged(nameof(BrowserSummary));
                 OnPropertyChanged(nameof(ExtensionsPageLabel));
+                RefreshLaunchPreviewProperties();
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -193,6 +200,34 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SetField(ref _selectedExtraOwner, value))
                 CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public string LaunchUrlInput
+    {
+        get => _launchUrlInput;
+        set
+        {
+            if (SetField(ref _launchUrlInput, value))
+            {
+                _settings.LaunchUrl = NormalizeLaunchUrl(value);
+                _settingsService.Save(_settings);
+                RefreshLaunchPreviewProperties();
+            }
+        }
+    }
+
+    public bool LaunchWithTemporaryProfile
+    {
+        get => _launchWithTemporaryProfile;
+        set
+        {
+            if (SetField(ref _launchWithTemporaryProfile, value))
+            {
+                _settings.LaunchWithTemporaryProfile = value;
+                _settingsService.Save(_settings);
+                RefreshLaunchPreviewProperties();
+            }
         }
     }
 
@@ -254,6 +289,22 @@ public sealed class MainViewModel : ViewModelBase
     public string ExtensionsPageLabel => SelectedBrowser is null
         ? "Open browser extensions"
         : $"Open {BrowserLauncher.ExtensionsPageUrl(SelectedBrowser.Kind)}";
+    public string LaunchProfileSummary => LaunchWithTemporaryProfile
+        ? "Clean profile: each launch uses a new isolated browser profile under LocalChromeStore."
+        : "Default profile: launch uses the selected browser's normal profile.";
+    public string LaunchPreview
+    {
+        get
+        {
+            if (SelectedBrowser is null) return "Select a supported Chromium browser to preview launch arguments.";
+            var plan = _launcher.BuildLaunchPlan(
+                SelectedBrowser,
+                _extensions.Installed,
+                NormalizeLaunchUrl(LaunchUrlInput),
+                LaunchWithTemporaryProfile);
+            return plan.DisplayCommand;
+        }
+    }
     public bool ShowEmptyState => !Busy && VisibleCount == 0;
     public string EmptyStateTitle
     {
@@ -428,6 +479,8 @@ public sealed class MainViewModel : ViewModelBase
         _settings.GitHubUser = user;
         _settings.GitHubToken = string.IsNullOrWhiteSpace(GitHubTokenInput) ? null : GitHubTokenInput.Trim();
         _settings.TopicFilter = topic;
+        _settings.LaunchUrl = NormalizeLaunchUrl(LaunchUrlInput);
+        _settings.LaunchWithTemporaryProfile = LaunchWithTemporaryProfile;
         // Persist current ExtraOwners ordering — already kept in sync with the ObservableCollection.
         _settings.ExtraOwners = ExtraOwners.ToList();
         _settingsService.Save(_settings);
@@ -449,6 +502,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(BrowserSummary));
         OnPropertyChanged(nameof(CanLaunchBrowser));
         OnPropertyChanged(nameof(ExtensionsPageLabel));
+        RefreshLaunchPreviewProperties();
     }
 
     private void HideExtension(ExtensionCardViewModel extension)
@@ -503,14 +557,38 @@ public sealed class MainViewModel : ViewModelBase
         }
         try
         {
-            _launcher.Launch(SelectedBrowser, set);
+            var launchUrl = NormalizeLaunchUrl(LaunchUrlInput);
+            _settings.LaunchUrl = launchUrl;
+            _settings.LaunchWithTemporaryProfile = LaunchWithTemporaryProfile;
+            _settingsService.Save(_settings);
+
+            var result = _launcher.Launch(SelectedBrowser, set, launchUrl, LaunchWithTemporaryProfile);
             StatusText = $"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s).";
             Log($"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s) loaded.");
+            if (!string.IsNullOrEmpty(result.Plan.TemporaryProfilePath))
+                Log($"Temporary browser profile: {result.Plan.TemporaryProfilePath}");
+            Log($"Launch command: {result.Plan.DisplayCommand}");
         }
         catch (Exception ex)
         {
             StatusText = $"Launch failed: {ex.Message}";
             Log($"! Launch failed: {ex.Message}");
+        }
+    }
+
+    private void CopyLaunchArguments()
+    {
+        if (SelectedBrowser is null) return;
+        try
+        {
+            Clipboard.SetText(LaunchPreview);
+            StatusText = "Launch command copied to clipboard.";
+            Log("Copied launch command to clipboard.");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Could not copy launch command: {ex.Message}";
+            Log($"! Could not copy launch command: {ex.Message}");
         }
     }
 
@@ -597,6 +675,9 @@ public sealed class MainViewModel : ViewModelBase
         foreach (var b in Browsers)
             sb.AppendLine($"  {b.Kind,-8} {b.DisplayName,-18} {b.ExecutablePath}");
         sb.AppendLine($"  Selected:      {SelectedBrowser?.DisplayName ?? "(none)"}");
+        sb.AppendLine($"  Launch URL:    {NormalizeLaunchUrl(LaunchUrlInput) ?? "(none)"}");
+        sb.AppendLine($"  Temp profile:  {LaunchWithTemporaryProfile}");
+        sb.AppendLine($"  Launch command preview: {LaunchPreview}");
         sb.AppendLine();
 
         sb.AppendLine("== Installed extensions ==");
@@ -708,6 +789,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowEmptyState));
         OnPropertyChanged(nameof(EmptyStateTitle));
         OnPropertyChanged(nameof(EmptyStateMessage));
+        RefreshLaunchPreviewProperties();
         RefreshHiddenRepoProperties();
     }
 
@@ -717,6 +799,18 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasHiddenRepos));
         OnPropertyChanged(nameof(HiddenRepoSummary));
         CommandManager.InvalidateRequerySuggested();
+    }
+
+    private void RefreshLaunchPreviewProperties()
+    {
+        OnPropertyChanged(nameof(LaunchPreview));
+        OnPropertyChanged(nameof(LaunchProfileSummary));
+    }
+
+    private static string? NormalizeLaunchUrl(string? value)
+    {
+        var trimmed = value?.Trim();
+        return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
     }
 }
 

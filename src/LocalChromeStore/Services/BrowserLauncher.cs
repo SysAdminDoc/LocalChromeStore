@@ -7,6 +7,7 @@ namespace LocalChromeStore.Services;
 public sealed class BrowserLauncher
 {
     private readonly ExtensionService _extensions;
+    private const string TemporaryProfilePlaceholder = "<new temporary LocalChromeStore profile>";
 
     public BrowserLauncher(ExtensionService extensions)
     {
@@ -62,27 +63,69 @@ public sealed class BrowserLauncher
         }
     }
 
-    public Process? Launch(BrowserInfo browser, IEnumerable<InstalledExtension>? overrideSet = null, string? launchUrl = null)
+    public BrowserLaunchResult Launch(
+        BrowserInfo browser,
+        IEnumerable<InstalledExtension>? overrideSet = null,
+        string? launchUrl = null,
+        bool useTemporaryProfile = false)
     {
-        var set = (overrideSet ?? _extensions.Installed).ToList();
-        var paths = set.Select(e => e.InstallPath).Where(Directory.Exists).ToList();
-        var args = new List<string>();
-        if (paths.Count > 0)
-        {
-            // Quote each path; --load-extension wants a comma-separated list.
-            var joined = string.Join(",", paths);
-            args.Add($"--load-extension=\"{joined}\"");
-        }
-        if (!string.IsNullOrWhiteSpace(launchUrl))
-            args.Add(launchUrl);
+        var temporaryProfilePath = useTemporaryProfile ? CreateTemporaryProfileDirectory() : null;
+        var plan = BuildLaunchPlan(browser, overrideSet ?? _extensions.Installed, launchUrl, useTemporaryProfile, temporaryProfilePath);
 
         var psi = new ProcessStartInfo
         {
             FileName = browser.ExecutablePath,
             UseShellExecute = false,
         };
-        foreach (var a in args) psi.ArgumentList.Add(a);
-        return Process.Start(psi);
+        foreach (var a in plan.Arguments) psi.ArgumentList.Add(a);
+        return new BrowserLaunchResult(Process.Start(psi), plan);
+    }
+
+    public BrowserLaunchPlan BuildLaunchPlan(
+        BrowserInfo browser,
+        IEnumerable<InstalledExtension>? overrideSet = null,
+        string? launchUrl = null,
+        bool useTemporaryProfile = false)
+        => BuildLaunchPlan(browser, overrideSet ?? _extensions.Installed, launchUrl, useTemporaryProfile, temporaryProfilePath: null);
+
+    public static BrowserLaunchPlan BuildLaunchPlan(
+        BrowserInfo browser,
+        IEnumerable<InstalledExtension> installed,
+        string? launchUrl = null,
+        bool useTemporaryProfile = false,
+        string? temporaryProfilePath = null)
+    {
+        var paths = installed
+            .Select(e => e.InstallPath)
+            .Where(p => !string.IsNullOrWhiteSpace(p) && Directory.Exists(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var args = new List<string>();
+        string? profilePath = null;
+        if (useTemporaryProfile)
+        {
+            profilePath = string.IsNullOrWhiteSpace(temporaryProfilePath)
+                ? TemporaryProfilePlaceholder
+                : temporaryProfilePath;
+            args.Add($"--user-data-dir={profilePath}");
+            args.Add("--no-first-run");
+            args.Add("--no-default-browser-check");
+        }
+
+        if (paths.Count > 0)
+            args.Add($"--load-extension={string.Join(",", paths)}");
+
+        if (!string.IsNullOrWhiteSpace(launchUrl))
+            args.Add(launchUrl.Trim());
+
+        return new BrowserLaunchPlan
+        {
+            Browser = browser,
+            Arguments = args,
+            ExtensionCount = paths.Count,
+            TemporaryProfilePath = profilePath
+        };
     }
 
     /// <summary>
@@ -107,6 +150,35 @@ public sealed class BrowserLauncher
         _ => "chrome://extensions"
     };
 
+    public static string FormatCommandLine(string executablePath, IEnumerable<string> arguments)
+    {
+        var parts = new List<string> { QuoteForDisplay(executablePath) };
+        parts.AddRange(arguments.Select(QuoteForDisplay));
+        return string.Join(" ", parts);
+    }
+
+    private static string QuoteForDisplay(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return "\"\"";
+        var escaped = value.Replace("\"", "\\\"");
+        return escaped.Any(char.IsWhiteSpace) || escaped.Contains(',') || escaped.Contains('<') || escaped.Contains('>')
+            ? $"\"{escaped}\""
+            : escaped;
+    }
+
+    private static string CreateTemporaryProfileDirectory()
+    {
+        var root = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "LocalChromeStore",
+            "profiles",
+            "temp");
+        Directory.CreateDirectory(root);
+        var path = Path.Combine(root, DateTime.Now.ToString("yyyyMMdd-HHmmss-ffff"));
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
     private static string ProgramFiles(string rel) =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), rel);
     private static string ProgramFiles86(string rel) =>
@@ -114,3 +186,14 @@ public sealed class BrowserLauncher
     private static string LocalAppData(string rel) =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), rel);
 }
+
+public sealed class BrowserLaunchPlan
+{
+    public required BrowserInfo Browser { get; init; }
+    public required IReadOnlyList<string> Arguments { get; init; }
+    public required int ExtensionCount { get; init; }
+    public string? TemporaryProfilePath { get; init; }
+    public string DisplayCommand => BrowserLauncher.FormatCommandLine(Browser.ExecutablePath, Arguments);
+}
+
+public sealed record BrowserLaunchResult(Process? Process, BrowserLaunchPlan Plan);

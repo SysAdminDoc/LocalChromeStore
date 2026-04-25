@@ -247,7 +247,7 @@ public sealed class ExtensionService
     /// Accepts both single-hash sidecars (`<hash>` or `<hash>  <filename>`) and
     /// multi-line SHA256SUMS-style files where the asset name is the disambiguator.
     /// </summary>
-    private static string? ParseExpectedSha256(string sidecar, string? assetName)
+    internal static string? ParseExpectedSha256(string sidecar, string? assetName)
     {
         // Strip BOM and normalise newlines.
         sidecar = sidecar.Replace("\r\n", "\n");

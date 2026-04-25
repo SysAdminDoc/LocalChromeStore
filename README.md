@@ -40,9 +40,10 @@ LocalChromeStore wraps path 2 with a real store UI and (in v0.2.0) wraps path 3 
 - **One-click install** — downloads the latest release ZIP, extracts to a managed folder, tracks it
 - **One-click uninstall** — wipes the local copy and removes it from the load list
 - **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with `--load-extension=...` pointing at every installed extension
+- **Auditable launch sessions** — optional startup URL, clean temporary profile mode, and a copyable launch command preview
 - **Search and filter** — by name, repo, or description; toggle to show only installed
 - **Topic filter (optional)** — restrict discovery to repos tagged with a specific GitHub topic (default `chrome-extension`)
-- **Optional GitHub PAT** — unauthenticated GitHub API caps at 60 req/h; a personal access token raises that to 5,000/h and unlocks private repos
+- **Optional GitHub PAT** — unauthenticated GitHub API caps at 60 req/h; a personal access token raises that to 5,000/h, unlocks private repos, and is stored with Windows DPAPI
 - **Catppuccin Mocha dark theme** — easy on the eyes; light theme planned
 - **Activity log + crash log** — every install / uninstall / launch is logged in-app and to disk
 - **Async** — every API call, download, and extraction runs off the UI thread
@@ -65,6 +66,7 @@ Requires the .NET 9 Desktop Runtime (the installer prompts if missing).
 git clone https://github.com/SysAdminDoc/LocalChromeStore.git
 cd LocalChromeStore
 dotnet build src/LocalChromeStore/LocalChromeStore.csproj -c Release
+dotnet test LocalChromeStore.sln -c Release
 ./src/LocalChromeStore/bin/Release/net9.0-windows/LocalChromeStore.exe
 ```
 
@@ -83,9 +85,13 @@ Every qualifying repo appears as a card. Click **Install** on a card — LocalCh
 To load installed extensions into a browser:
 
 1. Pick the browser from the dropdown
-2. Click **Launch**
+2. *(Optional)* Enter a startup URL to open after the extensions load
+3. *(Optional)* Enable **Clean temp profile** to launch with an isolated browser profile under `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\`
+4. Click **Launch session**
 
 The browser opens with `--load-extension=<all installed paths>`. The browser will show its standard "developer mode extensions" banner — that is normal for `--load-extension` and not a sign anything is wrong. The extensions persist for that browsing session; close the browser and they unload (which is exactly what you want during dev/test).
+
+Use **Copy args** to copy the exact command LocalChromeStore will run. This is useful when debugging extension load failures or reproducing a launch session outside the app.
 
 ---
 
@@ -107,9 +113,10 @@ Repos with no manifest and no release ZIP/CRX are skipped — they won't clutter
 
 | Path | Purpose |
 | --- | --- |
-| `%APPDATA%\LocalChromeStore\settings.json` | User settings (GitHub user, token, preferred browser) |
+| `%APPDATA%\LocalChromeStore\settings.json` | User settings (GitHub user, DPAPI-protected token, preferred browser, launch options) |
 | `%APPDATA%\LocalChromeStore\installed.json` | Installed-extension manifest |
 | `%LOCALAPPDATA%\LocalChromeStore\extensions\<owner>\<repo>\<version>\` | Extracted extension files |
+| `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\` | Clean temporary Chromium profiles created for launch sessions |
 | `%LOCALAPPDATA%\LocalChromeStore\cache\icons\` | Cached extension icons |
 | `%LOCALAPPDATA%\LocalChromeStore\logs\` | Crash logs |
 
@@ -119,10 +126,10 @@ To start fresh, just delete the two folders.
 
 ## Architecture
 
-WPF on .NET 9 — MVVM, no third-party MVVM toolkit. The whole app is ~1,100 lines of C# + ~500 lines of XAML.
+WPF on .NET 9 — MVVM, no third-party MVVM toolkit.
 
 - `Models/` — plain data records (`ExtensionInfo`, `InstalledExtension`, `BrowserInfo`, `AppSettings`)
-- `Services/` — `GitHubService` (Octokit wrapper, discovery), `ExtensionService` (download, ZIP / CRX extract, install state), `BrowserLauncher` (browser detection + `--load-extension` invocation), `SettingsService` (JSON persistence)
+- `Services/` — `GitHubService` (Octokit wrapper, discovery), `ExtensionService` (download, ZIP / CRX extract, install state), `BrowserLauncher` (browser detection + launch-plan construction), `SettingsService` (JSON persistence + DPAPI token protection)
 - `ViewModels/` — `MainViewModel` orchestrates everything; `ExtensionCardViewModel` per-card state
 - `Views/` — `ExtensionCardView` user control, plus the main window
 - `Themes/` — Catppuccin Mocha resource dictionary
@@ -138,7 +145,7 @@ See [ROADMAP.md](ROADMAP.md). Highlights:
 - **v0.2.0** — Enterprise Policy install path: write `HKLM\Software\Policies\Google\Chrome\ExtensionInstallForcelist` (and Brave / Edge equivalents) plus a self-hosted `update.xml` on GitHub Pages, so extensions auto-install at next browser launch with no `--load-extension` flag and no developer-mode banner
 - **v0.3.0** — Auto-update: on refresh, detect new releases for installed extensions and show an "Update available" badge
 - **v0.4.0** — Light theme + accent color picker
-- **v0.5.0** — Multi-org support UI; right now only one primary user is editable in settings (extras are JSON-only)
+- **v0.5.0** — Local folder source, custom update-feed source, and richer named launch profiles
 
 ---
 
