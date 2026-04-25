@@ -1,230 +1,403 @@
 # Roadmap
 
-## Research findings — projects and ecosystems to learn from
-
-Research date: 2026-04-25. Goal: make LocalChromeStore more capable than a simple GitHub release browser by turning it into a serious private extension catalog, install orchestrator, trust surface, and developer workflow hub.
-
-### 1. Extension build frameworks should become first-class discovery signals
-
-Projects researched:
-
-- [WXT](https://wxt.dev/) / [wxt-dev/wxt](https://github.com/wxt-dev/wxt) — modern open-source WebExtension framework with multi-browser output, MV2/MV3 builds, fast dev mode, file-based entrypoints, zip/publish tooling, and browser startup/profile support.
-- [Plasmo](https://docs.plasmo.com/) / [PlasmoHQ/plasmo](https://github.com/PlasmoHQ/plasmo) — browser extension SDK with TypeScript/React-oriented workflow, live reload/HMR, storage/messaging helpers, and publishing tooling.
-- [Extension.js](https://extension.js.org/) — cross-browser extension framework with browser-specific manifest compilation, predictable target outputs, reload behavior, packaging, Playwright E2E guidance, and security/performance workflow docs.
-- [Mozilla web-ext](https://github.com/mozilla/web-ext) / [web-ext docs](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/) — command-line tool for running, linting, building, and signing WebExtensions; useful even for Chromium-adjacent validation and packaging ideas.
-- [Google Chrome extension samples](https://github.com/GoogleChrome/chrome-extensions-samples) — official sample corpus organized by APIs and functional extension examples.
-
-What to add to LocalChromeStore:
-
-- [ ] Detect project type: WXT, Plasmo, Extension.js, web-ext, plain MV3, plain MV2, packed release only, unpacked local folder.
-- [ ] Show framework badges on cards: `WXT`, `Plasmo`, `Extension.js`, `web-ext`, `MV3`, `MV2`, `CRX`, `ZIP`.
-- [ ] Add a "Build output resolver" that can infer likely artifact directories: `.output/chrome-mv3`, `build/chrome-mv3-prod`, `dist`, `extension-dist`, `public`, `extension`, etc.
-- [ ] Add per-repo build instructions capture: if no release asset exists but a known framework is detected, show the build command and expected output path rather than just "No release".
-- [ ] Add an optional local framework build step for trusted repos: run configured `npm run build`, `pnpm build`, `wxt zip`, `plasmo build`, or `extension build`, then install the generated output.
-- [ ] Add a "Sample mode" using Google Chrome samples as known-good test fixtures for manifest parsing, permission display, icon discovery, and install smoke tests.
-
-Why it matters:
-
-LocalChromeStore should not only consume finished ZIP/CRX releases. It should understand how extension developers actually build projects and bridge the gap from source repo to runnable local extension.
-
-### 2. The install/update path should be modeled on browser-native self-hosting
-
-Projects/docs researched:
-
-- [Chrome self-hosting and update manifest docs](https://developer.chrome.com/docs/extensions/how-to/distribute/host-on-linux) — documents `update_url`, CRX hosting, update manifest XML, extension ID, codebase, version, and same-key update requirements.
-- [Microsoft Edge external auto-update docs](https://learn.microsoft.com/en-us/microsoft-edge/extensions-chromium/update/auto-update) — Edge uses the same update manifest pattern for externally installed extensions.
-- [Microsoft Edge ExtensionInstallForcelist policy](https://learn.microsoft.com/en-us/deployedge/microsoft-edge-browser-policies/extensioninstallforcelist) — policy installs silently, grants permissions implicitly, and users cannot remove force-installed extensions.
-- [Chrome Enterprise ExtensionInstallForcelist policy](https://chromeenterprise.google/policies/extension-install-forcelist/) and [Chrome Windows registry policy docs](https://support.google.com/chrome/a/answer/9131254?hl=en-EN) — confirm the policy/registry direction already planned for v0.2.
-- [ahwayakchih/crx3](https://github.com/ahwayakchih/crx3) / [crx3 npm package](https://www.npmjs.com/package/crx3) — Node CRX3 packaging library for Chromium-family browsers.
-- [crx3 PyPI](https://pypi.org/project/crx3/) — Python CRX packaging/parsing library with private key creation support.
-
-What to add to LocalChromeStore:
-
-- [ ] Treat Enterprise Policy mode as a separate install backend with a visible safety model, not just a setting.
-- [ ] Generate a deterministic extension ID from the signing key and show it before install.
-- [ ] Validate same-key update compatibility before replacing any policy-managed extension.
-- [ ] Generate static `updates.xml` with one `<app>` entry per extension, and a combined catalog XML for multi-extension hosting.
-- [ ] Support two hosting modes: GitHub Pages static hosting and local loopback hosting for private/internal testing.
-- [ ] Add "Policy health" checks: registry path exists, extension ID present, update URL reachable, XML parses, CRX URL reachable, CRX signature/key matches, installed browser reports policy.
-- [ ] Add a rollback path: remove registry policy entry, preserve CRX/update XML artifacts, and optionally reinstall as `Load unpacked`.
-- [ ] Add explicit warning copy for policy mode: force-installed extensions cannot be disabled by normal browser UI and permissions are granted implicitly.
-
-Why it matters:
-
-This is the path that turns the app from a developer convenience wrapper into a real private extension store. The update manifest and signing model need to be treated as product-critical trust infrastructure.
-
-### 3. Extension manager UX should borrow profiles, grouping, and curation
-
-Projects researched:
-
-- [Extensity](https://github.com/sergiokas/Extensity) — open-source Chrome extension manager focused on quickly enabling/disabling extensions, keeping the browser lean, profile switching, always-enabled extensions, and cloud storage sync.
-- [SimpleExtManager ecosystem references](https://www.makeuseof.com/tag/simpleextmanager-extension-manager-for-chrome/) — common extension-manager pattern around fast enable/disable, grouping, extension options/details access, and quick uninstall.
-
-What to add to LocalChromeStore:
-
-- [ ] Profiles / load sets: `Work`, `Testing`, `Debug`, `Minimal`, `All installed`.
-- [ ] Per-profile extension selection and launch command generation.
-- [ ] "Always include" extensions for every launched browser session.
-- [ ] Drag-and-drop order inside each profile, because `--load-extension` order can matter.
-- [ ] Per-card quick actions: pin, hide, add to profile, remove from profile, open options page if detected.
-- [ ] Global actions: launch selected profile, duplicate profile, export profile, import profile.
-- [ ] Browser-session presets: Chrome stable, Chrome for Testing, Edge, Brave, clean temporary profile, persistent test profile.
-
-Why it matters:
-
-Developers do not just install extensions one by one; they switch between project sets, test profiles, and browser targets. Profiles would make LocalChromeStore feel like an extension workstation rather than a static catalog.
-
-### 4. Package-manager and registry projects suggest stronger catalog governance
-
-Projects researched:
-
-- [Eclipse Open VSX](https://github.com/eclipse/openvsx) — open-source extension registry with server, web UI, and CLI publisher; useful reference for a vendor-neutral extension marketplace architecture.
-- [Open VSX public registry/community model](https://www.eclipse.org/community/eclipse_newsletter/2020/march/1.php) — shows the value of a vendor-neutral registry plus publisher workflow.
-- [Windows Package Manager repository submission process](https://learn.microsoft.com/en-us/windows/package-manager/package/repository) — validates manifests and checks packages before they are discoverable by winget.
-- [WinGet manifest authoring docs](https://learn.microsoft.com/en-us/windows/package-manager/package/manifest) — useful model for declarative package metadata and validation.
-
-What to add to LocalChromeStore:
-
-- [ ] Optional `localchromestore.json` catalog manifest in each extension repo for richer metadata: display name, channel, homepage, release asset pattern, build command, output dir, trust notes, screenshots, tags, supported browsers.
-- [ ] Catalog validation before install: manifest schema, release asset checks, SHA256 checksums when available, version consistency, icon validity, update URL sanity.
-- [ ] Publisher/source trust tiers: local repo, configured owner, signed release, verified GitHub release, policy-ready CRX, unknown ZIP.
-- [ ] "Why is this shown?" panel explaining which discovery rule matched: release asset, manifest path, topic, local source, custom feed.
-- [ ] Moderation-like local curation: hidden repos, pinned repos, favorites, allowlist/denylist, stale repo warnings.
-- [ ] Machine-readable export of the whole catalog so LocalChromeStore can become a source for another machine or CI job.
-
-Why it matters:
-
-A league-of-its-own version should feel governed and explainable. Every card should make clear where it came from, why it is trusted, how it updates, and what metadata is missing.
-
-### 5. Trust and security should become a visible product surface
-
-Projects/docs researched:
-
-- [Chrome Web Store best practices](https://developer.chrome.com/docs/webstore/best_practices) — emphasizes Manifest V3, compliance, security, privacy, performance, and testing.
-- [Chrome MV3 security migration guidance](https://developer.chrome.com/docs/extensions/develop/migrate/improve-security) — highlights removing arbitrary string execution, banning remotely hosted code, and tightening CSP.
-- [Chrome permission warning guidance](https://developer.chrome.com/docs/extensions/mv2/permission-warnings) — useful for permission-risk explanations even though the linked page is MV2-era and should be mapped to current MV3 semantics.
-- [Chrome management API docs](https://developer.chrome.com/docs/extensions/reference/api/management) — shows the browser-native concepts users expect around managing installed apps/extensions.
-- [Duo CRXcavator writeup](https://duo.com/resources/infographics/chrome-extension-security-crxcavator) and [ExtensionTotal](https://www.extensiontotal.com/chrome) — examples of extension risk scoring and security posture reporting.
-- [palant/chrome-extension-manifests-dataset](https://github.com/palant/chrome-extension-manifests-dataset) — manifest corpus useful for permission/CSP/query rule ideas and benchmark data.
-
-What to add to LocalChromeStore:
-
-- [ ] Manifest risk panel: permissions, host permissions, optional permissions, externally connectable, content scripts, CSP, background/service worker type, web accessible resources, update URL, minimum Chrome version.
-- [ ] Permission diff on update: new permissions, removed permissions, broader host patterns, CSP weakening, newly added remote endpoints.
-- [ ] Trust summary badge: `Low risk`, `Review`, `High risk`, based on transparent heuristics rather than opaque scoring.
-- [ ] "Why risky?" explanations with actionable language: broad host access, remote code patterns, MV2, unsafe-eval, all_urls, debugger/proxy/downloads/history/tabs permissions.
-- [ ] Security regression gate before install/update when risk increases; allow user override with a clear confirmation.
-- [ ] Source freshness checks: last release date, last commit date, open security advisories if GitHub exposes them, archived repo status, license presence.
-- [ ] Local-only privacy posture: make clear that PAT and installed-extension state remain in local app data unless the user explicitly publishes artifacts.
-
-Why it matters:
-
-The app is installing privileged browser code. Premium polish here is not just visuals; it is giving users confidence, context, and a way to avoid quietly accepting dangerous extension changes.
-
-### 6. Publishing and release automation should be built in, not outsourced mentally
-
-Projects researched:
-
-- [fregante/chrome-webstore-upload-cli](https://github.com/fregante/chrome-webstore-upload-cli) — CLI wrapper for uploading/publishing Chrome Web Store extensions.
-- [Plasmo Browser Platform Publisher / BPP](https://github.com/PlasmoHQ/bpp) — multi-store browser extension publisher.
-- [Plasmo docs](https://docs.plasmo.com/) — frames extension creation, testing, beta distribution, and publishing as one lifecycle.
-
-What to add to LocalChromeStore:
-
-- [ ] Release readiness checklist per repo: manifest version, version bump, icon set, permissions summary, changelog, ZIP/CRX asset present, checksum present.
-- [ ] GitHub release helper: package output, calculate SHA256, create draft release, upload ZIP/CRX/update XML.
-- [ ] Optional multi-store publishing links/integrations: Chrome Web Store, Edge Add-ons, Firefox AMO, without making public store publishing mandatory.
-- [ ] "Dogfood channel" concept: install from latest successful GitHub Actions artifact, prerelease, stable release, or local build.
-- [ ] Staged rollout notes: support beta/test channels before promoting to stable.
-
-Why it matters:
-
-The strongest version of this project owns the whole private-extension lifecycle: discover, build, validate, package, install, update, publish, and rollback.
-
-### 7. Developer workflow should support live test sessions
-
-Projects/docs researched:
-
-- [web-ext run](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/) — starts a browser session, disables auto-updates, and supports extension reload workflows.
-- [WXT browser startup docs](https://wxt.dev/guide/essentials/config/browser-startup.html) — persistent browser profiles and startup configuration for extension development.
-- [Chrome DevTools Protocol](https://chromedevtools.github.io/devtools-protocol/) — automation surface for browser/debug workflows; powerful but should be used carefully.
-- [Chrome extension DevTools extension docs](https://developer.chrome.com/docs/extensions/how-to/devtools/extend-devtools) — reference for extension-specific debugging surfaces.
-
-What to add to LocalChromeStore:
-
-- [ ] Launch with clean temporary profile, persistent per-project profile, or selected existing profile.
-- [ ] Launch with test URL(s) after browser start.
-- [ ] Optional file watcher for local unpacked folders that prompts or triggers session reload.
-- [ ] Capture browser stderr/stdout and extension load errors into LocalChromeStore activity log.
-- [ ] Add a "debug session" panel with browser target, profile path, extension paths, launch args, and quick open to `chrome://extensions`.
-- [ ] Add Chrome for Testing detection as a safer automation target separate from the user's daily browser.
-
-Why it matters:
-
-The current launch flow is useful, but a premium developer tool should reduce the entire edit-build-launch-debug loop, not just open a browser with extensions loaded.
-
-### 8. Competitive positioning: what would make this product feel unique
-
-- A private extension catalog that understands GitHub, local folders, framework outputs, custom feeds, and policy-managed installs.
-- Store-like browsing with package-manager-grade explainability: source, trust tier, risk, version, update channel, install mode.
-- First-class extension profiles for repeatable browser sessions.
-- Policy install/update infrastructure that makes self-hosted CRX deployment approachable on Windows.
-- Permission and manifest diffs that make extension updates safer than a blind reinstall.
-- Integrated release readiness and GitHub release publishing so developers can dogfood their own extensions quickly.
-- Export/importable machine manifests so a fresh Windows machine can recreate the same extension development environment.
-
-## v0.2.0 — Enterprise Policy auto-install (the "real store" mode)
-
-The reason this exists at all. Stock Chromium browsers reject self-signed CRX install via drag-drop with `CRX_REQUIRED_PROOF_MISSING`, but they happily honor `ExtensionInstallForcelist` policy. v0.2.0 wraps that path.
-
-- [ ] Toggle in Settings: **Install mode** = `Load unpacked` (current) or `Enterprise Policy`
-- [ ] Per-browser registry policy writer:
-  - `HKLM\Software\Policies\Google\Chrome\ExtensionInstallForcelist`
-  - `HKLM\Software\Policies\BraveSoftware\Brave\ExtensionInstallForcelist`
-  - `HKLM\Software\Policies\Microsoft\Edge\ExtensionInstallForcelist`
-  - Vivaldi, Chromium, Opera as available
-- [ ] CRX3 self-signing pipeline (per-project `selfhost.pem`, ID derived from key)
-- [ ] Self-hosted `updates.xml` generator (per-extension, per-version)
-- [ ] Optional GitHub Pages publish flow so each extension's update.xml has a stable HTTPS URL
-- [ ] Local fallback: serve update.xml + CRX from `127.0.0.1:<port>` if user opts out of public hosting
-- [ ] Elevation prompt when writing HKLM (UAC); document a one-time install run
-- [ ] Migration helper: convert existing `Load unpacked` installs to Policy installs
-
-## v0.3.0 — Update intelligence
-
-- [ ] On Refresh, compare installed version vs. latest release tag — show **Update available** badge
-- [ ] **Update all** button
-- [ ] Auto-update toggle (per-extension or global) that runs on app launch
-- [ ] Optional notification when a new release is published since last refresh
-
-## v0.4.0 — Theming + UX polish
-
-- [ ] Catppuccin Latte (light theme)
-- [ ] Accent color picker (Mauve, Sapphire, Green, Pink, Peach)
-- [ ] Per-card progress bar instead of percentage text during downloads
-- [ ] Drag-and-drop reorder for the install order (matters for `--load-extension` precedence)
-- [ ] Favorites / pin a card to the top
-- [ ] Keyboard navigation (per project rules: no shortcuts; this is mouse only)
-
-## v0.5.0 — Multi-source
-
-- [ ] GUI editor for additional GitHub owners (`ExtraOwners`)
-- [ ] GitHub org support with per-org token
-- [ ] Local folder source: point at a directory of unpacked extensions and they show up alongside GitHub ones
-- [ ] Custom update-feed source (`updates.xml` URL → list of tracked extensions)
-- [ ] Cross-platform port? (.NET 9 lets us go cross-platform with Avalonia later if there's demand)
-
-## v0.6.0 — Diagnostic / power-user
-
-- [ ] Manifest viewer: open the `manifest.json` of an installed extension in the app
-- [ ] Permissions diff: highlight new permissions when an extension updates
-- [ ] Trust score: surface the source repo's open issues / star count / last commit / signing state
-- [ ] Export the current set of installed extensions as a portable JSON manifest for a fresh machine
-- [ ] Import flow: ingest the JSON manifest and bulk-install everything
-
-## Backlog / maybes
-
-- Firefox / LibreWolf support (different manifest, different load path — might split into its own app)
-- Extension settings export (`chrome.storage.sync` snapshot via DevTools protocol — risky, deferred)
-- GitHub Codespaces integration
-- Microsoft Store packaging (MSIX)
+Roadmap version: 2026-04-25-strategy-pass. This supersedes the earlier milestone-only roadmap while preserving its core direction: LocalChromeStore should stay a lightweight, local-first Windows tool, but grow from a simple release browser into a private Chromium extension workstation.
+
+## State Of The Repo
+
+LocalChromeStore today is a WPF / .NET 9 Windows desktop app for discovering Chromium extension repositories from GitHub, installing ZIP/CRX release assets into local app data, hiding noisy repos, and launching Chrome-family browsers with `--load-extension`. It uses MVVM without a third-party MVVM toolkit, Octokit 13.0.1 as the only NuGet dependency, JSON files under `%APPDATA%` for settings/install state, and `%LOCALAPPDATA%` for extracted extensions, icons, and logs.
+
+What it claims and delivers:
+
+- GitHub-sourced discovery for a primary owner plus JSON-backed extra owners.
+- Optional topic filtering, optional GitHub PAT, release ZIP/CRX detection, and fallback `manifest.json` probing.
+- Manifest enrichment for name, version, description, and icon.
+- Install, uninstall, hidden-repo curation, installed-only filtering, browser detection, browser launch, settings drawer, and activity log.
+- Framework-dependent Windows release workflow with ZIP plus SHA256 sidecar.
+
+What is incomplete or stubbed:
+
+- `LaunchBrowserAfterInstall` and `AutoUpdateOnRefresh` are persisted settings without a complete user-facing workflow.
+- Extra owners are supported by JSON and discovery code but not editable in the GUI.
+- Enterprise policy install, CRX3 signing, update XML, and auto-update are roadmap-only.
+- No test project, no CI build/test gate beyond release packaging, and no Dependabot/security scanning enabled in the repository.
+- GitHub PAT is hidden in the UI but still persisted as local JSON rather than protected with Windows DPAPI.
+- No manifest risk surface, permission diff, local source folder source, profile/load-set model, or export/import environment manifest.
+
+Philosophy inferred from README, code, and docs:
+
+- Personal developer/dogfood workflow first, not a public marketplace.
+- Local-first and explainable: do not clutter the catalog, avoid unnecessary dependencies, keep async operations off the UI thread, and prefer native Windows behavior.
+- Small, maintainable WPF architecture over broad framework churn.
+- Trust and self-hosting matter because privileged browser code is being installed.
+
+Hard constraints:
+
+- Windows 10/11 desktop target, `net9.0-windows`, WPF, MIT license.
+- Octokit is the only third-party runtime dependency today.
+- Chromium CRX drag/drop install is no longer a reliable path on stock Windows Chrome-family browsers; enterprise policy plus update manifest is the serious self-host path.
+- .NET 9 is STS and supported until November 2026, so an upgrade plan to .NET 10 LTS should be planned before the support window closes.
+
+Local audit notes:
+
+- Top-level docs inspected: `README.md`, `CHANGELOG.md`, existing `ROADMAP.md`, `docs/companion-prompts.md`, `.github/workflows/release.yml`, `CLAUDE.md`, `LICENSE`.
+- Manifest inspected: `src/LocalChromeStore/LocalChromeStore.csproj`.
+- Source markers: no source `TODO`, `FIXME`, `HACK`, `XXX`, `@deprecated`, or `NotImplementedException` markers outside documentation examples.
+- GitHub issues for `SysAdminDoc/LocalChromeStore`: none returned.
+- Last 200 commits inspected; repository has 7 commits as of this pass.
+- Dependency audit: `dotnet list package --vulnerable --include-transitive` reported no vulnerable packages; `dotnet list package --outdated --include-transitive` reported Octokit 14.0.0 available over 13.0.1.
+- GitHub Dependabot alerts API returned that alerts are disabled or inaccessible for this repository.
+
+## External Research Summary
+
+### Direct OSS Competitors And Close Analogs
+
+Stars and pushed dates are from GitHub metadata collected on 2026-04-25.
+
+| Project | Stars | Last pushed | Maintainer / active owner | Why it matters |
+| --- | ---: | --- | --- | --- |
+| WXT | 9,661 | 2026-04-25 | `wxt-dev` | Sets the bar for extension framework detection, dev server UX, HMR, zipping, publishing, multi-browser targets, and persistent browser profiles. |
+| Plasmo | 12,991 | 2026-04-24 | `PlasmoHQ` | Strong extension SDK model with React/TypeScript workflow, publishing lifecycle, storage/messaging abstractions, and community requests around source/build customization. |
+| Extension.js | 4,976 | 2026-04-25 | `extension-js` | Zero-config cross-browser extension framework with browser profile support and recent browser/build-tool updates. |
+| Mozilla web-ext | 3,061 | 2026-04-24 | Mozilla | Canonical run/build/lint/sign CLI pattern; useful reference for temporary profiles, run configuration, and extension reload workflows. |
+| CRXJS Chrome Extension Tools | 4,049 | 2026-04-23 | `crxjs` | Vite-native build/HMR tooling and issue themes around mixed Chrome/Firefox output, CSS HMR, manifest schema/types, and build compatibility. |
+| Google Chrome extension samples | 17,493 | 2026-04-17 | GoogleChrome | Official API sample corpus; useful as regression fixtures for manifest parsing, permission display, and API support coverage. |
+| Extensity | 529 | 2024-08-31 | `sergiokas` | Extension manager UX reference: profiles, always-on extensions, favorites, search, options shortcuts, and sync. |
+| Auto Extension Manager | 764 | 2026-02-15 | `JasonGrass` | Rules, grouping, keyboard/timer requests, i18n, list sorting, and auto enable/disable workflows. |
+| One Click Extensions Manager | 252 | 2025-12-13 | `hankxdev` | Sticky extension ideas, translation coverage, Edge upload workflow, and lightweight extension-management UI. |
+| Shoji Extension Admin | 1 | 2021-08-17 | `noxasch` | Low-signal but confirms community interest in open-source extension administration. |
+| Browser Platform Publisher | 205 | 2025-02-12 | `PlasmoHQ` | Multi-store publishing automation, trusted tester targeting, Firefox source-code submission. |
+| chrome-webstore-upload-cli | 489 | 2026-04-16 | `fregante` | Store upload/publish CLI; recent PRs emphasize env-only secrets, CRX input support, retrying in-progress publishing, and Node 20+. |
+| Eclipse Open VSX | 1,909 | 2026-04-24 | Eclipse Open VSX | Open extension registry model: publisher namespaces, signed package verification, token scope, storage backends, statistics, search, migration. |
+| Windows Package Manager package repository | 10,518 | 2026-04-25 | Microsoft | Strong manifest validation, submission review, package metadata, and checksum expectations. |
+| Obtainium | 16,696 | 2026-04-16 | `ImranR98` | Adjacent "install from source" model: many sources, exports, prereleases, local network storage, proxy support, parallel download controls, per-source behavior. |
+
+### Commercial / Closed-Source Signals
+
+| Product or platform | Signal to steal | Source IDs |
+| --- | --- | --- |
+| Chrome Web Store / Developer Dashboard | Package validation, publisher identity, listing metrics, staged publish percentage, review constraints, store readiness checklist. | S32, S33, S84 |
+| Microsoft Edge Add-ons / Partner Center | Submission workflow, visibility controls, markets, package validation, testing notes. | S34 |
+| Chrome Enterprise Core | Extension requests, permissions governance, fleet reporting, cloud-managed policy. | S57, S58, S59 |
+| Edge / Intune policy management | ExtensionInstallForcelist, ExtensionSettings, `override_update_url`, toolbar state, user inability to uninstall force-installed extensions. | S19, S20, S21, S73, S74 |
+| ExtensionTotal | Risk scoring, malicious/risky/vulnerable/non-compliant detection positioning. | S54 |
+| LayerX | Extension inventory, permission/developer reputation analysis, risk scoring, adaptive enforcement. | S56 |
+| Spin.AI | Chrome extension risk assessment integrated with Chrome Browser Cloud Management. | S60 |
+| IronCrux Shield | Permission pivot detection, developer-mode extension flagging, risk explanations. | S61 |
+| ChromeStats / Chrome Analytics | Ecosystem analytics, MV3 migration tracking, publisher identity changes, installs/ratings/release metadata. | S62, S63 |
+
+### Community Signals
+
+Recurring user complaints and requests:
+
+- Extension managers are valuable when they support profiles, groups, batch enable/disable, "always on" sets, details/options shortcuts, and quick state switches.
+- Users want conditional enable/disable by site, timers, hotkeys, sort order, and visual grouping.
+- Enterprises struggle with Edge/Chrome extension policy composition, Intune assignment combinations, self-hosted update URLs, and force-install behavior.
+- Extension developers repeatedly hit MV3 remote-hosted-code rejections and CSP confusion.
+- Security practitioners want maintained malicious-extension data, permission-change alerts, and explainable risk scoring.
+- Developers want reproducible browser sessions, persistent dev profiles, Chrome for Testing, and CDP-backed debugging.
+
+## Feature Harvest And Prioritization
+
+Scoring: Impact, Effort, and Risk are 1 low to 5 high. "Prevalence" is `rare`, `emerging`, `common`, or `table-stakes`.
+
+| ID | Candidate | Signal | Category | Prevalence | Fit | I/E/R | Depends | Novelty | Tier | Rationale |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| F001 | Framework detector for WXT, Plasmo, Extension.js, CRXJS, web-ext, plain MV3/MV2. | S01-S08, S76, S79 | dev-experience | common | Yes | 5/2/1 | Repo file probes | parity | Now | Discovery should explain source projects, not only release assets. |
+| F002 | Framework badges on cards. | S01-S08 | UX | common | Yes | 4/1/1 | F001 | parity | Now | Badges make the catalog scannable and trustworthy. |
+| F003 | "Why is this shown?" discovery explanation panel. | S37-S40, S41 | UX, trust | emerging | Yes | 5/2/1 | F001 | leapfrog | Now | Explainability is a strong differentiator for a private store. |
+| F004 | Optional `localchromestore.json` repo manifest with schema. | S37-S40, S41 | data, plugin ecosystem | common | Yes | 5/3/2 | Schema validation | leapfrog | Now | Declarative metadata unlocks richer catalog governance without a server. |
+| F005 | Catalog manifest validator. | S39, S40 | reliability | table-stakes | Yes | 5/3/2 | F004 | parity | Now | Package-manager-grade validation prevents broken cards and bad installs. |
+| F006 | Release asset checksum verification using SHA256 sidecars. | S39, S40, S32 | security | table-stakes | Yes | 5/2/2 | Download pipeline | parity | Now | The release workflow already emits sidecars; install should consume them. |
+| F007 | Source trust tier badge: local repo, configured owner, verified release, signed CRX, unknown ZIP. | S54-S61 | security | common | Yes | 5/3/2 | F004, F006 | leapfrog | Now | Users need a clear trust model before installing privileged browser code. |
+| F008 | DPAPI protection for GitHub PAT. | S50, local audit | security | table-stakes | Yes | 5/2/1 | Settings migration | parity | Now | Hidden UI is not enough; local token persistence should be protected. |
+| F009 | Permission/manifest risk panel. | S22-S31, S52-S56, S64-S70 | security | common | Yes | 5/3/3 | Manifest parser | leapfrog | Now | Installing extensions without permission context is a trust gap. |
+| F010 | Permission diff before update. | S54-S61, S70 | security | emerging | Yes | 5/3/3 | Installed manifest snapshots | leapfrog | Now | Update safety is more valuable than first-install scanning. |
+| F011 | Update-available badges from installed vs latest release/manifest version. | S15, S20, S41 | UX, reliability | table-stakes | Yes | 5/2/2 | Version comparison | parity | Now | Existing roadmap and settings already point here. |
+| F012 | Manual "Update" and "Update all". | S41, S15, S20 | UX | table-stakes | Yes | 5/3/2 | F011, F010 | parity | Now | A store without update actions feels incomplete. |
+| F013 | Profiles / load sets. | S10-S13, S71, S72 | UX | common | Yes | 5/3/2 | Installed set model | parity | Now | Reusable browser sessions are core to developer workflow. |
+| F014 | Always-include extensions per profile. | S10, S12 | UX | common | Yes | 4/2/1 | F013 | parity | Next | Useful after profiles land. |
+| F015 | Drag-and-drop install/load order. | S12, S72 | UX | emerging | Yes | 3/3/2 | F013 | parity | Next | Order can matter, but not before profiles exist. |
+| F016 | Clean temporary browser profile launch. | S07, S82, S83 | dev-experience | common | Yes | 5/3/2 | BrowserLauncher refactor | parity | Now | Keeps testing separate from the user's daily browser state. |
+| F017 | Persistent per-project browser profile launch. | S82, S85 | dev-experience | common | Yes | 5/3/2 | F013, F016 | parity | Next | Mirrors WXT/web-ext workflows after base profiles exist. |
+| F018 | Chrome for Testing detection/download. | S83, S86 | testing | emerging | Yes | 4/3/2 | Browser source model | leapfrog | Next | Reproducible browser binaries improve extension QA. |
+| F019 | Launch with test URLs. | S07, S82, S81 | dev-experience | common | Yes | 4/2/1 | BrowserLauncher refactor | parity | Now | Reduces the edit-build-launch-debug loop. |
+| F020 | Launch argument preview/copy. | S07, S81, S82 | docs, UX | common | Yes | 4/1/1 | BrowserLauncher refactor | parity | Now | Makes behavior auditable and easier to debug. |
+| F021 | Debug session panel with browser path, profile path, loaded extensions, target URL, args. | S81, S82, S83 | observability | emerging | Yes | 5/2/1 | F016-F020 | leapfrog | Next | Turns launch into a transparent session object. |
+| F022 | Capture browser stdout/stderr and policy/load errors into activity log. | S81, S85 | observability | common | Yes | 4/3/2 | Process tracking | parity | Next | Failure diagnosis should not require hunting in Chrome UI. |
+| F023 | Local source folder source. | S01-S08, S41 | platform/OS | common | Yes | 5/3/2 | Source abstraction | parity | Next | Not every extension has a release asset yet. |
+| F024 | Build output resolver for `.output/chrome-mv3`, `build/chrome-mv3-prod`, `dist`, `extension`, `public`. | S01-S08, S79 | dev-experience | common | Yes | 5/3/2 | F001, F023 | leapfrog | Next | Bridges source repos to runnable artifacts. |
+| F025 | Trusted local build command runner. | S01-S08, S79 | dev-experience | common | Yes | 4/4/4 | F004, sandbox warnings | Under Consideration | Powerful but risks arbitrary command execution. |
+| F026 | Build command dry-run/checklist without executing. | S01-S08 | docs | common | Yes | 4/2/1 | F001, F004 | parity | Now | Gives guidance without adding execution risk. |
+| F027 | CRX3 signer/packager integration. | S15, S20, S87-S90 | distribution/packaging | common | Yes | 5/4/3 | Key store design | Next | Required for policy mode and stable extension IDs. |
+| F028 | Deterministic extension ID preview from signing key. | S15, S20, S87 | security | table-stakes | Yes | 5/3/3 | F027 | parity | Next | Prevents surprise ID changes and broken updates. |
+| F029 | Same-key update compatibility check. | S15, S20, S87 | security | table-stakes | Yes | 5/3/3 | F027, F028 | parity | Next | Browser update rules require same private key. |
+| F030 | `updates.xml` generator. | S15, S20, S19 | distribution/packaging | table-stakes | Yes | 5/3/2 | F027-F029 | parity | Next | This is the core self-hosted update primitive. |
+| F031 | GitHub Pages static update hosting helper. | S15, S20, S32, S35 | distribution/packaging | common | Yes | 4/4/3 | F030, GitHub release helper | parity | Later | Valuable after local policy mode is proven. |
+| F032 | Local loopback update server. | S15, S20, S73 | offline/resilience | rare | Partial | 3/4/4 | F030, firewall handling | Under Consideration | Useful for private testing but fragile for browser policy. |
+| F033 | Enterprise Policy install backend. | S17-S21, S73, S74 | platform/OS | table-stakes | Yes | 5/5/4 | F027-F030 | Next | The app's "real store" mode depends on policy install. |
+| F034 | Policy health checks: registry, ID, update URL, XML, CRX reachability, browser policy page. | S17-S21, S73, S74 | reliability | table-stakes | Yes | 5/4/3 | F033 | leapfrog | Next | Policy mode must be diagnosable, not magical. |
+| F035 | Policy rollback path to remove force-install entry and preserve artifacts. | S19, S21 | reliability | table-stakes | Yes | 5/3/3 | F033 | parity | Next | Force-installed extensions cannot be treated like normal installs. |
+| F036 | Explicit policy-mode warning and consent copy. | S19, S21 | UX, security | table-stakes | Yes | 5/1/1 | F033 | parity | Next | Users must understand force install and implicit permissions. |
+| F037 | ExtensionSettings support for `override_update_url`, toolbar state, blocked hosts. | S18, S21 | platform/OS | emerging | Partial | 4/4/4 | F033 | Later | Powerful for managed use but risks enterprise complexity. |
+| F038 | Import/export portable LocalChromeStore environment manifest. | S41, S39, S40 | migration | common | Yes | 5/3/2 | Data schema | Now | Fresh Windows setup is a core use case. |
+| F039 | Export machine-readable catalog JSON for CI/other apps. | S37-S41 | integrations | common | Yes | 4/2/1 | F004 | Next | Makes LocalChromeStore useful beyond the GUI. |
+| F040 | Import from another machine with missing-source diagnostics. | S41, S39 | migration | common | Yes | 4/3/2 | F038 | Next | Completes the portable environment story. |
+| F041 | Multi-owner GUI editor. | S41 | UX | common | Yes | 4/2/1 | Existing `ExtraOwners` | Now | Backed by existing settings but missing UI. |
+| F042 | Custom update feed source. | S15, S20 | integrations | common | Yes | 4/3/3 | Source abstraction | Later | Useful after update XML parsing exists. |
+| F043 | Local catalog file source. | S39-S41 | offline/resilience | common | Yes | 4/3/2 | F004, F038 | Next | Supports offline/private catalogs. |
+| F044 | Pinned/favorite repos. | S10, S12 | UX | common | Yes | 3/2/1 | Card state | Next | Helpful but lower priority than profiles and updates. |
+| F045 | Hidden repo management list with per-repo restore. | S37-S41 | UX | common | Yes | 3/2/1 | Existing hidden repos | Next | Current restore-all behavior is too blunt. |
+| F046 | Stale repo warnings: archived, no recent commit, no recent release. | S54-S63 | trust | common | Yes | 4/2/1 | Repo metadata | Now | Low-cost trust context from GitHub metadata. |
+| F047 | License presence and type badge. | S37-S40 | trust, licensing | common | Yes | 3/2/1 | Repo metadata | Next | Helps filter private/open-source catalog quality. |
+| F048 | Release channel selector: stable, prerelease, latest Actions artifact, local build. | S35, S36, S41 | distribution/packaging | emerging | Yes | 5/4/3 | Source model | Later | High value but depends on update/source abstractions. |
+| F049 | Release readiness checklist. | S31-S36 | distribution/packaging | common | Yes | 4/3/2 | F004, F006, F009 | Next | Helps extension authors publish better artifacts. |
+| F050 | GitHub draft release helper. | S35, S36, S84 | distribution/packaging | common | Yes | 4/4/3 | F049, Octokit upgrade | Later | Useful but should follow install safety foundations. |
+| F051 | Chrome Web Store upload/publish integration. | S32, S35, S84 | integrations | common | Partial | 3/4/4 | Secret handling, OAuth | Under Consideration | Valuable for public publishing, but not core private-store scope. |
+| F052 | Multi-store publishing integration. | S34-S36 | integrations | common | Partial | 3/5/4 | F051 | Under Consideration | BPP already handles this; LocalChromeStore should not duplicate too early. |
+| F053 | Store metrics ingestion. | S33, S62, S63 | telemetry | common | Partial | 2/4/3 | External credentials | Later | Useful for public extensions, not core dogfood install. |
+| F054 | Basic analytics-free local usage stats. | S57, S62, local philosophy | telemetry | emerging | Yes | 3/2/1 | Local event log | Later | Keep local-only; no external telemetry by default. |
+| F055 | Opt-in external telemetry. | S57 | telemetry | common | No - contradicts local-first unless explicitly requested | 1/3/4 | Consent system | Rejected | The project philosophy favors local state, not product telemetry. |
+| F056 | Manifest MV2/MV3 compatibility badge. | S24, S63, S65 | platform/OS | table-stakes | Yes | 4/1/1 | Manifest parser | Now | MV3 status is a central extension-platform health signal. |
+| F057 | Remote-hosted-code/CSP checks. | S24, S25, S75, S80 | security | table-stakes | Yes | 5/3/3 | Manifest + package scan | Next | Developers repeatedly hit this rejection and security risk. |
+| F058 | High-risk permission explanations. | S22, S23, S58, S54-S61 | security | common | Yes | 5/2/2 | F009 | Now | Risk scoring must be transparent, not opaque. |
+| F059 | Optional permissions and host permissions summary. | S22, S23, S58 | security | table-stakes | Yes | 5/2/2 | F009 | Now | Host access is one of the most important review signals. |
+| F060 | Permission increase install/update gate. | S54-S61, S70 | security | emerging | Yes | 5/3/3 | F010, F058 | Next | Blocks quiet privilege escalation while still allowing override. |
+| F061 | Malicious extension feed cross-check. | S54-S56, S69, S71 | security | emerging | Partial | 4/4/4 | Feed quality policy | Under Consideration | Useful if source/license/maintenance quality is acceptable. |
+| F062 | Static code scanner for obfuscation, eval, remote imports, secret leakage. | S64, S66, S70 | security | emerging | Yes | 4/5/4 | Package scanner | Later | High value but much larger than manifest analysis. |
+| F063 | Local LLM/security sandbox analysis. | S64 | security | rare | Partial | 2/5/5 | ML/runtime infra | Rejected | Too heavy and outside the current minimal dependency philosophy. |
+| F064 | CDP-driven extension reload/debug workflow. | S81, S85, S67 | dev-experience | emerging | Partial | 4/5/4 | Debug session model | Under Consideration | Powerful but CDP/debugger surfaces have security risk. |
+| F065 | File watcher with manual reload prompt. | S01, S07, S08 | dev-experience | common | Yes | 4/3/2 | Local source folder | Later | Useful after local folder/source support exists. |
+| F066 | DevTools/extension options quick links. | S10, S12, S30 | UX | common | Yes | 3/2/1 | Installed manifest + browser target | Next | Extension managers commonly expose options/details. |
+| F067 | Open `chrome://extensions` / `edge://extensions` action. | S30, S81 | UX | table-stakes | Yes | 3/1/1 | Browser target | Now | Low-cost bridge to native browser management. |
+| F068 | Browser policy page quick link. | S19, S21, S73 | support | common | Yes | 3/1/1 | Browser target | Next | Helpful once policy mode exists. |
+| F069 | Activity log export/copy diagnostics bundle. | S57, S41 | observability | common | Yes | 4/2/1 | Existing log | Now | Makes troubleshooting shareable without adding telemetry. |
+| F070 | Structured JSON event log. | S57, S41 | observability | common | Yes | 4/2/1 | Existing log | Next | Enables machine-readable diagnostics and future tests. |
+| F071 | Download retry/resume and parallel-download limit. | S41 | performance | common | Yes | 4/3/2 | Download service | Next | Obtainium issues show source downloads need resilience controls. |
+| F072 | GitHub rate-limit visibility. | S41, S48 | reliability | common | Yes | 4/2/1 | Octokit metadata | Now | PAT/rate-limit behavior should be visible before failures. |
+| F073 | Proxy support. | S41 | integrations | common | Partial | 2/3/2 | HttpClient settings | Later | Useful in locked-down environments but not first-order. |
+| F074 | Offline cache mode for last-known catalog and icons. | S41, S43 | offline/resilience | common | Yes | 4/3/2 | Catalog persistence | Next | The app should remain useful when GitHub is unavailable. |
+| F075 | Graceful GitHub API degraded state. | S41, S57 | reliability | table-stakes | Yes | 4/2/1 | Existing logging | Now | Current app should distinguish auth, rate, network, and no-release states. |
+| F076 | Accessibility pass: keyboard focus, screen reader labels, contrast audit, reduced motion. | S31, S57 | accessibility | table-stakes | Yes | 5/3/1 | UI audit | Now | Premium desktop quality includes accessible controls and states. |
+| F077 | High contrast theme. | S31, S57 | accessibility | common | Yes | 3/3/1 | Theme tokens | Later | Important but behind core workflow and base accessibility. |
+| F078 | Light theme and accent picker. | local roadmap | UX | common | Yes | 3/3/1 | Theme tokens | Later | Nice polish, lower impact than trust/update/profile work. |
+| F079 | i18n-ready string resources. | S12, S13 | i18n | common | Yes | 3/3/1 | UI string extraction | Later | Extension managers show translation demand, but user base is personal-first. |
+| F080 | Full localization packs. | S12, S13 | i18n | common | Partial | 2/4/2 | F079, translators | Under Consideration | Premature until strings are resource-backed. |
+| F081 | Unit tests for manifest parsing, ZIP/CRX extraction, version compare, settings migration. | S09, S47, S50 | testing | table-stakes | Yes | 5/3/1 | Test project | Now | Risky code paths need automated guardrails. |
+| F082 | UI smoke test harness for WPF launch. | S47, S50 | testing | common | Yes | 4/3/2 | Test infra | Next | Build has been smoke-tested manually; automate it. |
+| F083 | Chrome extension sample fixture suite. | S09 | testing | common | Yes | 4/2/1 | Test project | Next | Official samples make good parser/permission fixtures. |
+| F084 | CI build/test workflow on pull requests. | S51 | testing | table-stakes | Yes | 5/2/1 | Test project | Now | Release-only workflow is too late to catch regressions. |
+| F085 | Dependabot and GitHub security scanning. | S48-S51, local audit | security | table-stakes | Yes | 4/1/1 | Repo settings/workflow | Now | Alerts are disabled/inaccessible today. |
+| F086 | Upgrade Octokit 13.0.1 to 14.0.0 after compatibility check. | S48-S50 | dependencies | common | Yes | 3/2/2 | Tests | Next | Latest version moves IDs to Int64; verify before upgrading. |
+| F087 | .NET 10 LTS migration plan. | S47, S50 | upgrade strategy | table-stakes | Yes | 4/3/2 | Tests | Next | .NET 9 support ends in November 2026. |
+| F088 | MSIX package. | S44, S45 | distribution/packaging | common | Partial | 3/4/3 | Release workflow maturity | Later | Useful for Windows install polish but not needed for personal portable use. |
+| F089 | Winget manifest export/submission helper. | S39, S40 | distribution/packaging | common | Partial | 3/3/2 | Stable releases | Later | Public distribution optional; export is useful for sibling desktop store. |
+| F090 | Signed release artifacts / Authenticode. | S39, S40, S45 | security | common | Yes | 4/4/3 | Certificate strategy | Later | Trust improvement, but certificate logistics may be heavy. |
+| F091 | Plugin system for custom source adapters. | S37, S41, S43 | plugin ecosystem | emerging | Partial | 3/5/4 | Stable core source interface | Under Consideration | Powerful but can bloat a personal app. |
+| F092 | First-party source adapter interface without external plugins. | S37, S41 | plugin ecosystem | common | Yes | 5/3/2 | F023, F043 | Next | Gives extensibility while staying maintainable. |
+| F093 | Multi-user/team catalog server. | S37, S57 | multi-user/collab | common | No - contradicts personal local-first scope today | 2/5/4 | Backend service | Rejected | A central service would change the product category. |
+| F094 | Shared Git-backed catalog repo workflow. | S37-S41 | multi-user/collab | emerging | Yes | 3/3/2 | F004, F039 | Later | Lightweight collaboration without operating a server. |
+| F095 | Mobile companion app. | S41-S43 | mobile | rare | No - separate product | 1/5/4 | New stack | Rejected | This repo is Windows Chromium-extension focused; mobile belongs in LocalAndroidStore. |
+| F096 | Avalonia cross-platform port. | S46 | platform/OS | common | Partial | 2/5/4 | Stable Windows feature set | Later | Valuable only if Windows-first scope changes. |
+| F097 | Browser-extension implementation of LocalChromeStore. | S10-S13, S30 | platform/OS | common | No - cannot manage local release assets/policy reliably | 1/5/4 | Browser extension limits | Rejected | A browser extension cannot replace native install/policy/file workflows. |
+| F098 | Silent install outside enterprise policy. | S16-S21 | platform/OS | rare | No - conflicts with browser security model | 1/5/5 | None | Rejected | Stock browsers intentionally block this path. |
+| F099 | Auto-accept publisher signing-key changes. | S15, S20, S87 | security | rare | No - unsafe | 1/1/5 | None | Rejected | Key changes must block or require explicit override. |
+| F100 | Send source packages to third-party scanners by default. | S54-S61 | security | common | No - privacy risk | 2/3/5 | User consent | Rejected | Private extension code should not leave the machine by default. |
+
+## Now
+
+These items should land before the next public feature release because they improve clarity, safety, or already-backed settings.
+
+1. **Catalog explainability and source metadata**
+   - Implement F001, F002, F003, F004, F005, F026, F041, F046, F056, F067, F072, and F075.
+   - Output: cards explain why a repo appears, what framework/artifact shape was detected, whether it is MV2/MV3, how fresh it is, and what metadata is missing.
+   - Acceptance: no install behavior changes; discovery records are richer; settings include extra-owner editing; empty/error/rate-limit states are distinct.
+
+2. **Trust baseline**
+   - Implement F006, F007, F008, F009, F058, F059, and F069.
+   - Output: checksum verification where sidecars exist, DPAPI-protected PAT migration, manifest risk panel, permission/host permission summary, and diagnostics export.
+   - Acceptance: installs fail closed on checksum mismatch; existing plaintext token settings are migrated; risk panel is visible before install.
+
+3. **Update and environment portability**
+   - Implement F011, F012, F038, F060 groundwork where feasible.
+   - Output: update badges, manual update/update-all, export/import of installed extension environment, and persisted manifest snapshots for future permission diffs.
+   - Acceptance: installed version vs latest version is visible; export file can recreate the selected installed set on another machine.
+
+4. **Profiles and better launch sessions**
+   - Implement F013, F016, F019, F020.
+   - Output: named load sets, temporary browser profile launches, optional launch URLs, launch args preview.
+   - Acceptance: user can launch `All installed`, a custom profile, or a clean temporary test session without editing JSON.
+
+5. **Engineering quality gate**
+   - Implement F076, F081, F084, F085.
+   - Output: accessibility sweep, unit tests for manifest/extraction/version/settings migration, PR build/test workflow, Dependabot/security scanning enabled.
+   - Acceptance: `dotnet build`, unit tests, and CI gate pass; focus/keyboard/screen-reader labels are audited.
+
+## Next
+
+These become valuable once the Now foundation exists.
+
+1. **Policy-ready packaging and install backend**
+   - Implement F027, F028, F029, F030, F033, F034, F035, F036.
+   - Reason: enterprise policy mode is the product's strongest technical differentiator, but it needs signing/update/preflight/rollback first.
+
+2. **Local/source-aware extension development**
+   - Implement F017, F018, F021, F022, F023, F024, F045, F049, F066, F068, F070, F071, F074, F082, F083, F086, F087, F092.
+   - Reason: LocalChromeStore should support source repos and developer sessions, but not before source metadata and tests exist.
+
+3. **Permission-diff enforcement**
+   - Implement F010 and F060 completely.
+   - Reason: once update snapshots exist, update gates can block silent privilege expansion.
+
+## Later
+
+These are directionally useful but should not distract from private-store, trust, and policy-mode fundamentals.
+
+- F031 GitHub Pages update hosting.
+- F037 advanced ExtensionSettings controls.
+- F039 machine-readable catalog export.
+- F040 import diagnostics.
+- F042 custom update feed source.
+- F043 local catalog file source.
+- F044 favorites/pinned repos.
+- F047 license badges.
+- F048 release channels.
+- F050 GitHub draft release helper.
+- F053 store metrics ingestion.
+- F054 local-only usage stats.
+- F057 remote-hosted-code/CSP package scanner.
+- F062 static package scanner.
+- F065 file watcher and manual reload prompt.
+- F073 proxy support.
+- F077 high contrast theme.
+- F078 light theme and accent picker.
+- F079 i18n-ready string resources.
+- F088 MSIX package.
+- F089 Winget manifest export.
+- F090 Authenticode signing.
+- F094 shared Git-backed catalog workflow.
+- F096 Avalonia cross-platform port.
+
+## Under Consideration
+
+- F025 trusted local build command runner: useful, but command execution needs explicit trust boundaries, dry-run mode first, and clear logs.
+- F032 local loopback update server: useful for private testing but fragile around policy, firewall, browser trust, and HTTPS expectations.
+- F051 Chrome Web Store publishing integration and F052 multi-store publishing: valuable only if LocalChromeStore grows into a release workstation; existing tools may be better integrations than reimplementation.
+- F061 malicious-extension feed cross-check: only acceptable with transparent data provenance and no private code upload.
+- F064 CDP-driven reload/debug workflow: powerful, but CDP/debugger surfaces are security-sensitive.
+- F080 localization packs: string resources first, translation later.
+- F091 external plugin system: source adapter interface first; plugin execution later only if there is a real use case.
+
+## Rejected
+
+- F055 opt-in external telemetry by default path: conflicts with local-first product philosophy unless a future user explicitly asks for analytics.
+- F063 local LLM/security sandbox analysis: too heavy for this minimal WPF tool.
+- F093 multi-user/team catalog server: changes the product from personal workstation to hosted platform.
+- F095 mobile companion app: belongs in sibling projects, not this Windows repo.
+- F097 browser-extension implementation: cannot own native local file, release, and policy workflows.
+- F098 silent install outside enterprise policy: conflicts with browser security model.
+- F099 auto-accept signing-key changes: unsafe.
+- F100 default third-party source scanning: privacy risk for private extension code.
+
+## Source Appendix
+
+S01. https://wxt.dev/
+S02. https://github.com/wxt-dev/wxt
+S03. https://www.plasmo.com/
+S04. https://github.com/PlasmoHQ/plasmo
+S05. https://extension.js.org/
+S06. https://github.com/mozilla/web-ext
+S07. https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/
+S08. https://github.com/crxjs/chrome-extension-tools
+S09. https://github.com/GoogleChrome/chrome-extensions-samples
+S10. https://github.com/sergiokas/Extensity
+S11. https://chromewebstore.google.com/detail/simpleextmanager/kniehgiejgnnpgojkdhhjbgbllnfkfdk
+S12. https://github.com/JasonGrass/auto-extension-manager
+S13. https://github.com/hankxdev/one-click-extensions-manager
+S14. https://github.com/noxasch/shoji-extension-admin
+S15. https://developer.chrome.com/docs/extensions/how-to/distribute/host-on-linux
+S16. https://developer.chrome.com/docs/extensions/mv2/hosting-changes
+S17. https://chromeenterprise.google/policies/extension-install-forcelist/
+S18. https://support.google.com/chrome/a/answer/9867568?hl=en-EN
+S19. https://learn.microsoft.com/en-us/deployedge/microsoft-edge-browser-policies/extensioninstallforcelist
+S20. https://learn.microsoft.com/en-us/microsoft-edge/extensions-chromium/update/auto-update
+S21. https://learn.microsoft.com/en-us/deployedge/microsoft-edge-manage-extensions-ref-guide
+S22. https://developer.chrome.com/docs/extensions/reference/permissions-list
+S23. https://developer.chrome.com/docs/extensions/reference/api/permissions
+S24. https://developer.chrome.com/docs/extensions/develop/migrate/what-is-mv3
+S25. https://developer.chrome.com/docs/extensions/develop/migrate/remote-hosted-code?hl=en
+S26. https://developer.chrome.com/docs/extensions/reference/sidePanel/
+S27. https://developer.chrome.com/docs/extensions/reference/api/offscreen
+S28. https://developer.chrome.com/docs/extensions/reference/api/userScripts
+S29. https://developer.chrome.com/blog/chrome-userscript
+S30. https://developer.chrome.com/docs/extensions/reference/api/management
+S31. https://developer.chrome.com/docs/webstore/best_practices
+S32. https://developer.chrome.com/docs/webstore/publish/
+S33. https://developer.chrome.com/docs/webstore/metrics/
+S34. https://learn.microsoft.com/en-us/microsoft-edge/extensions-chromium/publish/publish-extension
+S35. https://github.com/fregante/chrome-webstore-upload-cli
+S36. https://github.com/PlasmoHQ/bpp
+S37. https://github.com/eclipse-openvsx/openvsx
+S38. https://www.eclipse.org/community/eclipse_newsletter/2020/march/1.php
+S39. https://learn.microsoft.com/en-us/windows/package-manager/package/repository
+S40. https://learn.microsoft.com/en-us/windows/package-manager/package/manifest
+S41. https://github.com/ImranR98/Obtainium
+S42. https://github.com/f-droid/fdroidclient
+S43. https://github.com/f-droid/fdroidserver
+S44. https://github.com/electron-userland/electron-builder
+S45. https://github.com/microsoft/PowerToys
+S46. https://github.com/AvaloniaUI/Avalonia
+S47. https://github.com/dotnet/wpf
+S48. https://github.com/octokit/octokit.net
+S49. https://www.nuget.org/packages/Octokit/13.0.1
+S50. https://learn.microsoft.com/en-us/dotnet/core/releases-and-support
+S51. https://github.com/actions/setup-dotnet
+S52. https://github.com/palant/chrome-extension-manifests-dataset
+S53. https://duo.com/resources/infographics/chrome-extension-security-crxcavator
+S54. https://www.extensiontotal.com/chrome
+S55. https://extensionsecurity.io/
+S56. https://layerxsecurity.com/use-cases/browser-extensions-protection/
+S57. https://chromeenterprise.google/products/cloud-management/
+S58. https://support.google.com/chrome/a/answer/7515036/chrome-app-and-extension-permissions?hl=en
+S59. https://support.google.com/chrome/a/answer/10405494?hl=en
+S60. https://www.businesswire.com/news/home/20230502005270/en/Spin.AI-Introduces-Chrome-Extension-Risk-Assessment-Integration-in-Partnership-with-Google-Chrome
+S61. https://www.ironcrux.com/extension-protection
+S62. https://chrome-analytics.com/extensions
+S63. https://chrome-stats.com/manifest-v3-migration
+S64. https://arxiv.org/abs/2505.21263
+S65. https://arxiv.org/abs/2404.08310
+S66. https://arxiv.org/abs/2505.19456
+S67. https://arxiv.org/abs/2305.11506
+S68. https://arxiv.org/abs/2406.12710
+S69. https://arxiv.org/abs/2512.10029
+S70. https://www.securitee.org/files/extensiondelta_ccs2020.pdf
+S71. https://www.reddit.com/r/chrome_extensions/comments/1ofpd9x/i_built_an_extension_to_manage_all_other_chrome/
+S72. https://www.reddit.com/r/chrome_extensions/comments/wda21a/extension_manager_extension_with_hotkey_timer_support/
+S73. https://www.reddit.com/r/MicrosoftEdge/comments/1n7b6vz/a_way_to_force_install_from_certain_crx_extension/
+S74. https://www.reddit.com/r/Intune/comments/1rddsn3/managing_chrome_andor_edge_extensions/
+S75. https://www.reddit.com/r/chrome_extensions/comments/1q7djyu/my_chrome_extension_was_almost_removed_i_hit_a/
+S76. https://github.com/fregante/Awesome-WebExtensions
+S77. https://crxjs.dev/awesome/
+S78. https://github.com/awesome-soft/awesome-chrome-extensions
+S79. https://addfox.dev/
+S80. https://stackoverflow.com/questions/26242682/unsafe-eval-on-chrome-extension
+S81. https://chromedevtools.github.io/devtools-protocol/
+S82. https://wxt.dev/guide/essentials/config/browser-startup.html
+S83. https://developer.chrome.com/blog/chrome-for-testing
+S84. https://developer.chrome.com/docs/webstore/using-api
+S85. https://developer.chrome.com/docs/extensions/reference/api/debugger
+S86. https://googlechromelabs.github.io/chrome-for-testing/
+S87. https://chromium.googlesource.com/chromium/src/+/HEAD/components/crx_file/
+S88. https://chromium.googlesource.com/chromium/src/+/refs/tags/131.0.6765.0/components/crx_file/crx3.proto
+S89. https://www.npmjs.com/package/crx3
+S90. https://pypi.org/project/crx3/
+S91. https://www.nuget.org/packages/Octokit/14.0.0
+S92. https://github.com/octokit/octokit.net/releases
+
+## Self-Audit
+
+- Every roadmap candidate includes at least one source ID and every source ID is listed in the appendix.
+- Tier placements are justified in the feature table and summarized in Now/Next/Later/Under Consideration/Rejected.
+- Required categories covered: security, accessibility, i18n/l10n, observability/telemetry, testing, docs, distribution/packaging, plugin ecosystem, mobile, offline/resilience, multi-user/collab, migration paths, and upgrade strategy.
+- No duplicate accepted items intentionally appear across tiers; later phase summaries reference feature IDs rather than restating conflicting requirements.
+- Rejected items are explicitly identified with one-line reasons.
+- The roadmap is written to the repository root as `ROADMAP.md`.
