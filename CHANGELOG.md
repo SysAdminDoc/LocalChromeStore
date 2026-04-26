@@ -4,6 +4,15 @@ All notable changes to LocalChromeStore are documented here. Format roughly foll
 
 ## Unreleased
 
+## v0.3.0 — 2026-07-03
+
+### Added
+- **`localchromestore.json` repo manifest (F004)** — Extension repos can now place a `localchromestore.json` in their root to supply catalog metadata (display name, description, homepage URL, icon URL, category, keywords, and optional `hideFromCatalog` flag). When found, the file's fields take precedence over `manifest.json`/repo metadata for catalog-facing display, and the card shows an "LCS Manifest" badge.
+- **Catalog manifest validator (F005)** — The manifest is validated on fetch: field lengths (display name ≤ 64 chars, description ≤ 280 chars), known category values, and URL syntax. Validation failures surface in the card's existing warnings system without blocking discovery.
+- **Build command dry-run / checklist (F026)** — The "Why" tooltip and a "Copy Build Cmd" card button now show the conventional build command for the detected framework (WXT → `wxt build`, Plasmo → `plasmo build`, Extension.js → `npx extension build`, CRXJS → `vite build`, web-ext → `web-ext build`). Clicking copies the command to the clipboard. Unknown/plain extensions show nothing.
+- **Teal accent tokens** — Added `TealColor`/`TealBrush`/`TealSoftBrush` (Catppuccin Mocha `#94e2d5`) to `DarkTheme.xaml` for the new LCS Manifest badge.
+- **`RepoManifest` tests** — `RepoManifestTests.cs` covers `Validate()` (valid manifest, field-length limits, unknown category, URL validity, multiple errors) and `FrameworkLabels.BuildCommand()` for all five frameworks and the three no-command cases. Total test count 56 → 79.
+
 ## v0.2.0 — 2026-07-03
 
 ### Added

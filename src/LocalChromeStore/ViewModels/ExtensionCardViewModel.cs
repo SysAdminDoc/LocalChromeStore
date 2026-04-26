@@ -51,6 +51,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         OpenInstallDirCommand = new RelayCommand(_ => OpenDir(), _ => CanOpenInstallDir);
         HideRepositoryCommand = new RelayCommand(_ => hideRepository(this), _ => !Busy);
         InspectCommand = new RelayCommand(_ => InspectAsync(), _ => !Busy);
+        OpenHomepageCommand = new RelayCommand(_ => OpenUrl(Info.HomepageUrl!), _ => HasHomepageUrl);
+        CopyBuildCommandCommand = new RelayCommand(_ => Clipboard.SetText(BuildCommand), _ => HasBuildCommand);
         _ = LoadIconAsync();
     }
 
@@ -145,6 +147,12 @@ public sealed class ExtensionCardViewModel : ViewModelBase
                 sb.AppendLine($"Manifest version: MV{Info.ManifestVersionNumber.Value}");
             else
                 sb.AppendLine("Manifest version: unknown (manifest could not be parsed).");
+            if (HasBuildCommand)
+                sb.AppendLine($"Build command: {BuildCommand}");
+            if (HasRepoManifest)
+                sb.AppendLine("Catalog manifest: localchromestore.json present.");
+            if (!string.IsNullOrEmpty(Info.HomepageUrl))
+                sb.AppendLine($"Homepage: {Info.HomepageUrl}");
             if (Info.RepoLastPushedAt.HasValue)
                 sb.AppendLine($"Last push: {Info.RepoLastPushedAt.Value.LocalDateTime:yyyy-MM-dd} ({FrameworkLabels.FreshnessLabel(Info.Freshness)})");
             if (Info.IsArchived)
@@ -233,6 +241,18 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public ICommand OpenInstallDirCommand { get; }
     public ICommand HideRepositoryCommand { get; }
     public ICommand InspectCommand { get; }
+    // F004: repo manifest homepage link
+    public ICommand OpenHomepageCommand { get; }
+    // F026: copy build command to clipboard
+    public ICommand CopyBuildCommandCommand { get; }
+
+    // F004: localchromestore.json
+    public bool HasRepoManifest => Info.HasRepoManifest;
+    public bool HasHomepageUrl  => !string.IsNullOrEmpty(Info.HomepageUrl);
+
+    // F026: build command dry-run
+    public string BuildCommand    => FrameworkLabels.BuildCommand(Info.Framework);
+    public bool   HasBuildCommand => !string.IsNullOrEmpty(BuildCommand);
 
     private void InspectAsync()
     {

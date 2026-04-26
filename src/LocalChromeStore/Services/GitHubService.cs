@@ -267,6 +267,16 @@ public sealed class GitHubService
             log?.Report($"  ~ framework probe failed for {repo.Name}: {ex.Message}");
         }
 
+        // F004/F005: probe localchromestore.json — repo author's catalog manifest.
+        try
+        {
+            await ProbeRepoManifestAsync(client, repo, info, log, ct);
+        }
+        catch (Exception ex)
+        {
+            log?.Report($"  ~ localchromestore.json probe failed for {repo.Name}: {ex.Message}");
+        }
+
         return info;
     }
 
@@ -465,6 +475,52 @@ public sealed class GitHubService
             info.Framework = ExtensionFramework.PlainMv2;
             info.FrameworkEvidence = "manifest_version: 2 (no framework markers found)";
         }
+    }
+
+    private static readonly JsonSerializerOptions RepoManifestJsonOpts = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true
+    };
+
+    private async Task ProbeRepoManifestAsync(GitHubClient client, Repository repo,
+        ExtensionInfo info, IProgress<string>? log, CancellationToken ct)
+    {
+        var json = await TryReadRepoFileAsync(client, repo, "localchromestore.json", ct);
+        if (json is null) return;
+
+        RepoManifest? manifest;
+        try
+        {
+            manifest = JsonSerializer.Deserialize<RepoManifest>(json, RepoManifestJsonOpts);
+        }
+        catch (JsonException ex)
+        {
+            info.Warnings.Add($"localchromestore.json: JSON parse error — {ex.Message}");
+            return;
+        }
+        if (manifest is null) return;
+
+        // F005: validate and surface issues as warnings (non-blocking).
+        var validationErrors = RepoManifest.Validate(manifest);
+        info.Warnings.AddRange(validationErrors);
+
+        // Apply overrides — localchromestore.json takes precedence over
+        // manifest.json / repo metadata for catalog-facing fields.
+        if (!string.IsNullOrWhiteSpace(manifest.DisplayName))
+            info.ManifestName = manifest.DisplayName;
+        if (!string.IsNullOrWhiteSpace(manifest.Description))
+            info.ManifestDescription = manifest.Description;
+        if (!string.IsNullOrWhiteSpace(manifest.IconUrl) && validationErrors.All(e => !e.Contains("iconUrl")))
+            info.IconUrl = manifest.IconUrl;
+        if (!string.IsNullOrWhiteSpace(manifest.HomepageUrl) && validationErrors.All(e => !e.Contains("homepageUrl")))
+            info.HomepageUrl = manifest.HomepageUrl;
+        if (manifest.HideFromCatalog == true)
+            info.Warnings.Add("localchromestore.json: repo author flagged this extension as hidden from catalog.");
+
+        info.HasRepoManifest = true;
+        log?.Report($"  + localchromestore.json found for {repo.Name}");
     }
 
     private async Task<string?> TryReadRepoFileAsync(GitHubClient client, Repository repo, string path, CancellationToken ct)

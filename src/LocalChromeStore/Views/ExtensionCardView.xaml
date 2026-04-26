@@ -261,6 +261,19 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </Border>
+                <!-- F004: localchromestore.json catalog manifest badge -->
+                <Border Visibility="{Binding HasRepoManifest, Converter={StaticResource BoolToVis}}"
+                        ToolTip="This repo provides a localchromestore.json catalog manifest (F004).">
+                    <Border.Style>
+                        <Style TargetType="Border" BasedOn="{StaticResource MetaBadge}">
+                            <Setter Property="Background" Value="{StaticResource TealSoftBrush}" />
+                            <Setter Property="BorderBrush" Value="{StaticResource TealBrush}" />
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="LCS Manifest"
+                               Style="{StaticResource MetaBadgeText}"
+                               Foreground="{StaticResource TealBrush}" />
+                </Border>
             </WrapPanel>
 
             <TextBlock Grid.Row="3"
@@ -386,6 +399,20 @@
                             Style="{StaticResource LinkButton}"
                             Command="{Binding InspectCommand}"
                             ToolTip="Open the manifest risk panel — permissions, host access, and trust signals before install."
+                            Margin="0,0,4,0" />
+                    <!-- F004: homepage link when repo manifest provides one -->
+                    <Button Content="Home"
+                            Style="{StaticResource LinkButton}"
+                            Command="{Binding OpenHomepageCommand}"
+                            Visibility="{Binding HasHomepageUrl, Converter={StaticResource BoolToVis}}"
+                            ToolTip="{Binding Info.HomepageUrl}"
+                            Margin="0,0,4,0" />
+                    <!-- F026: copy build command to clipboard when framework is known -->
+                    <Button Content="Copy Build Cmd"
+                            Style="{StaticResource LinkButton}"
+                            Command="{Binding CopyBuildCommandCommand}"
+                            Visibility="{Binding HasBuildCommand, Converter={StaticResource BoolToVis}}"
+                            ToolTip="{Binding BuildCommand}"
                             Margin="0,0,4,0" />
                     <Button Content="Why"
                             Style="{StaticResource LinkButton}"

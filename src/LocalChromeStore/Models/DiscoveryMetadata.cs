@@ -118,4 +118,18 @@ public static class FrameworkLabels
         TrustTier.ChecksumVerified => "Checksum verified",
         _ => "Unknown source"
     };
+
+    /// <summary>
+    /// F026: returns the conventional build command for the detected framework,
+    /// or an empty string for unknown / plain extensions.
+    /// </summary>
+    public static string BuildCommand(ExtensionFramework f) => f switch
+    {
+        ExtensionFramework.Wxt         => "wxt build",
+        ExtensionFramework.Plasmo      => "plasmo build",
+        ExtensionFramework.ExtensionJs => "npx extension build",
+        ExtensionFramework.Crxjs       => "vite build",
+        ExtensionFramework.WebExt      => "web-ext build",
+        _                              => string.Empty
+    };
 }

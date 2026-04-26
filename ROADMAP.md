@@ -211,6 +211,7 @@ These items should land before the next public feature release because they impr
    - Implement F001, F002, F003, F004, F005, F026, F041, F046, F056, F067, F072, and F075.
    - Output: cards explain why a repo appears, what framework/artifact shape was detected, whether it is MV2/MV3, how fresh it is, and what metadata is missing.
    - Acceptance: no install behavior changes; discovery records are richer; settings include extra-owner editing; empty/error/rate-limit states are distinct.
+   - 2026-07-03 progress: F004 `localchromestore.json` manifest fetch+override done; F005 manifest validator done (field-length, category, URL checks surface as card warnings); F026 build command dry-run done (`FrameworkLabels.BuildCommand()`, "Copy Build Cmd" card button, WhyShown tooltip, `RepoManifestTests` 23 cases). **F004, F005, F026 done. All Now/Group-1 items complete.**
 
 2. **Trust baseline**
    - Implement F006, F007, F008, F009, F058, F059, and F069.

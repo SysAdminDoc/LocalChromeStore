@@ -23,6 +23,8 @@
     <Color x:Key="YellowColor">#f9e2af</Color>
     <Color x:Key="YellowSoftColor">#45351f</Color>
     <Color x:Key="PeachColor">#fab387</Color>
+    <Color x:Key="TealColor">#94e2d5</Color>
+    <Color x:Key="TealSoftColor">#1e3d3a</Color>
 
     <SolidColorBrush x:Key="BaseBrush" Color="{StaticResource BaseColor}" />
     <SolidColorBrush x:Key="MantleBrush" Color="{StaticResource MantleColor}" />
@@ -45,6 +47,8 @@
     <SolidColorBrush x:Key="YellowBrush" Color="{StaticResource YellowColor}" />
     <SolidColorBrush x:Key="YellowSoftBrush" Color="{StaticResource YellowSoftColor}" />
     <SolidColorBrush x:Key="PeachBrush" Color="{StaticResource PeachColor}" />
+    <SolidColorBrush x:Key="TealBrush" Color="{StaticResource TealColor}" />
+    <SolidColorBrush x:Key="TealSoftBrush" Color="{StaticResource TealSoftColor}" />
     <SolidColorBrush x:Key="FocusRingBrush" Color="#f5c2e7" />
 
     <DropShadowEffect x:Key="PanelShadow"

@@ -30,6 +30,10 @@ public sealed class ExtensionInfo
     public bool IsArchived { get; set; }
     public List<string> Warnings { get; set; } = new();
 
+    // F004: repo-supplied catalog manifest
+    public bool HasRepoManifest { get; set; }
+    public string? HomepageUrl { get; set; }
+
     // Trust + risk metadata
     public string? ChecksumUrl { get; set; }
     public string? ChecksumName { get; set; }
