@@ -97,7 +97,7 @@ The browser opens with `--load-extension=<all installed paths>`. The browser wil
 
 Use **Copy args** to copy the exact command LocalChromeStore will run. This is useful when debugging extension load failures or reproducing a launch session outside the app.
 
-Use **Export environment** to save the installed extension set, manifest trust snapshot, GitHub owner list, topic filter, and launch options as a portable JSON file. Use **Import environment** on another machine to apply those discovery settings, refresh GitHub, and install matching ZIP/CRX release assets. GitHub tokens are never written to the export file.
+Use **Export environment** to save the installed extension set, manifest trust snapshot, GitHub owner list, topic filter, and launch options as a portable JSON file. Use **Import environment** on another machine to apply those discovery settings, refresh GitHub, and install matching ZIP/CRX release assets. If the current catalog release adds permissions compared with the exported snapshot or local installed copy, import asks for approval before installing it. GitHub tokens are never written to the export file.
 
 ---
 

@@ -78,6 +78,28 @@ public sealed class PermissionDiffTests
         Assert.Contains(diff.Removed, i => i.Kind == PermissionDiffKind.OptionalHostPermission && i.Value == "https://old.example/*");
     }
 
+    [Fact]
+    public void Compare_EnvironmentSnapshotDetectsCurrentCatalogExpansion()
+    {
+        var snapshot = new EnvironmentExtensionSnapshot
+        {
+            RepoOwner = "owner",
+            RepoName = "repo",
+            Version = "1.0.0",
+            Permissions = ["storage"],
+            OptionalHostPermissions = ["https://old.example/*"]
+        };
+        var incoming = Incoming(
+            permissions: ["storage", "history"],
+            optionalHostPermissions: ["https://old.example/*", "https://new.example/*"]);
+
+        var diff = PermissionDiff.Compare(snapshot, incoming);
+
+        Assert.True(diff.HasAdditions);
+        Assert.Contains(diff.Added, i => i.Kind == PermissionDiffKind.RequiredPermission && i.Value == "history");
+        Assert.Contains(diff.Added, i => i.Kind == PermissionDiffKind.OptionalHostPermission && i.Value == "https://new.example/*");
+    }
+
     private static InstalledExtension Installed(
         string[]? permissions = null,
         string[]? optionalPermissions = null,

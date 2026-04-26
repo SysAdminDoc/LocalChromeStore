@@ -17,7 +17,7 @@ What it claims and delivers:
 
 What is incomplete or stubbed:
 
-- Permission diff is now enforced for local release-asset updates, but exact historical-version restore and policy-hosted update safety remain open.
+- Permission diff is now enforced for local release-asset updates and environment imports that resolve to broader current catalog releases, but exact historical-version restore and policy-hosted update safety remain open.
 - Hidden repos are still restored as a single bulk action rather than through a per-repo management list.
 - Enterprise policy install, CRX3 signing, update XML, and browser-native hosted auto-update are roadmap-only.
 - Test coverage is still narrow: broader manifest/extraction/version/settings migration cases and UI smoke automation remain open.
@@ -224,6 +224,7 @@ These items should land before the next public feature release because they impr
    - 2026-04-25 progress: F038 and F060 groundwork are implemented. Installed records now retain manifest/trust snapshots, and environment JSON export/import can carry installed extension targets, GitHub owner/topic settings, and launch options across machines. Exact historical-version restore remains open.
    - 2026-04-25 progress: F011 and F012 are implemented for the local release-asset path. Cards expose update availability, the toolbar has **Update all**, settings now expose launch-after-install and auto-update-on-refresh, and diagnostics include those workflow flags.
    - 2026-04-25 progress: F010/F060 are enforced for local release-asset updates. Card updates and manual **Update all** require approval when required permissions, optional permissions, host access, or optional host access expand; auto-update skips those updates for manual review.
+   - 2026-04-25 progress: F038 import safety now uses the same permission-diff model. If a portable environment import resolves to a current catalog release with broader access than the exported snapshot or local installed copy, import requires approval before installing it.
 
 4. **Profiles and better launch sessions**
    - Implement F013, F016, F019, F020.
@@ -251,7 +252,7 @@ These become valuable once the Now foundation exists.
 
 3. **Historical restore and policy update safety**
    - Finish exact historical-version restore for environment imports and carry permission-diff checks into future policy-hosted update flows.
-   - Reason: local release-asset updates now block silent privilege expansion, but portable restores and policy mode need the same safety model.
+   - Reason: local release-asset updates and current-release imports now block silent privilege expansion, but exact historical restores and policy mode need the same safety model.
 
 ## Later
 

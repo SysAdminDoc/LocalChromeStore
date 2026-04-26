@@ -939,14 +939,15 @@ public sealed class MainViewModel : ViewModelBase
     {
         var cards = Extensions.ToDictionary(c => c.Repo, StringComparer.OrdinalIgnoreCase);
         var installed = 0;
-        var skipped = 0;
+        var alreadyCurrent = 0;
+        var skippedForPermissionReview = 0;
         var missing = 0;
         foreach (var target in manifest.Extensions)
         {
-            if (_extensions.Find(target.RepoOwner, target.RepoName) is { } existing
-                && existing.Version.Equals(target.Version, StringComparison.OrdinalIgnoreCase))
+            var existing = _extensions.Find(target.RepoOwner, target.RepoName);
+            if (existing is not null && existing.Version.Equals(target.Version, StringComparison.OrdinalIgnoreCase))
             {
-                skipped++;
+                alreadyCurrent++;
                 Log($"Import skip: {target.Key} is already installed at {target.Version}.");
                 continue;
             }
@@ -968,13 +969,49 @@ public sealed class MainViewModel : ViewModelBase
             if (!card.Version.Equals(target.Version, StringComparison.OrdinalIgnoreCase))
                 Log($"Import version note: {target.Key} requested {target.Version}; installing current catalog version {card.Version}.");
 
+            var permissionDiff = existing is not null
+                ? PermissionDiff.Compare(existing, card.Info)
+                : PermissionDiff.Compare(target, card.Info);
+            if (permissionDiff.HasAdditions && !ConfirmEnvironmentImportPermissionExpansion(target, card, permissionDiff, existing is null))
+            {
+                skippedForPermissionReview++;
+                Log($"Import skip: {target.Key} needs permission review before installing current catalog version {card.Version}.");
+                continue;
+            }
+
             await _extensions.InstallAsync(card.Info, new Progress<string>(Log));
             installed++;
         }
 
         _extensions.Reload();
-        Log($"Environment import summary: {installed} installed, {skipped} already current, {missing} missing.");
+        var summary = $"Environment import summary: {installed} installed, {alreadyCurrent} already current, {missing} missing";
+        if (skippedForPermissionReview > 0)
+            summary += $", {skippedForPermissionReview} skipped for permission review";
+        Log(summary + ".");
         RefreshAfterChange();
+    }
+
+    private bool ConfirmEnvironmentImportPermissionExpansion(
+        EnvironmentExtensionSnapshot target,
+        ExtensionCardViewModel card,
+        PermissionDiff diff,
+        bool comparedWithImportedSnapshot)
+    {
+        var baseline = comparedWithImportedSnapshot
+            ? $"the exported {target.Version} environment snapshot"
+            : "the local installed copy";
+        var confirm = MessageBox.Show(
+            $"Import {target.Key}?\n\nThe current catalog release ({card.Version}) adds extension access compared with {baseline}:\n\n{diff.FormatAddedForPrompt()}\n\nInstall the current catalog release anyway?",
+            "Review import permissions",
+            MessageBoxButton.YesNo,
+            diff.HasHighRiskAdditions ? MessageBoxImage.Warning : MessageBoxImage.Question);
+        if (confirm == MessageBoxResult.Yes)
+        {
+            Log($"Import permission expansion approved for {target.Key}: {diff.AddedSummary}.");
+            return true;
+        }
+
+        return false;
     }
 
     private string BuildDiagnosticsBundle()

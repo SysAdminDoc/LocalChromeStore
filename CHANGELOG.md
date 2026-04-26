@@ -6,7 +6,7 @@ All notable changes to LocalChromeStore are documented here. Format roughly foll
 
 ### Added
 - Auditable launch sessions with startup URL, clean temporary Chromium profile mode, and copyable launch command preview.
-- Portable environment export/import for installed extension targets, discovery settings, launch options, and manifest trust snapshots.
+- Portable environment export/import for installed extension targets, discovery settings, launch options, manifest trust snapshots, and permission review when imports resolve to broader current catalog releases.
 - Update workflow controls with **Update all**, optional auto-update on refresh, permission-diff approval for access-expanding updates, and optional browser launch after successful installs or updates.
 - Focused xUnit test project covering launch argument construction and SHA256 sidecar parsing.
 - Windows CI build/test workflow and Dependabot coverage for NuGet and GitHub Actions.

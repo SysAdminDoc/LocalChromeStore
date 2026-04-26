@@ -86,11 +86,35 @@ public sealed class PermissionDiff
 
     public static PermissionDiff Compare(InstalledExtension installed, ExtensionInfo incoming)
     {
-        var installedRequired = Normalize(installed.Permissions);
-        var installedOptional = Normalize(installed.OptionalPermissions);
-        var installedHost = Normalize(installed.HostPermissions);
-        var installedOptionalHost = Normalize(installed.OptionalHostPermissions);
+        return CompareSets(
+            installed.Permissions,
+            installed.OptionalPermissions,
+            installed.HostPermissions,
+            installed.OptionalHostPermissions,
+            incoming);
+    }
 
+    public static PermissionDiff Compare(EnvironmentExtensionSnapshot snapshot, ExtensionInfo incoming)
+    {
+        return CompareSets(
+            snapshot.Permissions,
+            snapshot.OptionalPermissions,
+            snapshot.HostPermissions,
+            snapshot.OptionalHostPermissions,
+            incoming);
+    }
+
+    private static PermissionDiff CompareSets(
+        IEnumerable<string>? currentPermissions,
+        IEnumerable<string>? currentOptionalPermissions,
+        IEnumerable<string>? currentHostPermissions,
+        IEnumerable<string>? currentOptionalHostPermissions,
+        ExtensionInfo incoming)
+    {
+        var installedRequired = Normalize(currentPermissions);
+        var installedOptional = Normalize(currentOptionalPermissions);
+        var installedHost = Normalize(currentHostPermissions);
+        var installedOptionalHost = Normalize(currentOptionalHostPermissions);
         var incomingRequired = Normalize(incoming.Permissions);
         var incomingOptional = Normalize(incoming.OptionalPermissions);
         var incomingHost = Normalize(incoming.HostPermissions);
