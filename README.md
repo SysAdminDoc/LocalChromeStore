@@ -42,7 +42,7 @@ LocalChromeStore wraps path 2 with a real store UI and (in v0.2.0) wraps path 3 
 - **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with `--load-extension=...` pointing at every installed extension
 - **Auditable launch sessions** — optional startup URL, clean temporary profile mode, and a copyable launch command preview
 - **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
-- **Update workflow** — update-available badges, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
+- **Update workflow** — update-available badges, permission-change review, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
 - **Search and filter** — by name, repo, or description; toggle to show only installed
 - **Topic filter (optional)** — restrict discovery to repos tagged with a specific GitHub topic (default `chrome-extension`)
 - **Optional GitHub PAT** — unauthenticated GitHub API caps at 60 req/h; a personal access token raises that to 5,000/h, unlocks private repos, and is stored with Windows DPAPI
@@ -84,7 +84,7 @@ dotnet test LocalChromeStore.sln -c Release
 
 Every qualifying repo appears as a card. Click **Install** on a card — LocalChromeStore downloads the latest release ZIP/CRX, extracts it to `%LOCALAPPDATA%\LocalChromeStore\extensions\<owner>\<repo>\<version>\`, and registers it.
 
-When installed extensions have newer catalog versions, their cards show **Update available**. Use the card's update button for one extension, or **Update all** to replace every installable outdated local copy. The Settings drawer also includes optional **Auto-update on refresh** and **Launch browser after install** toggles for a faster dogfood loop.
+When installed extensions have newer catalog versions, their cards show **Update available**. Use the card's update button for one extension, or **Update all** to replace every installable outdated local copy. If an update adds required permissions, optional permissions, host access, or optional host access, LocalChromeStore shows the diff and asks for approval first. **Auto-update on refresh** skips permission-expanding updates so new extension access is not accepted silently.
 
 To load installed extensions into a browser:
 
@@ -149,7 +149,7 @@ CRX files are unpacked by stripping the CRX2/CRX3 header and extracting the inne
 See [ROADMAP.md](ROADMAP.md). Highlights:
 
 - **v0.2.0** — Enterprise Policy install path: write `HKLM\Software\Policies\Google\Chrome\ExtensionInstallForcelist` (and Brave / Edge equivalents) plus a self-hosted `update.xml` on GitHub Pages, so extensions auto-install at next browser launch with no `--load-extension` flag and no developer-mode banner
-- **v0.3.0** — Update safety: permission diffs before update, stronger manifest/extraction tests, and policy-ready package checks
+- **v0.3.0** — Update safety: historical-version restore for environment imports, stronger manifest/extraction tests, and policy-ready package checks
 - **v0.4.0** — Light theme + accent color picker
 - **v0.5.0** — Local folder source, custom update-feed source, and richer named launch profiles
 

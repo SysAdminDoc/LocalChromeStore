@@ -82,6 +82,11 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public string InstalledDetail => IsInstalled
         ? $"Local version {_installed!.Version}"
         : "Not installed locally";
+    public PermissionDiff UpdatePermissionDiff => _installed is null
+        ? PermissionDiff.Empty
+        : PermissionDiff.Compare(_installed, Info);
+    public bool HasUpdatePermissionExpansion => IsUpdateAvailable && UpdatePermissionDiff.HasAdditions;
+    public bool HasHighRiskUpdatePermissionExpansion => HasUpdatePermissionExpansion && UpdatePermissionDiff.HasHighRiskAdditions;
 
     // Catalog explainability ------------------------------------------------
 
@@ -241,6 +246,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     private async Task InstallAsync(object? _)
     {
         if (!HasAsset) return;
+        if (IsUpdateAvailable && !ConfirmUpdatePermissionExpansion()) return;
+
         var installed = false;
         Busy = true;
         try
@@ -280,6 +287,26 @@ public sealed class ExtensionCardViewModel : ViewModelBase
             try { await _afterInstall(); }
             catch (Exception ex) { _log($"! Post-install action failed for {Repo}: {ex.Message}"); }
         }
+    }
+
+    private bool ConfirmUpdatePermissionExpansion()
+    {
+        var diff = UpdatePermissionDiff;
+        if (!diff.HasAdditions) return true;
+
+        var confirm = MessageBox.Show(
+            $"Update {Title}?\n\nThis update adds extension access:\n\n{diff.FormatAddedForPrompt()}\n\nInstall this update anyway?",
+            "Review update permissions",
+            MessageBoxButton.YesNo,
+            diff.HasHighRiskAdditions ? MessageBoxImage.Warning : MessageBoxImage.Question);
+        if (confirm == MessageBoxResult.Yes)
+        {
+            _log($"Permission expansion approved for {Repo}: {diff.AddedSummary}.");
+            return true;
+        }
+
+        _log($"Update cancelled for {Repo}: permission expansion was not approved.");
+        return false;
     }
 
     private void Uninstall()
@@ -362,6 +389,9 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(StatusBadge));
         OnPropertyChanged(nameof(HasAsset));
         OnPropertyChanged(nameof(IsUpdateAvailable));
+        OnPropertyChanged(nameof(UpdatePermissionDiff));
+        OnPropertyChanged(nameof(HasUpdatePermissionExpansion));
+        OnPropertyChanged(nameof(HasHighRiskUpdatePermissionExpansion));
         OnPropertyChanged(nameof(CanOpenInstallDir));
         OnPropertyChanged(nameof(InstalledDetail));
         OnPropertyChanged(nameof(Trust));

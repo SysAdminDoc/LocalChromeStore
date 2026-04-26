@@ -443,7 +443,7 @@
                                 <CheckBox Content="Auto-update on refresh"
                                           IsChecked="{Binding AutoUpdateOnRefresh}"
                                           Margin="0,8,0,0"
-                                          ToolTip="When refresh finds installed extensions with newer release assets, update them automatically." />
+                                          ToolTip="When refresh finds installed extensions with newer release assets, update them automatically. Updates that add permissions are skipped until manual review." />
                                 <TextBlock Text="{Binding UpdateStatusSummary}"
                                            Style="{StaticResource MuteText}"
                                            TextWrapping="Wrap"

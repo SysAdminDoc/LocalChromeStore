@@ -234,6 +234,33 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </Border>
+                <Border Visibility="{Binding HasUpdatePermissionExpansion, Converter={StaticResource BoolToVis}}"
+                        ToolTip="{Binding UpdatePermissionDiff.AddedSummary}">
+                    <Border.Style>
+                        <Style TargetType="Border" BasedOn="{StaticResource MetaBadge}">
+                            <Setter Property="Background" Value="{StaticResource YellowSoftBrush}" />
+                            <Setter Property="BorderBrush" Value="{StaticResource YellowBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasHighRiskUpdatePermissionExpansion}" Value="True">
+                                    <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
+                                    <Setter Property="BorderBrush" Value="{StaticResource RedBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="Review update">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource MetaBadgeText}">
+                                <Setter Property="Foreground" Value="{StaticResource YellowBrush}" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasHighRiskUpdatePermissionExpansion}" Value="True">
+                                        <Setter Property="Foreground" Value="{StaticResource RedBrush}" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Border>
             </WrapPanel>
 
             <TextBlock Grid.Row="3"

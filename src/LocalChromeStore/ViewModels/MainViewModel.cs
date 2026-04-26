@@ -129,6 +129,7 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(HasHiddenRepos));
                 OnPropertyChanged(nameof(HasInstallableUpdates));
                 OnPropertyChanged(nameof(UpdateAllLabel));
+                OnPropertyChanged(nameof(PermissionReviewUpdateCount));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -299,6 +300,7 @@ public sealed class MainViewModel : ViewModelBase
     public int AvailableCount => Extensions.Count;
     public int UpdateAvailableCount => Extensions.Count(e => e.IsUpdateAvailable);
     public int InstallableUpdateCount => Extensions.Count(e => e.IsUpdateAvailable && e.HasAsset);
+    public int PermissionReviewUpdateCount => Extensions.Count(e => e.IsUpdateAvailable && e.HasAsset && e.HasUpdatePermissionExpansion);
     public int VisibleCount => ExtensionsView.Cast<object>().Count();
     public int HiddenRepoCount => _settings.HiddenRepos.Count;
     public bool HasInstalledExtensions => InstalledCount > 0;
@@ -311,8 +313,11 @@ public sealed class MainViewModel : ViewModelBase
     public string UpdateStatusSummary => UpdateAvailableCount == 0
         ? "No installed extensions have newer catalog versions."
         : InstallableUpdateCount == UpdateAvailableCount
-            ? $"{UpdateAvailableCount} installed extension(s) can be updated."
-            : $"{InstallableUpdateCount} of {UpdateAvailableCount} update(s) have installable release assets.";
+            ? $"{UpdateAvailableCount} installed extension(s) can be updated.{PermissionReviewSuffix}"
+            : $"{InstallableUpdateCount} of {UpdateAvailableCount} update(s) have installable release assets.{PermissionReviewSuffix}";
+    private string PermissionReviewSuffix => PermissionReviewUpdateCount == 0
+        ? string.Empty
+        : $" {PermissionReviewUpdateCount} add new permissions and require review.";
     public string BrowserSummary => Browsers.Count == 0
         ? "No supported Chromium browser detected."
         : $"{Browsers.Count} browser(s) detected.";
@@ -581,20 +586,47 @@ public sealed class MainViewModel : ViewModelBase
             return;
         }
 
+        var skippedPermissionReview = 0;
+        var skippedNoAsset = updateCards.Count - installableCards.Count;
+        if (!confirmFirst)
+        {
+            var permissionReviewCards = installableCards.Where(c => c.HasUpdatePermissionExpansion).ToList();
+            if (permissionReviewCards.Count > 0)
+            {
+                foreach (var card in permissionReviewCards)
+                    Log($"! {operationName} skipped {card.Repo}: update adds permissions or host access ({card.UpdatePermissionDiff.AddedSummary}). Use manual update to review.");
+
+                skippedPermissionReview = permissionReviewCards.Count;
+                installableCards = installableCards.Where(c => !c.HasUpdatePermissionExpansion).ToList();
+                if (installableCards.Count == 0)
+                {
+                    var reviewSummary = $"{operationName} skipped {skippedPermissionReview} update(s) that add permissions or host access. Use Update all or the card update button to review.";
+                    StatusText = reviewSummary;
+                    Log(reviewSummary);
+                    return;
+                }
+            }
+        }
+
         if (confirmFirst)
         {
+            var permissionReviewCards = installableCards.Where(c => c.HasUpdatePermissionExpansion).ToList();
+            var permissionReviewText = permissionReviewCards.Count == 0
+                ? string.Empty
+                : $"{Environment.NewLine}{Environment.NewLine}Permission changes needing approval:{Environment.NewLine}{FormatPermissionReviewList(permissionReviewCards)}";
             var confirm = MessageBox.Show(
-                $"Update {installableCards.Count} installed extension(s)?\n\nLocalChromeStore will replace each local copy with the current catalog release asset. Existing installs remain registered if an update fails.",
+                $"Update {installableCards.Count} installed extension(s)?\n\nLocalChromeStore will replace each local copy with the current catalog release asset. Existing installs remain registered if an update fails.{permissionReviewText}",
                 "Update extensions",
                 MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
+                permissionReviewCards.Any(c => c.HasHighRiskUpdatePermissionExpansion) ? MessageBoxImage.Warning : MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
+            foreach (var card in permissionReviewCards)
+                Log($"Permission expansion approved for {card.Repo}: {card.UpdatePermissionDiff.AddedSummary}.");
         }
 
         var catalog = catalogSnapshot ?? Extensions.Select(c => c.Info).ToList();
         var updated = 0;
         var failed = 0;
-        var skippedNoAsset = updateCards.Count - installableCards.Count;
         StatusText = $"{operationName}: updating {installableCards.Count} extension(s)...";
         Log($"{operationName}: updating {installableCards.Count} extension(s).");
 
@@ -618,12 +650,22 @@ public sealed class MainViewModel : ViewModelBase
         var summary = $"{operationName} summary: {updated} updated, {failed} failed";
         if (skippedNoAsset > 0)
             summary += $", {skippedNoAsset} skipped without installable assets";
+        if (skippedPermissionReview > 0)
+            summary += $", {skippedPermissionReview} skipped for permission review";
         summary += ".";
         Log(summary);
         StatusText = summary;
 
         if (updated > 0)
             MaybeLaunchAfterInstall($"{updated} updated extension(s)");
+    }
+
+    private static string FormatPermissionReviewList(IReadOnlyList<ExtensionCardViewModel> cards)
+    {
+        var lines = cards.Take(6).Select(c => $"- {c.Repo}: {c.UpdatePermissionDiff.AddedSummary}").ToList();
+        if (cards.Count > lines.Count)
+            lines.Add($"- +{cards.Count - lines.Count} more");
+        return string.Join(Environment.NewLine, lines);
     }
 
     private Task OnExtensionInstalledAsync()
@@ -1000,6 +1042,8 @@ public sealed class MainViewModel : ViewModelBase
             sb.AppendLine($"    Manifest ver: {(info.ManifestVersionNumber.HasValue ? "MV" + info.ManifestVersionNumber : "unknown")}");
             sb.AppendLine($"    Freshness:    {FrameworkLabels.FreshnessLabel(info.Freshness)}{(info.IsArchived ? " (archived)" : "")}");
             sb.AppendLine($"    Permissions:  {info.Permissions.Count + info.OptionalPermissions.Count} ({info.HostPermissions.Count + info.OptionalHostPermissions.Count} host)");
+            if (ext.IsUpdateAvailable && ext.UpdatePermissionDiff.HasAdditions)
+                sb.AppendLine($"    Update adds:  {ext.UpdatePermissionDiff.AddedSummary}");
             sb.AppendLine($"    Checksum:     {(string.IsNullOrEmpty(info.ChecksumUrl) ? "no sidecar" : info.ChecksumName)}");
             if (info.Warnings.Count > 0)
                 sb.AppendLine($"    Warnings:     {string.Join(" | ", info.Warnings)}");
@@ -1094,6 +1138,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(AvailableCount));
         OnPropertyChanged(nameof(UpdateAvailableCount));
         OnPropertyChanged(nameof(InstallableUpdateCount));
+        OnPropertyChanged(nameof(PermissionReviewUpdateCount));
         OnPropertyChanged(nameof(HasInstalledExtensions));
         OnPropertyChanged(nameof(HasUpdates));
         OnPropertyChanged(nameof(HasInstallableUpdates));

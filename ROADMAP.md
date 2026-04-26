@@ -17,11 +17,11 @@ What it claims and delivers:
 
 What is incomplete or stubbed:
 
-- Permission diff before update is still not enforced; updates currently replace local copies with the latest installable catalog release asset after the same manifest risk surfacing used for installs.
+- Permission diff is now enforced for local release-asset updates, but exact historical-version restore and policy-hosted update safety remain open.
 - Hidden repos are still restored as a single bulk action rather than through a per-repo management list.
 - Enterprise policy install, CRX3 signing, update XML, and browser-native hosted auto-update are roadmap-only.
 - Test coverage is still narrow: broader manifest/extraction/version/settings migration cases and UI smoke automation remain open.
-- No permission diff, local source folder source, or named profile/load-set model.
+- No local source folder source or named profile/load-set model.
 
 Philosophy inferred from README, code, and docs:
 
@@ -218,11 +218,12 @@ These items should land before the next public feature release because they impr
    - Acceptance: installs fail closed on checksum mismatch; existing plaintext token settings are migrated; risk panel is visible before install.
 
 3. **Update and environment portability**
-   - Implement F011, F012, F038, F060 groundwork where feasible.
-   - Output: update badges, manual update/update-all, export/import of installed extension environment, and persisted manifest snapshots for future permission diffs.
-   - Acceptance: installed version vs latest version is visible; export file can recreate the selected installed set on another machine.
-   - 2026-04-25 progress: F038 and F060 groundwork are implemented. Installed records now retain manifest/trust snapshots, and environment JSON export/import can carry installed extension targets, GitHub owner/topic settings, and launch options across machines. Exact historical-version restore and permission-diff enforcement remain open.
-   - 2026-04-25 progress: F011 and F012 are implemented for the local release-asset path. Cards expose update availability, the toolbar has **Update all**, settings now expose launch-after-install and auto-update-on-refresh, and diagnostics include those workflow flags. Permission-diff enforcement before update remains open under F010/F060.
+   - Implement F011, F012, F038, and F060 for the local release-asset path.
+   - Output: update badges, manual update/update-all, export/import of installed extension environment, persisted manifest snapshots, and permission-diff approval before access-expanding updates.
+   - Acceptance: installed version vs latest version is visible; export file can recreate the selected installed set on another machine; auto-update does not silently accept new extension access.
+   - 2026-04-25 progress: F038 and F060 groundwork are implemented. Installed records now retain manifest/trust snapshots, and environment JSON export/import can carry installed extension targets, GitHub owner/topic settings, and launch options across machines. Exact historical-version restore remains open.
+   - 2026-04-25 progress: F011 and F012 are implemented for the local release-asset path. Cards expose update availability, the toolbar has **Update all**, settings now expose launch-after-install and auto-update-on-refresh, and diagnostics include those workflow flags.
+   - 2026-04-25 progress: F010/F060 are enforced for local release-asset updates. Card updates and manual **Update all** require approval when required permissions, optional permissions, host access, or optional host access expand; auto-update skips those updates for manual review.
 
 4. **Profiles and better launch sessions**
    - Implement F013, F016, F019, F020.
@@ -248,9 +249,9 @@ These become valuable once the Now foundation exists.
    - Implement F017, F018, F021, F022, F023, F024, F045, F049, F066, F068, F070, F071, F074, F082, F083, F086, F087, F092.
    - Reason: LocalChromeStore should support source repos and developer sessions, but not before source metadata and tests exist.
 
-3. **Permission-diff enforcement**
-   - Implement F010 and F060 completely.
-   - Reason: once update snapshots exist, update gates can block silent privilege expansion.
+3. **Historical restore and policy update safety**
+   - Finish exact historical-version restore for environment imports and carry permission-diff checks into future policy-hosted update flows.
+   - Reason: local release-asset updates now block silent privilege expansion, but portable restores and policy mode need the same safety model.
 
 ## Later
 
