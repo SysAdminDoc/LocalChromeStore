@@ -231,12 +231,15 @@ These items should land before the next public feature release because they impr
    - Output: named load sets, temporary browser profile launches, optional launch URLs, launch args preview.
    - Acceptance: user can launch `All installed`, a custom profile, or a clean temporary test session without editing JSON.
    - 2026-04-25 progress: F016, F019, and F020 are implemented. Launch sessions now support a clean temporary Chromium profile, optional startup URL, and copyable command preview. F013 named load sets remain open.
+   - 2026-07-03 progress: F013 named load sets implemented. Toolbar load-set selector, settings drawer management panel (snapshot, list, per-item delete), `loadsets.json` persistence. **F013 done.**
+   - 2026-07-03 progress: F045 per-repo hidden-repo restore also done here. **F045 done.**
 
 5. **Engineering quality gate**
    - Implement F076, F081, F084, F085.
    - Output: accessibility sweep, unit tests for manifest/extraction/version/settings migration, PR build/test workflow, Dependabot/security scanning enabled.
    - Acceptance: `dotnet build`, unit tests, and CI gate pass; focus/keyboard/screen-reader labels are audited.
    - 2026-04-25 progress: F081, F084, and F085 groundwork are implemented with focused launch/checksum tests, a Windows CI build/test workflow, and Dependabot coverage for NuGet and GitHub Actions. F076 accessibility sweep and broader manifest/extraction/version/settings tests remain open.
+   - 2026-07-03 progress: F076 accessibility sweep done (AutomationProperties.Name on all interactive controls). F081 broader tests done (PermissionCatalogTests + LoadSetSerializationTests, 56 tests total). **F076 and F081 done.**
 
 ## Next
 
@@ -247,8 +250,9 @@ These become valuable once the Now foundation exists.
    - Reason: enterprise policy mode is the product's strongest technical differentiator, but it needs signing/update/preflight/rollback first.
 
 2. **Local/source-aware extension development**
-   - Implement F017, F018, F021, F022, F023, F024, F045, F049, F066, F068, F070, F071, F074, F082, F083, F086, F087, F092.
+   - Implement F017, F018, F021, F022, F023, F024, F049, F066, F068, F070, F071, F074, F082, F083, F086, F087, F092.
    - Reason: LocalChromeStore should support source repos and developer sessions, but not before source metadata and tests exist.
+   - Note: F045 per-repo hidden-repo restore moved to Now and completed in v0.2.0.
 
 3. **Historical restore and policy update safety**
    - Finish exact historical-version restore for environment imports and carry permission-diff checks into future policy-hosted update flows.

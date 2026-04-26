@@ -4,17 +4,16 @@ All notable changes to LocalChromeStore are documented here. Format roughly foll
 
 ## Unreleased
 
-### Added
-- Auditable launch sessions with startup URL, clean temporary Chromium profile mode, and copyable launch command preview.
-- Portable environment export/import for installed extension targets, discovery settings, launch options, manifest trust snapshots, and permission review when imports resolve to broader current catalog releases.
-- Update workflow controls with **Update all**, optional auto-update on refresh, permission-diff approval for access-expanding updates, and optional browser launch after successful installs or updates.
-- Focused xUnit test project covering launch argument construction and SHA256 sidecar parsing.
-- Windows CI build/test workflow and Dependabot coverage for NuGet and GitHub Actions.
+## v0.2.0 — 2026-07-03
 
-### Changed
-- Browser launch argument construction now uses raw `ProcessStartInfo.ArgumentList` values and only quotes the human-readable preview.
-- Installed extension records now persist manifest version, framework, permissions, host permissions, display name, and repo URL for future permission-diff and migration work.
-- README and roadmap now reflect DPAPI token storage, extra-owner UI, trust metadata, launch sessions, and the new quality gate.
+### Added
+- **Named load sets (F013)** — Snapshot the currently-installed extensions into a named launch profile. The toolbar load-set selector lets you switch between "All installed" and any saved set. Sets are persisted to `%APPDATA%\LocalChromeStore\loadsets.json` and respected by Launch, Launch (installed only), and the launch preview summary.
+- **Per-repo hidden-repo restore (F045)** — The settings drawer "Hidden repositories" section now lists individual hidden repos with per-row Restore buttons in addition to the existing "Restore all" action.
+- **Accessibility sweep (F076)** — Added `AutomationProperties.Name` to all previously unlabeled interactive controls: search box, browser selector, load-set selector, GitHub credentials inputs, extra-owner input, and topic filter. Screen readers now surface useful names for every toolbar and settings-drawer input.
+- **Broader unit tests (F081)** — `PermissionCatalogTests.cs` covers `Describe()` risk classification (High/Medium/Low/Informational) for 20+ permissions, case-insensitive lookup, optional-flag forwarding, `DescribeHost()` universal/wildcard/exact host patterns, and `Aggregate()` dominance rules. `LoadSetSerializationTests.cs` covers JSON roundtrip with null and non-null `ExtensionKeys`, list serialization, and `CreatedAt` preservation. Total test count 10 → 56.
+
+### Fixed
+- `LaunchBrowser()` `installedOnly` parameter bug where both branches were identical; replaced by load-set–aware `GetActiveLoadSetExtensions()`.
 
 ## v0.1.0 — 2026-04-25
 

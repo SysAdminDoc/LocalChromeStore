@@ -14,6 +14,7 @@ public sealed class SettingsService
     public string CacheDir { get; }
     public string LogsDir { get; }
     public string ManifestPath { get; }
+    public string LoadSetsPath { get; }
     public string IconCacheDir { get; }
 
     /// <summary>
@@ -42,6 +43,7 @@ public sealed class SettingsService
         LogsDir = Path.Combine(localAppData, "LocalChromeStore", "logs");
         IconCacheDir = Path.Combine(CacheDir, "icons");
         ManifestPath = Path.Combine(SettingsDir, "installed.json");
+        LoadSetsPath = Path.Combine(SettingsDir, "loadsets.json");
         Directory.CreateDirectory(SettingsDir);
         Directory.CreateDirectory(ExtensionsRoot);
         Directory.CreateDirectory(CacheDir);
@@ -113,6 +115,23 @@ public sealed class SettingsService
     {
         var json = JsonSerializer.Serialize(manifest, JsonOpts);
         File.WriteAllText(ManifestPath, json);
+    }
+
+    public List<LoadSet> LoadLoadSets()
+    {
+        if (!File.Exists(LoadSetsPath)) return [];
+        try
+        {
+            var json = File.ReadAllText(LoadSetsPath);
+            return JsonSerializer.Deserialize<List<LoadSet>>(json, JsonOpts) ?? [];
+        }
+        catch { return []; }
+    }
+
+    public void SaveLoadSets(IEnumerable<LoadSet> sets)
+    {
+        var json = JsonSerializer.Serialize(sets.ToList(), JsonOpts);
+        File.WriteAllText(LoadSetsPath, json);
     }
 
     private static string Protect(string plaintext)

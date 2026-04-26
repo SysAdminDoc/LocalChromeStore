@@ -34,12 +34,18 @@ public sealed class MainViewModel : ViewModelBase
     private bool _isDegraded;
     private string _launchUrlInput = string.Empty;
     private bool _launchWithTemporaryProfile;
+    private LoadSet? _selectedLoadSet;
+    private string _newLoadSetNameInput = string.Empty;
+
+    private static readonly LoadSet SentinelLoadSet = new() { Id = "__all__", Name = "All installed" };
 
     public ObservableCollection<ExtensionCardViewModel> Extensions { get; } = new();
     public ICollectionView ExtensionsView { get; }
     public ObservableCollection<string> LogLines { get; } = new();
     public ObservableCollection<BrowserInfo> Browsers { get; } = new();
     public ObservableCollection<string> ExtraOwners { get; } = new();
+    public ObservableCollection<LoadSet> LoadSets { get; } = new();
+    public ObservableCollection<string> HiddenRepos { get; } = new();
 
     public ICommand RefreshCommand { get; }
     public ICommand UpdateAllCommand { get; }
@@ -57,6 +63,9 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand ExportEnvironmentCommand { get; }
     public ICommand ImportEnvironmentCommand { get; }
     public ICommand CopyLaunchArgumentsCommand { get; }
+    public ICommand CreateLoadSetCommand { get; }
+    public ICommand DeleteLoadSetCommand { get; }
+    public ICommand RestoreHiddenRepoCommand { get; }
 
     public MainViewModel()
     {
@@ -72,6 +81,8 @@ public sealed class MainViewModel : ViewModelBase
         _launchUrlInput = _settings.LaunchUrl ?? string.Empty;
         _launchWithTemporaryProfile = _settings.LaunchWithTemporaryProfile;
         ReloadExtraOwnersFromSettings();
+        SyncHiddenReposCollection();
+        ReloadLoadSetsFromService();
 
         ExtensionsView = CollectionViewSource.GetDefaultView(Extensions);
         ExtensionsView.Filter = FilterExtension;
@@ -87,8 +98,8 @@ public sealed class MainViewModel : ViewModelBase
             if (SaveSettings())
                 await RefreshAsync();
         }, _ => !Busy);
-        LaunchBrowserCommand = new RelayCommand(_ => LaunchBrowser(installedOnly: false), _ => CanLaunchBrowser);
-        LaunchInstalledOnlyCommand = new RelayCommand(_ => LaunchBrowser(installedOnly: true), _ => SelectedBrowser != null && _extensions.Installed.Any());
+        LaunchBrowserCommand = new RelayCommand(_ => LaunchBrowser(), _ => CanLaunchBrowser);
+        LaunchInstalledOnlyCommand = new RelayCommand(_ => LaunchBrowser(), _ => CanLaunchBrowser);
         OpenInstallDirCommand = new RelayCommand(_ => OpenInstallDir());
         ClearHiddenReposCommand = new AsyncRelayCommand(async _ =>
         {
@@ -103,6 +114,15 @@ public sealed class MainViewModel : ViewModelBase
         ExportEnvironmentCommand = new RelayCommand(_ => ExportEnvironment());
         ImportEnvironmentCommand = new AsyncRelayCommand(_ => ImportEnvironmentAsync(), _ => !Busy);
         CopyLaunchArgumentsCommand = new RelayCommand(_ => CopyLaunchArguments(), _ => SelectedBrowser != null);
+        CreateLoadSetCommand = new RelayCommand(_ => CreateLoadSet(),
+            _ => !string.IsNullOrWhiteSpace(NewLoadSetNameInput) && _extensions.Installed.Any());
+        DeleteLoadSetCommand = new RelayCommand(
+            o => DeleteLoadSet(o as LoadSet ?? _selectedLoadSet),
+            o => {
+                var target = o as LoadSet ?? _selectedLoadSet;
+                return target is not null && target.Id != SentinelLoadSet.Id;
+            });
+        RestoreHiddenRepoCommand = new RelayCommand(o => RestoreHiddenRepo(o as string), o => o is string { Length: > 0 });
 
         DetectBrowsers();
         Log($"LocalChromeStore v{App.ResourceAssembly.GetName().Version} ready.");
@@ -242,6 +262,36 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    public LoadSet? SelectedLoadSet
+    {
+        get => _selectedLoadSet;
+        set
+        {
+            if (SetField(ref _selectedLoadSet, value))
+            {
+                OnPropertyChanged(nameof(ActiveLoadSetLabel));
+                RefreshLaunchPreviewProperties();
+                CommandManager.InvalidateRequerySuggested();
+            }
+        }
+    }
+
+    public string NewLoadSetNameInput
+    {
+        get => _newLoadSetNameInput;
+        set
+        {
+            if (SetField(ref _newLoadSetNameInput, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public bool HasNamedLoadSets => LoadSets.Count > 1;
+
+    public string ActiveLoadSetLabel => _selectedLoadSet is null || _selectedLoadSet.Id == SentinelLoadSet.Id
+        ? "All installed extensions"
+        : $"{_selectedLoadSet.Name} ({_selectedLoadSet.ExtensionKeys?.Count ?? 0} extension(s))";
+
     public bool LaunchBrowserAfterInstall
     {
         get => _settings.LaunchBrowserAfterInstall;
@@ -342,17 +392,27 @@ public sealed class MainViewModel : ViewModelBase
     public string ExtensionsPageLabel => SelectedBrowser is null
         ? "Open browser extensions"
         : $"Open {BrowserLauncher.ExtensionsPageUrl(SelectedBrowser.Kind)}";
-    public string LaunchProfileSummary => LaunchWithTemporaryProfile
-        ? "Clean profile: each launch uses a new isolated browser profile under LocalChromeStore."
-        : "Default profile: launch uses the selected browser's normal profile.";
+    public string LaunchProfileSummary
+    {
+        get
+        {
+            var profilePart = LaunchWithTemporaryProfile
+                ? "Clean profile: each launch uses a new isolated browser profile under LocalChromeStore."
+                : "Default profile: launch uses the selected browser's normal profile.";
+            if (_selectedLoadSet is not null && _selectedLoadSet.Id != SentinelLoadSet.Id)
+                return $"{profilePart} Load set: {_selectedLoadSet.Name} ({_selectedLoadSet.ExtensionKeys?.Count ?? 0} extension(s)).";
+            return profilePart;
+        }
+    }
     public string LaunchPreview
     {
         get
         {
             if (SelectedBrowser is null) return "Select a supported Chromium browser to preview launch arguments.";
+            var extensions = GetActiveLoadSetExtensions(_extensions.Installed);
             var plan = _launcher.BuildLaunchPlan(
                 SelectedBrowser,
-                _extensions.Installed,
+                extensions,
                 NormalizeLaunchUrl(LaunchUrlInput),
                 LaunchWithTemporaryProfile);
             return plan.DisplayCommand;
@@ -685,7 +745,7 @@ public sealed class MainViewModel : ViewModelBase
         }
 
         Log($"Launch after install is enabled after {reason}.");
-        LaunchBrowser(installedOnly: false);
+        LaunchBrowser();
     }
 
     private void DetectBrowsers()
@@ -743,14 +803,19 @@ public sealed class MainViewModel : ViewModelBase
         return true;
     }
 
-    private void LaunchBrowser(bool installedOnly)
+    private void LaunchBrowser()
     {
         if (SelectedBrowser is null) return;
-        var set = installedOnly ? _extensions.Installed.ToList() : _extensions.Installed.ToList();
+        var set = GetActiveLoadSetExtensions(_extensions.Installed);
         if (set.Count == 0)
         {
-            StatusText = "Install at least one extension before launching a browser session.";
-            Log("No extensions installed yet — install one before launching.");
+            var isSentinel = _selectedLoadSet is null || _selectedLoadSet.Id == SentinelLoadSet.Id;
+            StatusText = isSentinel
+                ? "Install at least one extension before launching a browser session."
+                : $"No extensions in load set '{_selectedLoadSet!.Name}' are currently installed. Install them or switch to 'All installed'.";
+            Log(isSentinel
+                ? "No extensions installed yet — install one before launching."
+                : $"Load set '{_selectedLoadSet!.Name}' has no installed extensions — check installs or switch load set.");
             return;
         }
         try
@@ -761,8 +826,11 @@ public sealed class MainViewModel : ViewModelBase
             _settingsService.Save(_settings);
 
             var result = _launcher.Launch(SelectedBrowser, set, launchUrl, LaunchWithTemporaryProfile);
-            StatusText = $"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s).";
-            Log($"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s) loaded.");
+            var setLabel = _selectedLoadSet is null || _selectedLoadSet.Id == SentinelLoadSet.Id
+                ? "all installed"
+                : $"load set '{_selectedLoadSet.Name}'";
+            StatusText = $"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s) ({setLabel}).";
+            Log($"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s) loaded ({setLabel}).");
             if (!string.IsNullOrEmpty(result.Plan.TemporaryProfilePath))
                 Log($"Temporary browser profile: {result.Plan.TemporaryProfilePath}");
             Log($"Launch command: {result.Plan.DisplayCommand}");
@@ -772,6 +840,14 @@ public sealed class MainViewModel : ViewModelBase
             StatusText = $"Launch failed: {ex.Message}";
             Log($"! Launch failed: {ex.Message}");
         }
+    }
+
+    private List<InstalledExtension> GetActiveLoadSetExtensions(IReadOnlyList<InstalledExtension> installed)
+    {
+        if (_selectedLoadSet is null || _selectedLoadSet.Id == SentinelLoadSet.Id || _selectedLoadSet.ExtensionKeys is null)
+            return installed.ToList();
+        var keys = _selectedLoadSet.ExtensionKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return installed.Where(e => keys.Contains(e.Key)).ToList();
     }
 
     private void CopyLaunchArguments()
@@ -1160,6 +1236,78 @@ public sealed class MainViewModel : ViewModelBase
         Log($"Removed extra owner '{match}'.");
     }
 
+    private void ReloadLoadSetsFromService()
+    {
+        LoadSets.Clear();
+        LoadSets.Add(SentinelLoadSet);
+        foreach (var ls in _settingsService.LoadLoadSets())
+            LoadSets.Add(ls);
+        _selectedLoadSet = SentinelLoadSet;
+        OnPropertyChanged(nameof(SelectedLoadSet));
+        OnPropertyChanged(nameof(HasNamedLoadSets));
+        OnPropertyChanged(nameof(ActiveLoadSetLabel));
+    }
+
+    private void SyncHiddenReposCollection()
+    {
+        HiddenRepos.Clear();
+        foreach (var r in _settings.HiddenRepos)
+            HiddenRepos.Add(r);
+    }
+
+    private void CreateLoadSet()
+    {
+        var name = NewLoadSetNameInput.Trim();
+        if (string.IsNullOrWhiteSpace(name) || !_extensions.Installed.Any()) return;
+        if (LoadSets.Any(ls => ls.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        {
+            StatusText = $"A load set named '{name}' already exists.";
+            Log($"! Load set '{name}' already exists — choose a different name.");
+            return;
+        }
+        var keys = _extensions.Installed.Select(e => e.Key).ToList();
+        var newSet = new LoadSet { Name = name, ExtensionKeys = keys };
+        LoadSets.Add(newSet);
+        PersistLoadSets();
+        SelectedLoadSet = newSet;
+        NewLoadSetNameInput = string.Empty;
+        OnPropertyChanged(nameof(HasNamedLoadSets));
+        StatusText = $"Load set '{name}' created with {keys.Count} extension(s).";
+        Log($"Created load set '{name}' with {keys.Count} extension(s): {string.Join(", ", keys)}.");
+    }
+
+    private void DeleteLoadSet(LoadSet? target = null)
+    {
+        target ??= _selectedLoadSet;
+        if (target is null || target.Id == SentinelLoadSet.Id) return;
+        var name = target.Name;
+        LoadSets.Remove(target);
+        PersistLoadSets();
+        if (_selectedLoadSet?.Id == target.Id)
+            SelectedLoadSet = SentinelLoadSet;
+        OnPropertyChanged(nameof(HasNamedLoadSets));
+        StatusText = $"Load set '{name}' deleted.";
+        Log($"Deleted load set '{name}'.");
+    }
+
+    private void PersistLoadSets()
+    {
+        _settingsService.SaveLoadSets(LoadSets.Where(ls => ls.Id != SentinelLoadSet.Id));
+    }
+
+    private void RestoreHiddenRepo(string? repoKey)
+    {
+        if (string.IsNullOrWhiteSpace(repoKey)) return;
+        var match = _settings.HiddenRepos.FirstOrDefault(r => r.Equals(repoKey, StringComparison.OrdinalIgnoreCase));
+        if (match is null) return;
+        _settings.HiddenRepos.Remove(match);
+        _settings.HiddenRepos.Sort(StringComparer.OrdinalIgnoreCase);
+        _settingsService.Save(_settings);
+        RefreshHiddenRepoProperties();
+        StatusText = $"Restored '{match}' to discovery.";
+        Log($"Restored '{match}' to discovery. Refresh to show it in the catalog.");
+    }
+
     private void RefreshExtensionView()
     {
         ExtensionsView.Refresh();
@@ -1188,10 +1336,12 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(EmptyStateMessage));
         RefreshLaunchPreviewProperties();
         RefreshHiddenRepoProperties();
+        CommandManager.InvalidateRequerySuggested();
     }
 
     private void RefreshHiddenRepoProperties()
     {
+        SyncHiddenReposCollection();
         OnPropertyChanged(nameof(HiddenRepoCount));
         OnPropertyChanged(nameof(HasHiddenRepos));
         OnPropertyChanged(nameof(HiddenRepoSummary));
@@ -1202,6 +1352,7 @@ public sealed class MainViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(LaunchPreview));
         OnPropertyChanged(nameof(LaunchProfileSummary));
+        OnPropertyChanged(nameof(ActiveLoadSetLabel));
     }
 
     private static string? NormalizeLaunchUrl(string? value)

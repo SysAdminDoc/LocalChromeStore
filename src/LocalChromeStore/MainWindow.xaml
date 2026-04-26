@@ -97,7 +97,8 @@
 
                     <Grid Grid.Column="0" Width="470" MinWidth="320">
                         <TextBox x:Name="SearchBox"
-                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="Search extensions" />
                         <TextBlock Text="Search extensions, repositories, or descriptions"
                                    Style="{StaticResource MuteText}"
                                    Margin="12,0,0,0"
@@ -131,6 +132,8 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
@@ -144,6 +147,7 @@
                               ItemsSource="{Binding Browsers}"
                               SelectedItem="{Binding SelectedBrowser}"
                               DisplayMemberPath="DisplayName"
+                              AutomationProperties.Name="Browser"
                               MinWidth="190"
                               Margin="0,0,8,0"
                               ToolTip="{Binding BrowserSummary}" />
@@ -159,13 +163,28 @@
                             Margin="0,0,8,0"
                             ToolTip="Opens chrome://extensions (or edge://extensions) in the selected browser." />
 
-                    <Button Grid.Column="4"
+                    <TextBlock Grid.Column="4"
+                               Text="Load set"
+                               Style="{StaticResource InputLabel}"
+                               Margin="8,0,6,0"
+                               VerticalAlignment="Center" />
+
+                    <ComboBox Grid.Column="5"
+                              ItemsSource="{Binding LoadSets}"
+                              SelectedItem="{Binding SelectedLoadSet}"
+                              DisplayMemberPath="Name"
+                              AutomationProperties.Name="Load set"
+                              MinWidth="150"
+                              Margin="0,0,8,0"
+                              ToolTip="{Binding ActiveLoadSetLabel}" />
+
+                    <Button Grid.Column="6"
                             Content="Launch session"
                             Command="{Binding LaunchBrowserCommand}"
                             Style="{StaticResource AccentButton}"
-                            ToolTip="Launches the selected browser with every installed extension loaded through --load-extension." />
+                            ToolTip="Launches the selected browser with installed extensions for the active load set loaded through --load-extension." />
 
-                    <Button Grid.Column="5"
+                    <Button Grid.Column="7"
                             Content="{Binding UpdateAllLabel}"
                             Command="{Binding UpdateAllCommand}"
                             HorizontalAlignment="Left"
@@ -302,7 +321,8 @@
                         <TextBlock Text="GitHub user or organization" Style="{StaticResource InputLabel}" />
                         <Grid>
                             <TextBox x:Name="GitHubUserBox"
-                                     Text="{Binding GitHubUserInput, UpdateSourceTrigger=PropertyChanged}" />
+                                     Text="{Binding GitHubUserInput, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="GitHub user or organization" />
                             <TextBlock Text="example: SysAdminDoc"
                                        Style="{StaticResource MuteText}"
                                        Margin="12,0,0,0"
@@ -315,7 +335,8 @@
                                    Style="{StaticResource InputLabel}"
                                    Margin="0,12,0,5" />
                         <PasswordBox x:Name="GitHubTokenBox"
-                                     PasswordChanged="GitHubTokenBox_PasswordChanged" />
+                                     PasswordChanged="GitHubTokenBox_PasswordChanged"
+                                     AutomationProperties.Name="GitHub personal access token" />
                         <TextBlock Text="Optional. Stored only in your local settings file; leave blank to use public GitHub rate limits."
                                    Style="{StaticResource MuteText}"
                                    TextWrapping="Wrap"
@@ -331,7 +352,8 @@
                             </Grid.ColumnDefinitions>
                             <Grid Grid.Column="0">
                                 <TextBox x:Name="NewOwnerBox"
-                                         Text="{Binding NewOwnerInput, UpdateSourceTrigger=PropertyChanged}" />
+                                         Text="{Binding NewOwnerInput, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="Add extra owner" />
                                 <TextBlock Text="Add another GitHub user or org"
                                            Style="{StaticResource MuteText}"
                                            Margin="12,0,0,0"
@@ -416,7 +438,8 @@
                         <Grid Margin="0,8,0,0">
                             <TextBox x:Name="TopicFilterBox"
                                      Text="{Binding TopicFilter, UpdateSourceTrigger=PropertyChanged}"
-                                     IsEnabled="{Binding UseTopicFilter}" />
+                                     IsEnabled="{Binding UseTopicFilter}"
+                                     AutomationProperties.Name="Topic filter" />
                             <TextBlock Text="chrome-extension"
                                        Style="{StaticResource MuteText}"
                                        Margin="12,0,0,0"
@@ -457,34 +480,187 @@
                                 CornerRadius="8"
                                 Padding="12"
                                 Margin="0,14,0,0">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,12,0">
-                                    <TextBlock Text="Hidden repositories" Style="{StaticResource InputLabel}" />
-                                    <TextBlock Text="{Binding HiddenRepoSummary}"
-                                               Style="{StaticResource MuteText}"
-                                               TextWrapping="Wrap" />
-                                </StackPanel>
-                                <Button Grid.Row="0"
-                                        Grid.Column="1"
-                                        Content="Restore"
-                                        Command="{Binding ClearHiddenReposCommand}"
-                                        IsEnabled="{Binding HasHiddenRepos}"
-                                        VerticalAlignment="Center" />
-                                <TextBlock Grid.Row="1"
-                                           Grid.ColumnSpan="2"
-                                           Text="Use Hide on a card to keep noisy repos out of future refreshes without changing GitHub or local install files."
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <TextBlock Text="Hidden repositories" Style="{StaticResource InputLabel}" />
+                                        <TextBlock Text="{Binding HiddenRepoSummary}"
+                                                   Style="{StaticResource MuteText}"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1"
+                                            Content="Restore all"
+                                            Command="{Binding ClearHiddenReposCommand}"
+                                            IsEnabled="{Binding HasHiddenRepos}"
+                                            AutomationProperties.Name="Restore all hidden repositories"
+                                            VerticalAlignment="Top" />
+                                </Grid>
+                                <Border Background="{StaticResource BaseBrush}"
+                                        BorderBrush="{StaticResource Surface0Brush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="4"
+                                        Margin="0,8,0,0"
+                                        MaxHeight="90"
+                                        Visibility="{Binding HasHiddenRepos, Converter={StaticResource BoolToVis}}">
+                                    <ListBox ItemsSource="{Binding HiddenRepos}"
+                                             BorderThickness="0"
+                                             Background="Transparent"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                             AutomationProperties.Name="Hidden repositories list">
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <Setter Property="Padding" Value="0" />
+                                                <Setter Property="Background" Value="Transparent" />
+                                                <Setter Property="BorderThickness" Value="0" />
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="ListBoxItem">
+                                                            <Border x:Name="Bd"
+                                                                    Background="Transparent"
+                                                                    CornerRadius="4"
+                                                                    Padding="6,3">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="*" />
+                                                                        <ColumnDefinition Width="Auto" />
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Grid.Column="0"
+                                                                               Text="{Binding}"
+                                                                               Foreground="{StaticResource SubtextBrush}"
+                                                                               FontSize="11"
+                                                                               VerticalAlignment="Center"
+                                                                               TextTrimming="CharacterEllipsis" />
+                                                                    <Button Grid.Column="1"
+                                                                            Content="Restore"
+                                                                            Style="{StaticResource LinkButton}"
+                                                                            Command="{Binding DataContext.RestoreHiddenRepoCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}" />
+                                                                </Grid>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource Surface0Brush}" />
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                    </ListBox>
+                                </Border>
+                                <TextBlock Text="Use Hide on a card to keep noisy repos out of future refreshes without changing GitHub or local install files."
                                            Style="{StaticResource MuteText}"
                                            TextWrapping="Wrap"
                                            Margin="0,8,0,0" />
-                            </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Background="{StaticResource CrustBrush}"
+                                BorderBrush="{StaticResource Surface0Brush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="12"
+                                Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="Named load sets" Style="{StaticResource InputLabel}" />
+                                <TextBlock Text="Snapshot the current installed extensions as a named launch profile. Select it in the toolbar to scope 'Launch session' to that subset."
+                                           Style="{StaticResource MuteText}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,4,0,8" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Grid.Column="0">
+                                        <TextBox x:Name="NewLoadSetNameBox"
+                                                 Text="{Binding NewLoadSetNameInput, UpdateSourceTrigger=PropertyChanged}"
+                                                 AutomationProperties.Name="New load set name" />
+                                        <TextBlock Text="New load set name"
+                                                   Style="{StaticResource MuteText}"
+                                                   Margin="12,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   IsHitTestVisible="False"
+                                                   Visibility="{Binding Text, ElementName=NewLoadSetNameBox, Converter={StaticResource EmptyStringToVis}}" />
+                                    </Grid>
+                                    <Button Grid.Column="1"
+                                            Content="Snapshot"
+                                            Command="{Binding CreateLoadSetCommand}"
+                                            AutomationProperties.Name="Create named load set from installed extensions"
+                                            Margin="8,0,0,0" />
+                                </Grid>
+                                <Border Background="{StaticResource BaseBrush}"
+                                        BorderBrush="{StaticResource Surface0Brush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        Padding="4"
+                                        Margin="0,8,0,0"
+                                        MaxHeight="90">
+                                    <Grid>
+                                        <ListBox ItemsSource="{Binding LoadSets}"
+                                                 SelectedItem="{Binding SelectedLoadSet}"
+                                                 BorderThickness="0"
+                                                 Background="Transparent"
+                                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                                 AutomationProperties.Name="Load sets">
+                                            <ListBox.ItemContainerStyle>
+                                                <Style TargetType="ListBoxItem">
+                                                    <Setter Property="Padding" Value="0" />
+                                                    <Setter Property="Background" Value="Transparent" />
+                                                    <Setter Property="BorderThickness" Value="0" />
+                                                    <Setter Property="Template">
+                                                        <Setter.Value>
+                                                            <ControlTemplate TargetType="ListBoxItem">
+                                                                <Border x:Name="Bd"
+                                                                        Background="Transparent"
+                                                                        CornerRadius="4"
+                                                                        Padding="6,3">
+                                                                    <Grid>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*" />
+                                                                            <ColumnDefinition Width="Auto" />
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBlock Grid.Column="0"
+                                                                                   Text="{Binding Name}"
+                                                                                   Foreground="{StaticResource TextBrush}"
+                                                                                   FontSize="11"
+                                                                                   VerticalAlignment="Center"
+                                                                                   TextTrimming="CharacterEllipsis" />
+                                                                        <Button Grid.Column="1"
+                                                                                Content="Delete"
+                                                                                Style="{StaticResource LinkButton}"
+                                                                                Command="{Binding DataContext.DeleteLoadSetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                                Visibility="{Binding Id, Converter={StaticResource EmptyStringToVis}}" />
+                                                                    </Grid>
+                                                                </Border>
+                                                                <ControlTemplate.Triggers>
+                                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource Surface0Brush}" />
+                                                                    </Trigger>
+                                                                    <Trigger Property="IsSelected" Value="True">
+                                                                        <Setter TargetName="Bd" Property="Background" Value="{StaticResource MauveSoftBrush}" />
+                                                                    </Trigger>
+                                                                </ControlTemplate.Triggers>
+                                                            </ControlTemplate>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Style>
+                                            </ListBox.ItemContainerStyle>
+                                        </ListBox>
+                                    </Grid>
+                                </Border>
+                                <Button Content="Delete selected"
+                                        Command="{Binding DeleteLoadSetCommand}"
+                                        HorizontalAlignment="Left"
+                                        AutomationProperties.Name="Delete selected load set"
+                                        Margin="0,8,0,0" />
+                            </StackPanel>
                         </Border>
                     </StackPanel>
 
