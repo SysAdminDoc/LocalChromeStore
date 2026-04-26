@@ -134,6 +134,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
@@ -163,13 +164,19 @@
                             Margin="0,0,8,0"
                             ToolTip="Opens chrome://extensions (or edge://extensions) in the selected browser." />
 
-                    <TextBlock Grid.Column="4"
+                    <Button Grid.Column="4"
+                            Content="{Binding PolicyPageLabel}"
+                            Command="{Binding OpenPolicyPageCommand}"
+                            Margin="0,0,8,0"
+                            ToolTip="Opens chrome://policy (or edge://policy) to inspect active browser policies." />
+
+                    <TextBlock Grid.Column="5"
                                Text="Load set"
                                Style="{StaticResource InputLabel}"
                                Margin="8,0,6,0"
                                VerticalAlignment="Center" />
 
-                    <ComboBox Grid.Column="5"
+                    <ComboBox Grid.Column="6"
                               ItemsSource="{Binding LoadSets}"
                               SelectedItem="{Binding SelectedLoadSet}"
                               DisplayMemberPath="Name"
@@ -178,13 +185,13 @@
                               Margin="0,0,8,0"
                               ToolTip="{Binding ActiveLoadSetLabel}" />
 
-                    <Button Grid.Column="6"
+                    <Button Grid.Column="7"
                             Content="Launch session"
                             Command="{Binding LaunchBrowserCommand}"
                             Style="{StaticResource AccentButton}"
                             ToolTip="Launches the selected browser with installed extensions for the active load set loaded through --load-extension." />
 
-                    <Button Grid.Column="7"
+                    <Button Grid.Column="8"
                             Content="{Binding UpdateAllLabel}"
                             Command="{Binding UpdateAllCommand}"
                             HorizontalAlignment="Left"
@@ -754,6 +761,10 @@
                             Command="{Binding ExportDiagnosticsCommand}"
                             Style="{StaticResource LinkButton}"
                             ToolTip="Save a text bundle with paths, GitHub state, browsers, installed extensions, and the activity log." />
+                    <Button Content="Catalog"
+                            Command="{Binding ExportCatalogCommand}"
+                            Style="{StaticResource LinkButton}"
+                            ToolTip="Save a machine-readable JSON snapshot of all catalog entries (installed status, asset info, readiness)." />
                     <Button Content="Clear"
                             Command="{Binding ClearLogCommand}"
                             Style="{StaticResource LinkButton}"

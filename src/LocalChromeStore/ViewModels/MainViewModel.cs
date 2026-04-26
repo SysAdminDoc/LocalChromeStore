@@ -59,9 +59,11 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand AddExtraOwnerCommand { get; }
     public ICommand RemoveExtraOwnerCommand { get; }
     public ICommand OpenBrowserExtensionsPageCommand { get; }
+    public ICommand OpenPolicyPageCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
     public ICommand ExportEnvironmentCommand { get; }
     public ICommand ImportEnvironmentCommand { get; }
+    public ICommand ExportCatalogCommand { get; }
     public ICommand CopyLaunchArgumentsCommand { get; }
     public ICommand CreateLoadSetCommand { get; }
     public ICommand DeleteLoadSetCommand { get; }
@@ -110,9 +112,11 @@ public sealed class MainViewModel : ViewModelBase
         AddExtraOwnerCommand = new RelayCommand(_ => AddExtraOwner(), _ => !string.IsNullOrWhiteSpace(NewOwnerInput));
         RemoveExtraOwnerCommand = new RelayCommand(o => RemoveExtraOwner(o as string ?? SelectedExtraOwner), o => (o as string ?? SelectedExtraOwner) is { Length: > 0 });
         OpenBrowserExtensionsPageCommand = new RelayCommand(_ => OpenBrowserExtensionsPage(), _ => SelectedBrowser != null);
+        OpenPolicyPageCommand = new RelayCommand(_ => OpenPolicyPage(), _ => SelectedBrowser != null);
         ExportDiagnosticsCommand = new RelayCommand(_ => ExportDiagnostics());
         ExportEnvironmentCommand = new RelayCommand(_ => ExportEnvironment());
         ImportEnvironmentCommand = new AsyncRelayCommand(_ => ImportEnvironmentAsync(), _ => !Busy);
+        ExportCatalogCommand = new RelayCommand(_ => ExportCatalog());
         CopyLaunchArgumentsCommand = new RelayCommand(_ => CopyLaunchArguments(), _ => SelectedBrowser != null);
         CreateLoadSetCommand = new RelayCommand(_ => CreateLoadSet(),
             _ => !string.IsNullOrWhiteSpace(NewLoadSetNameInput) && _extensions.Installed.Any());
@@ -196,6 +200,7 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(CanLaunchBrowser));
                 OnPropertyChanged(nameof(BrowserSummary));
                 OnPropertyChanged(nameof(ExtensionsPageLabel));
+                OnPropertyChanged(nameof(PolicyPageLabel));
                 RefreshLaunchPreviewProperties();
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -392,6 +397,9 @@ public sealed class MainViewModel : ViewModelBase
     public string ExtensionsPageLabel => SelectedBrowser is null
         ? "Open browser extensions"
         : $"Open {BrowserLauncher.ExtensionsPageUrl(SelectedBrowser.Kind)}";
+    public string PolicyPageLabel => SelectedBrowser is null
+        ? "Open policy page"
+        : $"Open {BrowserLauncher.PolicyPageUrl(SelectedBrowser.Kind)}";
     public string LaunchProfileSummary
     {
         get
@@ -760,6 +768,7 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(BrowserSummary));
         OnPropertyChanged(nameof(CanLaunchBrowser));
         OnPropertyChanged(nameof(ExtensionsPageLabel));
+        OnPropertyChanged(nameof(PolicyPageLabel));
         RefreshLaunchPreviewProperties();
     }
 
@@ -883,6 +892,23 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    private void OpenPolicyPage()
+    {
+        if (SelectedBrowser is null) return;
+        try
+        {
+            _launcher.OpenPolicyPage(SelectedBrowser);
+            var url = BrowserLauncher.PolicyPageUrl(SelectedBrowser.Kind);
+            StatusText = $"Opened {url} in {SelectedBrowser.DisplayName}.";
+            Log($"Opened {url} in {SelectedBrowser.DisplayName}.");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Could not open policy page: {ex.Message}";
+            Log($"! Could not open policy page: {ex.Message}");
+        }
+    }
+
     private void OpenInstallDir()
     {
         try { Process.Start(new ProcessStartInfo("explorer.exe", $"\"{_settingsService.ExtensionsRoot}\"") { UseShellExecute = true }); }
@@ -941,6 +967,70 @@ public sealed class MainViewModel : ViewModelBase
         {
             StatusText = $"Environment export failed: {ex.Message}";
             Log($"! Environment export failed: {ex.Message}");
+        }
+    }
+
+    // F039: machine-readable catalog snapshot.
+    private void ExportCatalog()
+    {
+        var defaultName = $"LocalChromeStore-catalog-{DateTime.Now:yyyy-MM-dd-HHmm}.json";
+        var dlg = new SaveFileDialog
+        {
+            FileName = defaultName,
+            DefaultExt = ".json",
+            Filter = "LocalChromeStore catalog (*.json)|*.json|All files (*.*)|*.*",
+            InitialDirectory = _settingsService.SettingsDir
+        };
+        var owner = Application.Current?.MainWindow;
+        var result = owner != null ? dlg.ShowDialog(owner) : dlg.ShowDialog();
+        if (result != true) return;
+
+        try
+        {
+            var installedByKey = _extensions.Installed.ToDictionary(
+                e => $"{e.RepoOwner}/{e.RepoName}",
+                e => e,
+                StringComparer.OrdinalIgnoreCase);
+
+            var entries = Extensions.Select(card =>
+            {
+                var info = card.Info;
+                installedByKey.TryGetValue($"{info.RepoOwner}/{info.RepoName}", out var inst);
+                return new CatalogExportEntry(
+                    RepoOwner: info.RepoOwner,
+                    RepoName: info.RepoName,
+                    RepoUrl: info.RepoUrl,
+                    DisplayName: info.DisplayName,
+                    DisplayVersion: info.DisplayVersion,
+                    Framework: info.Framework.ToString(),
+                    ManifestVersion: info.ManifestVersionNumber,
+                    HasAsset: !string.IsNullOrEmpty(info.AssetUrl),
+                    AssetName: info.AssetName,
+                    AssetUrl: info.AssetUrl,
+                    AssetSizeBytes: info.AssetSizeBytes > 0 ? info.AssetSizeBytes : null,
+                    ChecksumUrl: info.ChecksumUrl,
+                    DiscoverySource: info.DiscoverySource.ToString(),
+                    HasRepoManifest: info.HasRepoManifest,
+                    HomepageUrl: info.HomepageUrl,
+                    Stars: info.Stars > 0 ? info.Stars : null,
+                    Freshness: info.Freshness.ToString(),
+                    IsArchived: info.IsArchived,
+                    Warnings: info.Warnings.Count > 0 ? info.Warnings : null,
+                    InstalledVersion: inst?.Version,
+                    InstalledAt: inst?.InstalledAt,
+                    ChecksumVerified: inst?.ChecksumVerified);
+            }).ToList();
+
+            var opts = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
+            var json = System.Text.Json.JsonSerializer.Serialize(entries, opts);
+            File.WriteAllText(dlg.FileName, json, System.Text.Encoding.UTF8);
+            StatusText = $"Catalog exported: {entries.Count} extensions to {dlg.FileName}.";
+            Log($"Exported catalog snapshot ({entries.Count} extensions) to {dlg.FileName}.");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Catalog export failed: {ex.Message}";
+            Log($"! Catalog export failed: {ex.Message}");
         }
     }
 
@@ -1384,3 +1474,28 @@ internal sealed class Dispatcher_LogSink
         while (_sink.Count > MaxLines) _sink.RemoveAt(0);
     }
 }
+
+// F039: catalog export schema.
+internal sealed record CatalogExportEntry(
+    string RepoOwner,
+    string RepoName,
+    string RepoUrl,
+    string DisplayName,
+    string DisplayVersion,
+    string Framework,
+    int? ManifestVersion,
+    bool HasAsset,
+    string? AssetName,
+    string? AssetUrl,
+    long? AssetSizeBytes,
+    string? ChecksumUrl,
+    string DiscoverySource,
+    bool HasRepoManifest,
+    string? HomepageUrl,
+    int? Stars,
+    string Freshness,
+    bool IsArchived,
+    List<string>? Warnings,
+    string? InstalledVersion,
+    DateTimeOffset? InstalledAt,
+    bool? ChecksumVerified);

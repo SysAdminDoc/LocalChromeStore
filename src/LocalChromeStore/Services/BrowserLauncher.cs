@@ -150,6 +150,25 @@ public sealed class BrowserLauncher
         _ => "chrome://extensions"
     };
 
+    // F068: browser policy quick link.
+    public Process? OpenPolicyPage(BrowserInfo browser)
+    {
+        var url = PolicyPageUrl(browser.Kind);
+        var psi = new ProcessStartInfo
+        {
+            FileName = browser.ExecutablePath,
+            UseShellExecute = false,
+        };
+        psi.ArgumentList.Add(url);
+        return Process.Start(psi);
+    }
+
+    public static string PolicyPageUrl(BrowserKind kind) => kind switch
+    {
+        BrowserKind.Edge => "edge://policy",
+        _ => "chrome://policy"
+    };
+
     public static string FormatCommandLine(string executablePath, IEnumerable<string> arguments)
     {
         var parts = new List<string> { QuoteForDisplay(executablePath) };

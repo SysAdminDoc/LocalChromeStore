@@ -163,6 +163,16 @@ public sealed class ExtensionCardViewModel : ViewModelBase
                 sb.AppendLine("Warnings:");
                 foreach (var w in Info.Warnings) sb.AppendLine($"  • {w}");
             }
+            // F049: release readiness checklist
+            sb.AppendLine();
+            sb.AppendLine("Release readiness:");
+            sb.AppendLine($"  {(HasAsset ? "+" : "-")} Release asset (ZIP or CRX)");
+            sb.AppendLine($"  {(!string.IsNullOrEmpty(Info.ChecksumUrl) ? "+" : "-")} SHA-256 checksum sidecar");
+            sb.AppendLine($"  {(Info.ManifestVersionNumber == 3 ? "+" : "-")} Manifest V3");
+            sb.AppendLine($"  {(Info.HasRepoManifest ? "+" : "-")} localchromestore.json catalog manifest");
+            sb.AppendLine($"  {(Info.Freshness is RepoFreshness.Fresh or RepoFreshness.Aging && !Info.IsArchived ? "+" : "-")} Repository active within a year");
+            var score = new[] { HasAsset, !string.IsNullOrEmpty(Info.ChecksumUrl), Info.ManifestVersionNumber == 3, Info.HasRepoManifest, Info.Freshness is RepoFreshness.Fresh or RepoFreshness.Aging && !Info.IsArchived }.Count(x => x);
+            sb.Append($"  Score: {score}/5");
             return sb.ToString().TrimEnd();
         }
     }

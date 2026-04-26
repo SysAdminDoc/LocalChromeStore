@@ -584,11 +584,40 @@ public sealed class GitHubService
             info.Warnings.Add("Latest GitHub release is over a year old.");
     }
 
+    // F071: 3 attempts with 2-4-8 s exponential back-off. Resets the progress indicator on each retry.
     public async Task<byte[]> DownloadAssetAsync(string url, IProgress<long>? progress = null, CancellationToken ct = default)
+    {
+        const int MaxAttempts = 3;
+        Exception? last = null;
+        var delay = TimeSpan.FromSeconds(2);
+        for (var attempt = 1; attempt <= MaxAttempts; attempt++)
+        {
+            try
+            {
+                return await DownloadAssetCoreAsync(url, progress, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                last = ex;
+                if (attempt < MaxAttempts)
+                {
+                    progress?.Report(0);
+                    await Task.Delay(delay, ct);
+                    delay = TimeSpan.FromTicks(delay.Ticks * 2);
+                }
+            }
+        }
+        throw last!;
+    }
+
+    private async Task<byte[]> DownloadAssetCoreAsync(string url, IProgress<long>? progress, CancellationToken ct)
     {
         using var resp = await _http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         resp.EnsureSuccessStatusCode();
-        var total = resp.Content.Headers.ContentLength ?? -1L;
         await using var stream = await resp.Content.ReadAsStreamAsync(ct);
         using var ms = new MemoryStream();
         var buf = new byte[81920];
