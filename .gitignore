@@ -59,3 +59,7 @@ Desktop.ini
 # Local installer / portable runtime artifacts
 publish-*/
 LocalChromeStore-*/
+
+# Markdown files local-only (except README)
+*.md
+!README.md
