@@ -8,7 +8,6 @@ using System.Windows.Data;
 using System.Windows.Input;
 using LocalChromeStore.Models;
 using LocalChromeStore.Services;
-using Microsoft.Win32;
 
 namespace LocalChromeStore.ViewModels;
 
@@ -19,6 +18,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly ExtensionService _extensions;
     private readonly BrowserLauncher _launcher;
     private readonly PolicyEnrollmentService _policyEnrollment = new();
+    private readonly IDialogService _dialogs;
     private readonly Dispatcher_LogSink _logSink;
     private AppSettings _settings;
     private bool _busy;
@@ -70,8 +70,12 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand DeleteLoadSetCommand { get; }
     public ICommand RestoreHiddenRepoCommand { get; }
 
-    public MainViewModel()
+    public MainViewModel() : this(null) { }
+
+    /// <summary>Test/DI seam: inject a fake <see cref="IDialogService"/> to run the view model headlessly.</summary>
+    public MainViewModel(IDialogService? dialogs)
     {
+        _dialogs = dialogs ?? new DialogService();
         _settingsService = new SettingsService();
         _github = new GitHubService(_settingsService);
         _extensions = new ExtensionService(_settingsService, _github);
@@ -130,7 +134,7 @@ public sealed class MainViewModel : ViewModelBase
         RestoreHiddenRepoCommand = new RelayCommand(o => RestoreHiddenRepo(o as string), o => o is string { Length: > 0 });
 
         DetectBrowsers();
-        Log($"LocalChromeStore v{App.ResourceAssembly.GetName().Version} ready.");
+        Log($"LocalChromeStore v{AssemblyVersion} ready.");
         Log($"Extensions install root: {_settingsService.ExtensionsRoot}");
         if (_settingsService.TokenWasMigratedFromPlaintext)
         {
@@ -166,9 +170,15 @@ public sealed class MainViewModel : ViewModelBase
         set => SetField(ref _statusText, value);
     }
 
+    /// <summary>
+    /// App version (Major.Minor.Patch) read from this assembly. Uses the type's own assembly rather
+    /// than <c>App.ResourceAssembly</c> so it resolves when the view model runs headlessly under tests.
+    /// </summary>
+    private static string AssemblyVersion =>
+        typeof(MainViewModel).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+
     /// <summary>Footer label bound to the real assembly version so it never drifts from the build.</summary>
-    public string AppVersionLabel =>
-        $"LocalChromeStore v{App.ResourceAssembly.GetName().Version?.ToString(3) ?? "0.0.0"}";
+    public string AppVersionLabel => $"LocalChromeStore v{AssemblyVersion}";
 
     public string SearchText
     {
@@ -687,12 +697,11 @@ public sealed class MainViewModel : ViewModelBase
             var permissionReviewText = permissionReviewCards.Count == 0
                 ? string.Empty
                 : $"{Environment.NewLine}{Environment.NewLine}Permission changes needing approval:{Environment.NewLine}{FormatPermissionReviewList(permissionReviewCards)}";
-            var confirm = MessageBox.Show(
+            var confirm = _dialogs.Confirm(
                 $"Update {installableCards.Count} installed extension(s)?\n\nLocalChromeStore will replace each local copy with the current catalog release asset. Existing installs remain registered if an update fails.{permissionReviewText}",
                 "Update extensions",
-                MessageBoxButton.YesNo,
-                permissionReviewCards.Any(c => c.HasHighRiskUpdatePermissionExpansion) ? MessageBoxImage.Warning : MessageBoxImage.Question);
-            if (confirm != MessageBoxResult.Yes) return;
+                permissionReviewCards.Any(c => c.HasHighRiskUpdatePermissionExpansion) ? DialogIcon.Warning : DialogIcon.Question);
+            if (!confirm) return;
             foreach (var card in permissionReviewCards)
                 Log($"Permission expansion approved for {card.Repo}: {card.UpdatePermissionDiff.AddedSummary}.");
         }
@@ -783,12 +792,7 @@ public sealed class MainViewModel : ViewModelBase
             ? $"Hide {extension.Repo} from the catalog?\n\nIts installed local copy will remain on disk and can still be launched. Restore hidden repositories from Settings to manage it again."
             : $"Hide {extension.Repo} from future discovery?\n\nRestore hidden repositories from Settings if you want it back in the catalog.";
 
-        var confirm = MessageBox.Show(
-            message,
-            "Hide repository",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (confirm != MessageBoxResult.Yes) return;
+        if (!_dialogs.Confirm(message, "Hide repository")) return;
 
         if (!_settings.HiddenRepos.Contains(extension.Repo, StringComparer.OrdinalIgnoreCase))
         {
@@ -887,7 +891,7 @@ public sealed class MainViewModel : ViewModelBase
         if (SelectedBrowser is null) return;
         try
         {
-            Clipboard.SetText(LaunchPreview);
+            _dialogs.SetClipboardText(LaunchPreview);
             StatusText = "Launch command copied to clipboard.";
             Log("Copied launch command to clipboard.");
         }
@@ -941,22 +945,15 @@ public sealed class MainViewModel : ViewModelBase
     private void ExportDiagnostics()
     {
         var defaultName = $"LocalChromeStore-diagnostics-{DateTime.Now:yyyy-MM-dd-HHmm}.txt";
-        var dlg = new SaveFileDialog
-        {
-            FileName = defaultName,
-            DefaultExt = ".txt",
-            Filter = "Text file (*.txt)|*.txt|All files (*.*)|*.*",
-            InitialDirectory = _settingsService.LogsDir
-        };
-        var owner = Application.Current?.MainWindow;
-        var result = owner != null ? dlg.ShowDialog(owner) : dlg.ShowDialog();
-        if (result != true) return;
+        var path = _dialogs.SaveFile("Export diagnostics", "Text file (*.txt)|*.txt|All files (*.*)|*.*",
+            defaultName, _settingsService.LogsDir, ".txt");
+        if (path is null) return;
 
         try
         {
-            File.WriteAllText(dlg.FileName, BuildDiagnosticsBundle(), Encoding.UTF8);
-            StatusText = $"Diagnostics exported to {dlg.FileName}.";
-            Log($"Exported diagnostics bundle to {dlg.FileName}.");
+            File.WriteAllText(path, BuildDiagnosticsBundle(), Encoding.UTF8);
+            StatusText = $"Diagnostics exported to {path}.";
+            Log($"Exported diagnostics bundle to {path}.");
         }
         catch (Exception ex)
         {
@@ -968,23 +965,16 @@ public sealed class MainViewModel : ViewModelBase
     private void ExportEnvironment()
     {
         var defaultName = $"LocalChromeStore-environment-{DateTime.Now:yyyy-MM-dd-HHmm}.json";
-        var dlg = new SaveFileDialog
-        {
-            FileName = defaultName,
-            DefaultExt = ".json",
-            Filter = "LocalChromeStore environment (*.json)|*.json|All files (*.*)|*.*",
-            InitialDirectory = _settingsService.SettingsDir
-        };
-        var owner = Application.Current?.MainWindow;
-        var result = owner != null ? dlg.ShowDialog(owner) : dlg.ShowDialog();
-        if (result != true) return;
+        var path = _dialogs.SaveFile("Export environment", "LocalChromeStore environment (*.json)|*.json|All files (*.*)|*.*",
+            defaultName, _settingsService.SettingsDir, ".json");
+        if (path is null) return;
 
         try
         {
             var manifest = EnvironmentManifestService.Create(_settings, _extensions.Installed);
-            EnvironmentManifestService.Save(dlg.FileName, manifest);
-            StatusText = $"Environment exported to {dlg.FileName}.";
-            Log($"Exported environment manifest with {manifest.Extensions.Count} extension(s) to {dlg.FileName}.");
+            EnvironmentManifestService.Save(path, manifest);
+            StatusText = $"Environment exported to {path}.";
+            Log($"Exported environment manifest with {manifest.Extensions.Count} extension(s) to {path}.");
         }
         catch (Exception ex)
         {
@@ -997,16 +987,9 @@ public sealed class MainViewModel : ViewModelBase
     private void ExportCatalog()
     {
         var defaultName = $"LocalChromeStore-catalog-{DateTime.Now:yyyy-MM-dd-HHmm}.json";
-        var dlg = new SaveFileDialog
-        {
-            FileName = defaultName,
-            DefaultExt = ".json",
-            Filter = "LocalChromeStore catalog (*.json)|*.json|All files (*.*)|*.*",
-            InitialDirectory = _settingsService.SettingsDir
-        };
-        var owner = Application.Current?.MainWindow;
-        var result = owner != null ? dlg.ShowDialog(owner) : dlg.ShowDialog();
-        if (result != true) return;
+        var path = _dialogs.SaveFile("Export catalog", "LocalChromeStore catalog (*.json)|*.json|All files (*.*)|*.*",
+            defaultName, _settingsService.SettingsDir, ".json");
+        if (path is null) return;
 
         try
         {
@@ -1046,9 +1029,9 @@ public sealed class MainViewModel : ViewModelBase
 
             var opts = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
             var json = System.Text.Json.JsonSerializer.Serialize(entries, opts);
-            File.WriteAllText(dlg.FileName, json, System.Text.Encoding.UTF8);
-            StatusText = $"Catalog exported: {entries.Count} extensions to {dlg.FileName}.";
-            Log($"Exported catalog snapshot ({entries.Count} extensions) to {dlg.FileName}.");
+            File.WriteAllText(path, json, System.Text.Encoding.UTF8);
+            StatusText = $"Catalog exported: {entries.Count} extensions to {path}.";
+            Log($"Exported catalog snapshot ({entries.Count} extensions) to {path}.");
         }
         catch (Exception ex)
         {
@@ -1059,21 +1042,14 @@ public sealed class MainViewModel : ViewModelBase
 
     private async Task ImportEnvironmentAsync()
     {
-        var dlg = new OpenFileDialog
-        {
-            DefaultExt = ".json",
-            Filter = "LocalChromeStore environment (*.json)|*.json|All files (*.*)|*.*",
-            InitialDirectory = _settingsService.SettingsDir,
-            CheckFileExists = true
-        };
-        var owner = Application.Current?.MainWindow;
-        var result = owner != null ? dlg.ShowDialog(owner) : dlg.ShowDialog();
-        if (result != true) return;
+        var path = _dialogs.OpenFile("Import environment", "LocalChromeStore environment (*.json)|*.json|All files (*.*)|*.*",
+            _settingsService.SettingsDir, ".json");
+        if (path is null) return;
 
         EnvironmentManifest manifest;
         try
         {
-            manifest = EnvironmentManifestService.Load(dlg.FileName);
+            manifest = EnvironmentManifestService.Load(path);
         }
         catch (Exception ex)
         {
@@ -1082,12 +1058,10 @@ public sealed class MainViewModel : ViewModelBase
             return;
         }
 
-        var confirm = MessageBox.Show(
+        var confirm = _dialogs.Confirm(
             $"Import {manifest.Extensions.Count} extension(s) from this environment manifest?\n\nLocalChromeStore will update discovery settings, refresh GitHub, and install any matching release assets that are missing or outdated. Existing local installs are not removed.",
-            "Import environment",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Question);
-        if (confirm != MessageBoxResult.Yes) return;
+            "Import environment");
+        if (!confirm) return;
 
         Busy = true;
         try
@@ -1097,7 +1071,7 @@ public sealed class MainViewModel : ViewModelBase
             _settingsService.Save(_settings);
             SyncSettingsInputs();
             ReloadExtraOwnersFromSettings();
-            Log($"Imported environment settings from {dlg.FileName}.");
+            Log($"Imported environment settings from {path}.");
 
             await RefreshCatalogForImportAsync();
             await InstallEnvironmentTargetsAsync(manifest);
@@ -1189,12 +1163,11 @@ public sealed class MainViewModel : ViewModelBase
         var baseline = comparedWithImportedSnapshot
             ? $"the exported {target.Version} environment snapshot"
             : "the local installed copy";
-        var confirm = MessageBox.Show(
+        var confirm = _dialogs.Confirm(
             $"Import {target.Key}?\n\nThe current catalog release ({card.Version}) adds extension access compared with {baseline}:\n\n{diff.FormatAddedForPrompt()}\n\nInstall the current catalog release anyway?",
             "Review import permissions",
-            MessageBoxButton.YesNo,
-            diff.HasHighRiskAdditions ? MessageBoxImage.Warning : MessageBoxImage.Question);
-        if (confirm == MessageBoxResult.Yes)
+            diff.HasHighRiskAdditions ? DialogIcon.Warning : DialogIcon.Question);
+        if (confirm)
         {
             Log($"Import permission expansion approved for {target.Key}: {diff.AddedSummary}.");
             return true;
@@ -1208,7 +1181,7 @@ public sealed class MainViewModel : ViewModelBase
         var sb = new StringBuilder();
         sb.AppendLine("LocalChromeStore diagnostics bundle");
         sb.AppendLine($"Generated: {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}");
-        sb.AppendLine($"Version: {App.ResourceAssembly.GetName().Version}");
+        sb.AppendLine($"Version: {AssemblyVersion}");
         sb.AppendLine($"OS: {Environment.OSVersion}");
         sb.AppendLine($".NET: {Environment.Version}");
         sb.AppendLine();
