@@ -39,10 +39,11 @@ LocalChromeStore wraps path 2 with a real store UI today; path 3 (Enterprise Pol
 - **Store-style cards** — extension logo, name, version, description, install / uninstall buttons, link to repo
 - **One-click install** — downloads the latest release ZIP, extracts to a managed folder, tracks it
 - **One-click uninstall** — wipes the local copy and removes it from the load list
-- **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with `--load-extension=...` pointing at every installed extension
+- **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with every installed extension, version-gating the load strategy (plain `--load-extension`, the Chromium 137+ `--disable-features` override, or a guided warning on branded Chrome 142+, which removed command-line extension loading)
 - **Auditable launch sessions** — optional startup URL, clean temporary profile mode, and a copyable launch command preview
 - **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
 - **Update workflow** — update-available badges, permission-change review, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
+- **Self-update check** — on launch, compares the running build to the latest GitHub release and shows a dismissible banner with a download link when a newer version is available (never auto-installs itself)
 - **Search and filter** — by name, repo, or description; toggle to show only installed
 - **Topic filter (optional)** — restrict discovery to repos tagged with a specific GitHub topic (default `chrome-extension`)
 - **Optional GitHub PAT** — unauthenticated GitHub API caps at 60 req/h; a personal access token raises that to 5,000/h, unlocks private repos, and is stored with Windows DPAPI
