@@ -141,7 +141,7 @@
                                Text="{Binding FrameworkBadge}" />
                 </Border>
                 <Border Visibility="{Binding HasManifestVersionBadge, Converter={StaticResource BoolToVis}}"
-                        ToolTip="Manifest version detected from manifest.json">
+                        ToolTip="{Binding ManifestVersionTooltip}">
                     <Border.Style>
                         <Style TargetType="Border" BasedOn="{StaticResource MetaBadge}">
                             <Style.Triggers>

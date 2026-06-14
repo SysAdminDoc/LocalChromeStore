@@ -97,11 +97,20 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public string ManifestVersionBadge => Info.ManifestVersionNumber switch
     {
         3 => "MV3",
-        2 => "MV2",
+        2 => "MV2 · not loadable",
         _ => string.Empty
     };
     public bool HasManifestVersionBadge => Info.ManifestVersionNumber is 2 or 3;
     public bool IsManifestV2 => Info.ManifestVersionNumber == 2;
+
+    /// <summary>
+    /// MV2 was fully removed from Chrome in v139 (~mid-2025); an MV2 extension cannot load on a
+    /// current Chrome-family browser even though we can still parse its manifest.
+    /// </summary>
+    public string ManifestVersionTooltip => IsManifestV2
+        ? "Manifest V2 — removed from Chrome 139 (mid-2025). This extension will NOT load on a current " +
+          "Chrome-family browser; an MV3 release is required. (The manifest is still parsed for metadata.)"
+        : "Manifest version detected from manifest.json";
 
     public string FreshnessBadge => Info.Freshness switch
     {
