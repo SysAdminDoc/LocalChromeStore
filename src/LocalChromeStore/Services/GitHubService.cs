@@ -1,5 +1,4 @@
 using System.IO;
-using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
@@ -10,6 +9,8 @@ namespace LocalChromeStore.Services;
 
 public sealed class GitHubService
 {
+    private const int MaxProbeConcurrency = 6;
+
     private readonly SettingsService _settings;
     private readonly HttpClient _http;
     private GitHubClient? _client;
@@ -17,17 +18,21 @@ public sealed class GitHubService
 
     public GitHubServiceState LastState { get; private set; } = new();
 
+    /// <summary>App version (Major.Minor.Patch) read from the assembly, used for the GitHub User-Agent.</summary>
+    public static string AppVersion =>
+        typeof(GitHubService).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
+
     public GitHubService(SettingsService settings)
     {
         _settings = settings;
         _http = new HttpClient();
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd("LocalChromeStore/0.1");
+        _http.DefaultRequestHeaders.UserAgent.ParseAdd($"LocalChromeStore/{AppVersion}");
     }
 
     private GitHubClient GetClient(AppSettings cfg)
     {
         if (_client != null && _activeToken == cfg.GitHubToken) return _client;
-        var product = new ProductHeaderValue("LocalChromeStore", "0.1.0");
+        var product = new ProductHeaderValue("LocalChromeStore", AppVersion);
         var c = new GitHubClient(product);
         if (!string.IsNullOrWhiteSpace(cfg.GitHubToken))
             c.Credentials = new Credentials(cfg.GitHubToken);
@@ -35,6 +40,17 @@ public sealed class GitHubService
         _activeToken = cfg.GitHubToken;
         return c;
     }
+
+    /// <summary>Which Octokit listing endpoint to use for an owner.</summary>
+    public enum OwnerListing { User, Organization }
+
+    /// <summary>
+    /// Selects the repo-listing strategy from a GitHub account type. Organizations must use
+    /// <c>GetAllForOrg</c> (the only listing that returns private org repos to an authorized PAT);
+    /// everything else — including an unknown/failed type probe — falls back to user listing.
+    /// </summary>
+    public static OwnerListing ResolveOwnerListing(AccountType? accountType) =>
+        accountType == AccountType.Organization ? OwnerListing.Organization : OwnerListing.User;
 
     /// <summary>
     /// Discover candidate extensions across the configured user(s).
@@ -64,7 +80,17 @@ public sealed class GitHubService
             IReadOnlyList<Repository> repos;
             try
             {
-                repos = await client.Repository.GetAllForUser(owner);
+                // `GetAllForUser` does not return an organization's private repos. Detect the
+                // account type first so org listings use `GetAllForOrg`, which surfaces private
+                // repos the authenticated PAT can see. Falls back to user listing if the type
+                // probe fails (e.g. rate-limit on the lookup but list still works).
+                AccountType? accountType = null;
+                try { accountType = (await client.User.Get(owner)).Type; }
+                catch { /* fall back to user listing */ }
+
+                repos = ResolveOwnerListing(accountType) == OwnerListing.Organization
+                    ? await client.Repository.GetAllForOrg(owner)
+                    : await client.Repository.GetAllForUser(owner);
                 anyOwnerSucceeded = true;
             }
             catch (RateLimitExceededException ex)
@@ -117,22 +143,33 @@ public sealed class GitHubService
             }
 
             log?.Report($"  {repos.Count} repos returned");
-            foreach (var repo in repos)
+            var candidates = repos
+                .Where(r => !r.Archived &&
+                            !cfg.HiddenRepos.Contains($"{r.Owner.Login}/{r.Name}", StringComparer.OrdinalIgnoreCase))
+                .ToList();
+
+            // Probe repos with bounded concurrency instead of strictly sequentially — many-repo
+            // owners were slow when every probe waited on the previous one's round-trips.
+            using var gate = new SemaphoreSlim(MaxProbeConcurrency);
+            var probeTasks = candidates.Select(async repo =>
             {
-                ct.ThrowIfCancellationRequested();
-                if (repo.Archived) continue;
-                if (cfg.HiddenRepos.Contains($"{repo.Owner.Login}/{repo.Name}", StringComparer.OrdinalIgnoreCase)) continue;
-
-                if (cfg.UseTopicFilter && !string.IsNullOrWhiteSpace(cfg.TopicFilter))
+                await gate.WaitAsync(ct);
+                try
                 {
-                    var topics = await SafeGetTopics(client, repo);
-                    if (topics is null || !topics.Any(t => t.Equals(cfg.TopicFilter, StringComparison.OrdinalIgnoreCase)))
-                        continue;
+                    ct.ThrowIfCancellationRequested();
+                    if (cfg.UseTopicFilter && !string.IsNullOrWhiteSpace(cfg.TopicFilter))
+                    {
+                        var topics = await SafeGetTopics(client, repo);
+                        if (topics is null || !topics.Any(t => t.Equals(cfg.TopicFilter, StringComparison.OrdinalIgnoreCase)))
+                            return null;
+                    }
+                    return await ProbeRepoAsync(client, repo, log, ct);
                 }
+                finally { gate.Release(); }
+            });
 
-                var info = await ProbeRepoAsync(client, repo, log, ct);
-                if (info != null) found.Add(info);
-            }
+            var results = await Task.WhenAll(probeTasks);
+            found.AddRange(results.Where(r => r != null)!);
         }
 
         // Capture latest rate-limit data for the UI. Best-effort — never fail discovery on this.
@@ -216,9 +253,11 @@ public sealed class GitHubService
             }
         }
 
-        var manifestSourcePath = await FindManifestPathAsync(client, repo, ct);
+        // Single content-API read for the source manifest.json — used both to decide whether the
+        // repo is an extension candidate AND to enrich it, so we probe the common paths only once.
+        var (manifestSourcePath, manifestDoc) = await FindManifestAsync(client, repo, ct);
         var hasManifest = asset != null || manifestSourcePath != null;
-        if (!hasManifest) return null;
+        if (!hasManifest) { manifestDoc?.Dispose(); return null; }
 
         var info = new ExtensionInfo
         {
@@ -246,15 +285,18 @@ public sealed class GitHubService
         info.Freshness = ClassifyFreshness(info.IsArchived, info.RepoLastPushedAt);
         AddFreshnessWarnings(info, release);
 
-        // Try to enrich from manifest.json — best-effort, don't fail discovery if it errors.
+        // Enrich from the source manifest.json we already read above (no extra calls, no ZIP download).
         try
         {
-            var manifestJson = await TryReadManifestAsync(client, repo, asset, ct);
-            if (manifestJson != null) Enrich(info, manifestJson);
+            if (manifestDoc != null) Enrich(info, manifestDoc);
         }
         catch (Exception ex)
         {
-            log?.Report($"  ~ manifest probe failed for {repo.Name}: {ex.Message}");
+            log?.Report($"  ~ manifest enrich failed for {repo.Name}: {ex.Message}");
+        }
+        finally
+        {
+            manifestDoc?.Dispose();
         }
 
         // Framework detection — best-effort.
@@ -282,43 +324,15 @@ public sealed class GitHubService
 
     private static readonly string[] CommonManifestPaths = ["manifest.json", "extension/manifest.json", "src/manifest.json", "dist/manifest.json", "public/manifest.json"];
 
-    private static async Task<string?> FindManifestPathAsync(GitHubClient client, Repository repo, CancellationToken ct)
+    /// <summary>
+    /// Probes the common <c>manifest.json</c> locations via the repo content API exactly once and
+    /// returns both the path it was found at and the parsed document. Discovery never downloads the
+    /// release ZIP just to read one file — that wasted bandwidth (the ZIP is fetched again at install)
+    /// and slowed many-repo owners. ZIP-only repos still surface from their release asset; they just
+    /// skip deep manifest enrichment until install, which reads the real package.
+    /// </summary>
+    private static async Task<(string? path, JsonDocument? doc)> FindManifestAsync(GitHubClient client, Repository repo, CancellationToken ct)
     {
-        foreach (var path in CommonManifestPaths)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                var contents = await client.Repository.Content.GetAllContents(repo.Owner.Login, repo.Name, path);
-                if (contents.Count > 0) return path;
-            }
-            catch (NotFoundException) { /* try next */ }
-            catch { return null; }
-        }
-        return null;
-    }
-
-    private async Task<JsonDocument?> TryReadManifestAsync(GitHubClient client, Repository repo, ReleaseAsset? asset, CancellationToken ct)
-    {
-        // Strategy 1: ZIP asset → download → read manifest.json
-        if (asset != null && asset.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-        {
-            var bytes = await _http.GetByteArrayAsync(asset.BrowserDownloadUrl, ct);
-            using var ms = new MemoryStream(bytes);
-            using var zip = new ZipArchive(ms, ZipArchiveMode.Read);
-            var entry = zip.Entries.FirstOrDefault(e =>
-                e.FullName.Equals("manifest.json", StringComparison.OrdinalIgnoreCase) ||
-                e.FullName.EndsWith("/manifest.json", StringComparison.OrdinalIgnoreCase));
-            if (entry != null)
-            {
-                using var es = entry.Open();
-                using var reader = new StreamReader(es);
-                var json = await reader.ReadToEndAsync(ct);
-                return JsonDocument.Parse(json, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
-            }
-        }
-
-        // Strategy 2: probe manifest.json paths in repo
         foreach (var path in CommonManifestPaths)
         {
             ct.ThrowIfCancellationRequested();
@@ -327,12 +341,17 @@ public sealed class GitHubService
                 var contents = await client.Repository.Content.GetAllContents(repo.Owner.Login, repo.Name, path);
                 var c = contents.FirstOrDefault();
                 if (c?.Content != null)
-                    return JsonDocument.Parse(c.Content, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+                {
+                    var doc = JsonDocument.Parse(c.Content, new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+                    return (path, doc);
+                }
+                if (contents.Count > 0) return (path, null);
             }
             catch (NotFoundException) { /* try next */ }
-            catch { return null; }
+            catch (JsonException) { return (path, null); } // found but unparseable
+            catch { return (null, null); }
         }
-        return null;
+        return (null, null);
     }
 
     private static void Enrich(ExtensionInfo info, JsonDocument doc)
