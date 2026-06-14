@@ -11,7 +11,9 @@
     <Color x:Key="OverlayColor">#6c7086</Color>
     <Color x:Key="TextColor">#cdd6f4</Color>
     <Color x:Key="SubtextColor">#a6adc8</Color>
-    <Color x:Key="MuteColor">#7f849c</Color>
+    <!-- Catppuccin Mocha Overlay2: ~5.8:1 on Base for WCAG AA on small mute text
+         (Overlay1 #7f849c was ~4.46:1, just under the 4.5:1 threshold). -->
+    <Color x:Key="MuteColor">#9399b2</Color>
     <Color x:Key="MauveColor">#cba6f7</Color>
     <Color x:Key="MauveSoftColor">#3b3052</Color>
     <Color x:Key="SapphireColor">#74c7ec</Color>
