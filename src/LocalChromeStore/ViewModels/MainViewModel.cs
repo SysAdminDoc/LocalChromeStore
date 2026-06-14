@@ -834,12 +834,30 @@ public sealed class MainViewModel : ViewModelBase
             _settings.LaunchWithTemporaryProfile = LaunchWithTemporaryProfile;
             _settingsService.Save(_settings);
 
+            // Launching into an already-running default profile makes Chromium forward the
+            // command line to the existing process and drop --load-extension.
+            if (!LaunchWithTemporaryProfile && BrowserLauncher.IsBrowserRunning(SelectedBrowser))
+                Log($"! {SelectedBrowser.DisplayName} is already running. Chromium forwards arguments to the existing " +
+                    "window and drops --load-extension, so the extensions may not load. Close it first or enable 'Clean temp profile'.");
+
             var result = _launcher.Launch(SelectedBrowser, set, launchUrl, LaunchWithTemporaryProfile);
+            Log($"Load strategy — {result.Plan.StrategyDescription}");
+            foreach (var warning in result.Plan.Warnings)
+                Log($"! {warning}");
+
             var setLabel = _selectedLoadSet is null || _selectedLoadSet.Id == SentinelLoadSet.Id
                 ? "all installed"
                 : $"load set '{_selectedLoadSet.Name}'";
-            StatusText = $"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s) ({setLabel}).";
-            Log($"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s) loaded ({setLabel}).");
+            if (result.Plan.LoadsExtensions)
+            {
+                StatusText = $"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s) ({setLabel}).";
+                Log($"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s) loaded ({setLabel}).");
+            }
+            else
+            {
+                StatusText = $"Launched {SelectedBrowser.DisplayName}, but it cannot load extensions from the command line.";
+                Log($"Launched {SelectedBrowser.DisplayName} without loading {set.Count} extension(s) — see warning above.");
+            }
             if (!string.IsNullOrEmpty(result.Plan.TemporaryProfilePath))
                 Log($"Temporary browser profile: {result.Plan.TemporaryProfilePath}");
             Log($"Launch command: {result.Plan.DisplayCommand}");
