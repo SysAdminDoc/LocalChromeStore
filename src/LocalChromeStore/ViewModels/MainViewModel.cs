@@ -165,6 +165,10 @@ public sealed class MainViewModel : ViewModelBase
         set => SetField(ref _statusText, value);
     }
 
+    /// <summary>Footer label bound to the real assembly version so it never drifts from the build.</summary>
+    public string AppVersionLabel =>
+        $"LocalChromeStore v{App.ResourceAssembly.GetName().Version?.ToString(3) ?? "0.0.0"}";
+
     public string SearchText
     {
         get => _searchText;

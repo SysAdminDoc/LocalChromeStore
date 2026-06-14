@@ -29,7 +29,7 @@ Chromium 75+ blocks drag-and-drop install of self-signed CRX files with `CRX_REQ
 2. **Load unpacked** — works, but clicking through the file picker for ten extensions every browser reset is friction
 3. **Enterprise Policy `ExtensionInstallForcelist`** — the only self-host path that actually works on stock Chrome / Brave / Edge
 
-LocalChromeStore wraps path 2 with a real store UI and (in v0.2.0) wraps path 3 for true auto-install.
+LocalChromeStore wraps path 2 with a real store UI today; path 3 (Enterprise Policy auto-install) is planned.
 
 ---
 
@@ -146,12 +146,19 @@ CRX files are unpacked by stripping the CRX2/CRX3 header and extracting the inne
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md). Highlights:
+See [CHANGELOG.md](CHANGELOG.md) for full release history.
 
-- **v0.2.0** — Enterprise Policy install path: write `HKLM\Software\Policies\Google\Chrome\ExtensionInstallForcelist` (and Brave / Edge equivalents) plus a self-hosted `update.xml` on GitHub Pages, so extensions auto-install at next browser launch with no `--load-extension` flag and no developer-mode banner
-- **v0.3.0** — Update safety: historical-version restore for environment imports, stronger manifest/extraction tests, and policy-ready package checks
-- **v0.4.0** — Light theme + accent color picker
-- **v0.5.0** — Local folder source, custom update-feed source, and richer named launch profiles
+**Shipped**
+
+- **v0.2.0** — Named load sets, per-repo hidden-repo restore, accessibility sweep, broader unit tests
+- **v0.3.0** — `localchromestore.json` repo manifest + validator, framework build-command dry-run, teal accent token
+
+**Planned**
+
+- Version-gated browser launch strategy and a CDP `Extensions.loadUnpacked` loader for branded Chrome 137+/142+ (which removed command-line `--load-extension`)
+- Enterprise Policy install path: write `HKLM\Software\Policies\Google\Chrome\ExtensionInstallForcelist` (and Brave / Edge equivalents) plus a self-hosted `update.xml`, gated on a domain/Entra/CBCM enrollment precondition check
+- CRX3 signing (RSA-2048) with deterministic extension-ID preview and same-key update checks
+- Local folder source, custom update-feed source, light theme + accent picker
 
 ---
 

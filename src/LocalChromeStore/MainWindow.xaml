@@ -812,9 +812,8 @@
                 <TextBlock Grid.Column="0"
                            Text="{Binding StatusText}"
                            Style="{StaticResource SubtleText}" />
-                <TextBlock Grid.Column="1" Style="{StaticResource MuteText}">
-                    <Run Text="LocalChromeStore v0.1.0" />
-                </TextBlock>
+                <TextBlock Grid.Column="1" Style="{StaticResource MuteText}"
+                           Text="{Binding AppVersionLabel}" />
             </Grid>
         </Border>
     </Grid>
