@@ -17,6 +17,8 @@ public sealed class MainViewModel : ViewModelBase
     private readonly GitHubService _github;
     private readonly ExtensionService _extensions;
     private readonly BrowserLauncher _launcher;
+    private readonly BrowserLaunchManager _launchManager;
+    private readonly LoadSetManager _loadSets;
     private readonly PolicyEnrollmentService _policyEnrollment = new();
     private readonly IDialogService _dialogs;
     private readonly Dispatcher_LogSink _logSink;
@@ -38,7 +40,7 @@ public sealed class MainViewModel : ViewModelBase
     private LoadSet? _selectedLoadSet;
     private string _newLoadSetNameInput = string.Empty;
 
-    private static readonly LoadSet SentinelLoadSet = new() { Id = "__all__", Name = "All installed" };
+    private static readonly LoadSet SentinelLoadSet = LoadSetManager.CreateSentinel();
 
     public ObservableCollection<ExtensionCardViewModel> Extensions { get; } = new();
     public ICollectionView ExtensionsView { get; }
@@ -80,6 +82,8 @@ public sealed class MainViewModel : ViewModelBase
         _github = new GitHubService(_settingsService);
         _extensions = new ExtensionService(_settingsService, _github);
         _launcher = new BrowserLauncher(_extensions);
+        _launchManager = new BrowserLaunchManager(_launcher);
+        _loadSets = new LoadSetManager(_settingsService);
         _settings = _settingsService.Load();
         _logSink = new Dispatcher_LogSink(LogLines);
 
@@ -825,66 +829,33 @@ public sealed class MainViewModel : ViewModelBase
     {
         if (SelectedBrowser is null) return;
         var set = GetActiveLoadSetExtensions(_extensions.Installed);
+        var isSentinel = LoadSetManager.IsSentinel(_selectedLoadSet);
+
         if (set.Count == 0)
         {
-            var isSentinel = _selectedLoadSet is null || _selectedLoadSet.Id == SentinelLoadSet.Id;
-            StatusText = isSentinel
-                ? "Install at least one extension before launching a browser session."
-                : $"No extensions in load set '{_selectedLoadSet!.Name}' are currently installed. Install them or switch to 'All installed'.";
-            Log(isSentinel
-                ? "No extensions installed yet — install one before launching."
-                : $"Load set '{_selectedLoadSet!.Name}' has no installed extensions — check installs or switch load set.");
+            ApplyLaunchOutcome(BrowserLaunchManager.EmptySet(isSentinel, _selectedLoadSet?.Name));
             return;
         }
-        try
-        {
-            var launchUrl = NormalizeLaunchUrl(LaunchUrlInput);
-            _settings.LaunchUrl = launchUrl;
-            _settings.LaunchWithTemporaryProfile = LaunchWithTemporaryProfile;
-            _settingsService.Save(_settings);
 
-            // Launching into an already-running default profile makes Chromium forward the
-            // command line to the existing process and drop --load-extension.
-            if (!LaunchWithTemporaryProfile && BrowserLauncher.IsBrowserRunning(SelectedBrowser))
-                Log($"! {SelectedBrowser.DisplayName} is already running. Chromium forwards arguments to the existing " +
-                    "window and drops --load-extension, so the extensions may not load. Close it first or enable 'Clean temp profile'.");
+        // Persist the launch options used for this session (the input setters already persist them;
+        // this keeps the saved state consistent with what is actually launched).
+        var launchUrl = NormalizeLaunchUrl(LaunchUrlInput);
+        _settings.LaunchUrl = launchUrl;
+        _settings.LaunchWithTemporaryProfile = LaunchWithTemporaryProfile;
+        _settingsService.Save(_settings);
 
-            var result = _launcher.Launch(SelectedBrowser, set, launchUrl, LaunchWithTemporaryProfile);
-            Log($"Load strategy — {result.Plan.StrategyDescription}");
-            foreach (var warning in result.Plan.Warnings)
-                Log($"! {warning}");
-
-            var setLabel = _selectedLoadSet is null || _selectedLoadSet.Id == SentinelLoadSet.Id
-                ? "all installed"
-                : $"load set '{_selectedLoadSet.Name}'";
-            if (result.Plan.LoadsExtensions)
-            {
-                StatusText = $"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s) ({setLabel}).";
-                Log($"Launched {SelectedBrowser.DisplayName} with {set.Count} extension(s) loaded ({setLabel}).");
-            }
-            else
-            {
-                StatusText = $"Launched {SelectedBrowser.DisplayName}, but it cannot load extensions from the command line.";
-                Log($"Launched {SelectedBrowser.DisplayName} without loading {set.Count} extension(s) — see warning above.");
-            }
-            if (!string.IsNullOrEmpty(result.Plan.TemporaryProfilePath))
-                Log($"Temporary browser profile: {result.Plan.TemporaryProfilePath}");
-            Log($"Launch command: {result.Plan.DisplayCommand}");
-        }
-        catch (Exception ex)
-        {
-            StatusText = $"Launch failed: {ex.Message}";
-            Log($"! Launch failed: {ex.Message}");
-        }
+        ApplyLaunchOutcome(_launchManager.Launch(
+            SelectedBrowser, set, launchUrl, LaunchWithTemporaryProfile, isSentinel, _selectedLoadSet?.Name));
     }
 
-    private List<InstalledExtension> GetActiveLoadSetExtensions(IReadOnlyList<InstalledExtension> installed)
+    private void ApplyLaunchOutcome(BrowserLaunchManager.Outcome outcome)
     {
-        if (_selectedLoadSet is null || _selectedLoadSet.Id == SentinelLoadSet.Id || _selectedLoadSet.ExtensionKeys is null)
-            return installed.ToList();
-        var keys = _selectedLoadSet.ExtensionKeys.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        return installed.Where(e => keys.Contains(e.Key)).ToList();
+        StatusText = outcome.StatusText;
+        foreach (var line in outcome.Log) Log(line);
     }
+
+    private List<InstalledExtension> GetActiveLoadSetExtensions(IReadOnlyList<InstalledExtension> installed) =>
+        LoadSetManager.ResolveActiveExtensions(_selectedLoadSet, installed);
 
     private void CopyLaunchArguments()
     {
@@ -993,45 +964,10 @@ public sealed class MainViewModel : ViewModelBase
 
         try
         {
-            var installedByKey = _extensions.Installed.ToDictionary(
-                e => $"{e.RepoOwner}/{e.RepoName}",
-                e => e,
-                StringComparer.OrdinalIgnoreCase);
-
-            var entries = Extensions.Select(card =>
-            {
-                var info = card.Info;
-                installedByKey.TryGetValue($"{info.RepoOwner}/{info.RepoName}", out var inst);
-                return new CatalogExportEntry(
-                    RepoOwner: info.RepoOwner,
-                    RepoName: info.RepoName,
-                    RepoUrl: info.RepoUrl,
-                    DisplayName: info.DisplayName,
-                    DisplayVersion: info.DisplayVersion,
-                    Framework: info.Framework.ToString(),
-                    ManifestVersion: info.ManifestVersionNumber,
-                    HasAsset: !string.IsNullOrEmpty(info.AssetUrl),
-                    AssetName: info.AssetName,
-                    AssetUrl: info.AssetUrl,
-                    AssetSizeBytes: info.AssetSizeBytes > 0 ? info.AssetSizeBytes : null,
-                    ChecksumUrl: info.ChecksumUrl,
-                    DiscoverySource: info.DiscoverySource.ToString(),
-                    HasRepoManifest: info.HasRepoManifest,
-                    HomepageUrl: info.HomepageUrl,
-                    Stars: info.Stars > 0 ? info.Stars : null,
-                    Freshness: info.Freshness.ToString(),
-                    IsArchived: info.IsArchived,
-                    Warnings: info.Warnings.Count > 0 ? info.Warnings : null,
-                    InstalledVersion: inst?.Version,
-                    InstalledAt: inst?.InstalledAt,
-                    ChecksumVerified: inst?.ChecksumVerified);
-            }).ToList();
-
-            var opts = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
-            var json = System.Text.Json.JsonSerializer.Serialize(entries, opts);
-            File.WriteAllText(path, json, System.Text.Encoding.UTF8);
-            StatusText = $"Catalog exported: {entries.Count} extensions to {path}.";
-            Log($"Exported catalog snapshot ({entries.Count} extensions) to {path}.");
+            var export = ImportExportService.BuildCatalog(Extensions.Select(c => c.Info), _extensions.Installed);
+            File.WriteAllText(path, export.Json, Encoding.UTF8);
+            StatusText = $"Catalog exported: {export.Count} extensions to {path}.";
+            Log($"Exported catalog snapshot ({export.Count} extensions) to {path}.");
         }
         catch (Exception ex)
         {
@@ -1108,41 +1044,41 @@ public sealed class MainViewModel : ViewModelBase
         foreach (var target in manifest.Extensions)
         {
             var existing = _extensions.Find(target.RepoOwner, target.RepoName);
-            if (existing is not null && existing.Version.Equals(target.Version, StringComparison.OrdinalIgnoreCase))
+            cards.TryGetValue(target.Key, out var card);
+            var action = ImportExportService.ClassifyImportTarget(
+                existing, target.Version, hasCard: card is not null, cardHasAsset: card?.HasAsset ?? false);
+
+            switch (action)
             {
-                alreadyCurrent++;
-                Log($"Import skip: {target.Key} is already installed at {target.Version}.");
-                continue;
+                case ImportAction.AlreadyCurrent:
+                    alreadyCurrent++;
+                    Log($"Import skip: {target.Key} is already installed at {target.Version}.");
+                    continue;
+                case ImportAction.Missing:
+                    missing++;
+                    Log($"! Import missing: {target.Key} was not returned by current GitHub discovery.");
+                    continue;
+                case ImportAction.MissingAsset:
+                    missing++;
+                    Log($"! Import missing asset: {target.Key} has no installable ZIP/CRX release asset.");
+                    continue;
             }
 
-            if (!cards.TryGetValue(target.Key, out var card))
-            {
-                missing++;
-                Log($"! Import missing: {target.Key} was not returned by current GitHub discovery.");
-                continue;
-            }
-
-            if (!card.HasAsset)
-            {
-                missing++;
-                Log($"! Import missing asset: {target.Key} has no installable ZIP/CRX release asset.");
-                continue;
-            }
-
-            if (!card.Version.Equals(target.Version, StringComparison.OrdinalIgnoreCase))
-                Log($"Import version note: {target.Key} requested {target.Version}; installing current catalog version {card.Version}.");
+            var resolvedCard = card!; // ImportAction.Install implies the card exists with an asset.
+            if (!resolvedCard.Version.Equals(target.Version, StringComparison.OrdinalIgnoreCase))
+                Log($"Import version note: {target.Key} requested {target.Version}; installing current catalog version {resolvedCard.Version}.");
 
             var permissionDiff = existing is not null
-                ? PermissionDiff.Compare(existing, card.Info)
-                : PermissionDiff.Compare(target, card.Info);
-            if (permissionDiff.HasAdditions && !ConfirmEnvironmentImportPermissionExpansion(target, card, permissionDiff, existing is null))
+                ? PermissionDiff.Compare(existing, resolvedCard.Info)
+                : PermissionDiff.Compare(target, resolvedCard.Info);
+            if (permissionDiff.HasAdditions && !ConfirmEnvironmentImportPermissionExpansion(target, resolvedCard, permissionDiff, existing is null))
             {
                 skippedForPermissionReview++;
-                Log($"Import skip: {target.Key} needs permission review before installing current catalog version {card.Version}.");
+                Log($"Import skip: {target.Key} needs permission review before installing current catalog version {resolvedCard.Version}.");
                 continue;
             }
 
-            await _extensions.InstallAsync(card.Info, new Progress<string>(Log));
+            await _extensions.InstallAsync(resolvedCard.Info, new Progress<string>(Log));
             installed++;
         }
 
@@ -1343,7 +1279,7 @@ public sealed class MainViewModel : ViewModelBase
     {
         LoadSets.Clear();
         LoadSets.Add(SentinelLoadSet);
-        foreach (var ls in _settingsService.LoadLoadSets())
+        foreach (var ls in _loadSets.LoadSaved())
             LoadSets.Add(ls);
         _selectedLoadSet = SentinelLoadSet;
         OnPropertyChanged(nameof(SelectedLoadSet));
@@ -1362,14 +1298,14 @@ public sealed class MainViewModel : ViewModelBase
     {
         var name = NewLoadSetNameInput.Trim();
         if (string.IsNullOrWhiteSpace(name) || !_extensions.Installed.Any()) return;
-        if (LoadSets.Any(ls => ls.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        if (LoadSetManager.NameExists(LoadSets, name))
         {
             StatusText = $"A load set named '{name}' already exists.";
             Log($"! Load set '{name}' already exists — choose a different name.");
             return;
         }
-        var keys = _extensions.Installed.Select(e => e.Key).ToList();
-        var newSet = new LoadSet { Name = name, ExtensionKeys = keys };
+        var newSet = LoadSetManager.Snapshot(name, _extensions.Installed);
+        var keys = newSet.ExtensionKeys ?? new List<string>();
         LoadSets.Add(newSet);
         PersistLoadSets();
         SelectedLoadSet = newSet;
@@ -1393,10 +1329,7 @@ public sealed class MainViewModel : ViewModelBase
         Log($"Deleted load set '{name}'.");
     }
 
-    private void PersistLoadSets()
-    {
-        _settingsService.SaveLoadSets(LoadSets.Where(ls => ls.Id != SentinelLoadSet.Id));
-    }
+    private void PersistLoadSets() => _loadSets.Save(LoadSets);
 
     private void RestoreHiddenRepo(string? repoKey)
     {
@@ -1487,28 +1420,3 @@ internal sealed class Dispatcher_LogSink
         while (_sink.Count > MaxLines) _sink.RemoveAt(0);
     }
 }
-
-// F039: catalog export schema.
-internal sealed record CatalogExportEntry(
-    string RepoOwner,
-    string RepoName,
-    string RepoUrl,
-    string DisplayName,
-    string DisplayVersion,
-    string Framework,
-    int? ManifestVersion,
-    bool HasAsset,
-    string? AssetName,
-    string? AssetUrl,
-    long? AssetSizeBytes,
-    string? ChecksumUrl,
-    string DiscoverySource,
-    bool HasRepoManifest,
-    string? HomepageUrl,
-    int? Stars,
-    string Freshness,
-    bool IsArchived,
-    List<string>? Warnings,
-    string? InstalledVersion,
-    DateTimeOffset? InstalledAt,
-    bool? ChecksumVerified);
