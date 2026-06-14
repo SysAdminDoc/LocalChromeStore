@@ -32,10 +32,10 @@ public sealed class SettingsService
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
-    public SettingsService()
+    public SettingsService(string? appDataRoot = null, string? localAppDataRoot = null)
     {
-        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var appData = appDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var localAppData = localAppDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         SettingsDir = Path.Combine(appData, "LocalChromeStore");
         SettingsPath = Path.Combine(SettingsDir, "settings.json");
         ExtensionsRoot = Path.Combine(localAppData, "LocalChromeStore", "extensions");
@@ -53,27 +53,21 @@ public sealed class SettingsService
 
     public AppSettings Load()
     {
-        if (!File.Exists(SettingsPath)) return new AppSettings();
-        try
+        var s = ReadJsonWithBackup(SettingsPath, () => new AppSettings());
+        if (!string.IsNullOrEmpty(s.GitHubToken))
         {
-            var json = File.ReadAllText(SettingsPath);
-            var s = JsonSerializer.Deserialize<AppSettings>(json, JsonOpts) ?? new AppSettings();
-            if (!string.IsNullOrEmpty(s.GitHubToken))
+            if (s.GitHubToken.StartsWith(DpapiPrefix, StringComparison.Ordinal))
             {
-                if (s.GitHubToken.StartsWith(DpapiPrefix, StringComparison.Ordinal))
-                {
-                    s.GitHubToken = TryUnprotect(s.GitHubToken.Substring(DpapiPrefix.Length));
-                }
-                else
-                {
-                    // Legacy plaintext token — surface the migration to the caller so it
-                    // can be re-saved under DPAPI on the next persist.
-                    TokenWasMigratedFromPlaintext = true;
-                }
+                s.GitHubToken = TryUnprotect(s.GitHubToken.Substring(DpapiPrefix.Length));
             }
-            return s;
+            else
+            {
+                // Legacy plaintext token — surface the migration to the caller so it
+                // can be re-saved under DPAPI on the next persist.
+                TokenWasMigratedFromPlaintext = true;
+            }
         }
-        catch { return new AppSettings(); }
+        return s;
     }
 
     public void Save(AppSettings settings)
@@ -95,43 +89,77 @@ public sealed class SettingsService
             LaunchWithTemporaryProfile = settings.LaunchWithTemporaryProfile
         };
         var json = JsonSerializer.Serialize(copy, JsonOpts);
-        File.WriteAllText(SettingsPath, json);
+        WriteAtomic(SettingsPath, json);
         TokenWasMigratedFromPlaintext = false;
     }
 
-    public InstalledExtensionsManifest LoadManifest()
-    {
-        if (!File.Exists(ManifestPath)) return new InstalledExtensionsManifest();
-        try
-        {
-            var json = File.ReadAllText(ManifestPath);
-            return JsonSerializer.Deserialize<InstalledExtensionsManifest>(json, JsonOpts)
-                ?? new InstalledExtensionsManifest();
-        }
-        catch { return new InstalledExtensionsManifest(); }
-    }
+    public InstalledExtensionsManifest LoadManifest() =>
+        ReadJsonWithBackup(ManifestPath, () => new InstalledExtensionsManifest());
 
     public void SaveManifest(InstalledExtensionsManifest manifest)
     {
         var json = JsonSerializer.Serialize(manifest, JsonOpts);
-        File.WriteAllText(ManifestPath, json);
+        WriteAtomic(ManifestPath, json);
     }
 
-    public List<LoadSet> LoadLoadSets()
-    {
-        if (!File.Exists(LoadSetsPath)) return [];
-        try
-        {
-            var json = File.ReadAllText(LoadSetsPath);
-            return JsonSerializer.Deserialize<List<LoadSet>>(json, JsonOpts) ?? [];
-        }
-        catch { return []; }
-    }
+    public List<LoadSet> LoadLoadSets() =>
+        ReadJsonWithBackup<List<LoadSet>>(LoadSetsPath, () => []);
 
     public void SaveLoadSets(IEnumerable<LoadSet> sets)
     {
         var json = JsonSerializer.Serialize(sets.ToList(), JsonOpts);
-        File.WriteAllText(LoadSetsPath, json);
+        WriteAtomic(LoadSetsPath, json);
+    }
+
+    /// <summary>
+    /// Crash-safe write: serialize to <c>&lt;path&gt;.tmp</c>, flush to disk, then atomically
+    /// swap it into place, keeping the previous good copy as <c>&lt;path&gt;.bak</c>. A crash or
+    /// power loss mid-write leaves either the prior file intact or the <c>.bak</c> recoverable —
+    /// it can never truncate the live file. Used for every JSON state file.
+    /// </summary>
+    public static void WriteAtomic(string path, string contents)
+    {
+        var tmp = path + ".tmp";
+        var bak = path + ".bak";
+        // Write + fsync the temp file before any swap so the bytes are durable.
+        using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
+        using (var writer = new StreamWriter(fs, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false)))
+        {
+            writer.Write(contents);
+            writer.Flush();
+            fs.Flush(flushToDisk: true);
+        }
+
+        if (File.Exists(path))
+        {
+            // File.Replace is atomic on NTFS and writes the old contents to the backup.
+            File.Replace(tmp, path, bak, ignoreMetadataErrors: true);
+        }
+        else
+        {
+            File.Move(tmp, path);
+        }
+    }
+
+    /// <summary>
+    /// Reads and deserializes <paramref name="path"/>, transparently falling back to the
+    /// <c>.bak</c> written by <see cref="WriteAtomic"/> if the primary file is missing or corrupt,
+    /// and finally to <paramref name="fallback"/>.
+    /// </summary>
+    private static T ReadJsonWithBackup<T>(string path, Func<T> fallback)
+    {
+        foreach (var candidate in new[] { path, path + ".bak" })
+        {
+            if (!File.Exists(candidate)) continue;
+            try
+            {
+                var json = File.ReadAllText(candidate);
+                var value = JsonSerializer.Deserialize<T>(json, JsonOpts);
+                if (value is not null) return value;
+            }
+            catch { /* try the backup, then the fallback */ }
+        }
+        return fallback();
     }
 
     private static string Protect(string plaintext)
