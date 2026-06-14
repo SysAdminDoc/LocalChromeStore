@@ -386,8 +386,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     {
         try
         {
-            var cacheKey = $"{Info.RepoOwner}_{Info.RepoName}.png";
-            var cachePath = Path.Combine(_settings.IconCacheDir, cacheKey);
+            var cachePath = Path.Combine(_settings.IconCacheDir, IconCacheKey(Info));
             byte[]? bytes = null;
             if (File.Exists(cachePath))
                 bytes = await File.ReadAllBytesAsync(cachePath);
@@ -408,6 +407,27 @@ public sealed class ExtensionCardViewModel : ViewModelBase
             Icon = bmp;
         }
         catch { /* ignore — fall back to placeholder */ }
+    }
+
+    /// <summary>
+    /// Icon cache filename. The previous key (<c>{owner}_{name}.png</c>) never changed, so an
+    /// updated extension's new icon was never re-fetched while the stale file existed. Hashing the
+    /// icon URL and version into the key means a changed icon resolves to a fresh cache miss.
+    /// </summary>
+    public static string IconCacheKey(Models.ExtensionInfo info)
+    {
+        var seed = $"{info.IconUrl}|{info.DisplayVersion}";
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(seed));
+        var shortHash = Convert.ToHexString(hash, 0, 6).ToLowerInvariant();
+        return $"{Sanitize(info.RepoOwner)}_{Sanitize(info.RepoName)}_{shortHash}.png";
+    }
+
+    private static string Sanitize(string s)
+    {
+        Span<char> buf = stackalloc char[s.Length];
+        for (var i = 0; i < s.Length; i++)
+            buf[i] = Array.IndexOf(Path.GetInvalidFileNameChars(), s[i]) >= 0 ? '_' : s[i];
+        return new string(buf);
     }
 
     public void RaiseAllChanged()
