@@ -18,6 +18,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly GitHubService _github;
     private readonly ExtensionService _extensions;
     private readonly BrowserLauncher _launcher;
+    private readonly PolicyEnrollmentService _policyEnrollment = new();
     private readonly Dispatcher_LogSink _logSink;
     private AppSettings _settings;
     private bool _busy;
@@ -1240,6 +1241,23 @@ public sealed class MainViewModel : ViewModelBase
         sb.AppendLine($"  Launch URL:    {NormalizeLaunchUrl(LaunchUrlInput) ?? "(none)"}");
         sb.AppendLine($"  Temp profile:  {LaunchWithTemporaryProfile}");
         sb.AppendLine($"  Launch command preview: {LaunchPreview}");
+        sb.AppendLine();
+
+        sb.AppendLine("== Policy-mode readiness ==");
+        try
+        {
+            var enrollment = _policyEnrollment.DetectCurrent();
+            var support = PolicyEnrollmentService.EvaluateOffStoreForceInstall(enrollment);
+            sb.AppendLine($"  Domain joined:  {enrollment.DomainJoined}");
+            sb.AppendLine($"  Entra joined:   {enrollment.EntraJoined}");
+            sb.AppendLine($"  CBCM enrolled:  {enrollment.CbcmEnrolled}");
+            sb.AppendLine($"  Off-store force-install supported: {support.Supported}");
+            sb.AppendLine($"    {support.Reason}");
+        }
+        catch (Exception ex)
+        {
+            sb.AppendLine($"  (enrollment probe failed: {ex.Message})");
+        }
         sb.AppendLine();
 
         sb.AppendLine("== Installed extensions ==");
