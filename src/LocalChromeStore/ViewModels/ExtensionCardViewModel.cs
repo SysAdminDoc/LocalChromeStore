@@ -71,12 +71,11 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public bool HasAsset => !string.IsNullOrEmpty(Info.AssetUrl);
     public bool IsInstalled => _installed != null;
     public bool IsUpdateAvailable => IsInstalled
-        && !string.Equals(_installed!.Version, Info.DisplayVersion, StringComparison.OrdinalIgnoreCase);
+        && Services.VersionCompare.IsNewer(Info.DisplayVersion, _installed!.Version);
     public bool CanInstall => HasAsset && !Busy;
     public bool CanOpenInstallDir => IsInstalled && !Busy;
     public string InstallButtonLabel => IsInstalled
-        ? (string.Equals(_installed!.Version, Info.DisplayVersion, StringComparison.OrdinalIgnoreCase)
-            ? "Reinstall" : $"Update to {Info.DisplayVersion}")
+        ? (IsUpdateAvailable ? $"Update to {Info.DisplayVersion}" : "Reinstall")
         : (HasAsset ? "Install" : "Unavailable");
     public string StatusBadge => IsInstalled
         ? (IsUpdateAvailable ? "Update available" : "Installed")
