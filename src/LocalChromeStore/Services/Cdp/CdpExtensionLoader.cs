@@ -1,6 +1,4 @@
-using System.Diagnostics;
 using System.IO;
-using System.IO.Pipes;
 
 namespace LocalChromeStore.Services.Cdp;
 
@@ -13,14 +11,18 @@ public sealed record CdpLoadResult(bool Success, int Loaded, int Total, string D
 /// <summary>
 /// Loads unpacked extensions into branded Chrome 137+/142+ over a <c>--remote-debugging-pipe</c>
 /// CDP connection — the only sanctioned dev-load path after command-line <c>--load-extension</c> was
-/// removed. On Windows, Chrome reads/writes CDP on two inherited anonymous-pipe handles passed as
-/// fds 3 (read) and 4 (write); we create those pipes, launch with handle inheritance, and issue
+/// removed. On Windows, Chrome reads/writes CDP on two inherited anonymous-pipe handles exposed to
+/// its C runtime as fd 3 (read) and fd 4 (write); <see cref="CdpPipeProcess"/> creates those pipes
+/// and launches with the MSVCRT inheritance block so the handshake actually completes (plain
+/// <c>Process.Start</c> cannot map handles onto fd 3/4). We then issue
 /// <c>Extensions.loadUnpacked</c> for each directory.
 ///
 /// IMPORTANT: end-to-end loading requires branded Chrome 142+ at runtime and could not be exercised
 /// in the build environment. Every failure path is non-fatal — callers fall back to the launch
 /// strategy resolver's manual/policy path (see <see cref="BrowserLauncher.ResolveStrategy"/>). The
-/// wire protocol and command construction are unit-tested in isolation (<c>CdpProtocolTests</c>).
+/// wire protocol and the fd-inheritance block are unit-tested in isolation (<c>CdpProtocolTests</c>,
+/// <c>CdpPipeProcessTests</c>). Two things still need a live Chrome 142+ host to confirm: whether the
+/// browser keeps running after the controlling pipe closes, and the actual load result frames.
 /// </summary>
 public sealed class CdpExtensionLoader
 {
@@ -42,39 +44,20 @@ public sealed class CdpExtensionLoader
         if (extensionPaths.Count == 0) return CdpLoadResult.Skipped("no extensions to load");
         if (!OperatingSystem.IsWindows()) return CdpLoadResult.Skipped("CDP pipe loader is Windows-only");
 
-        // Chrome ↔ us pipes. Chrome reads from the "in" pipe (its fd 3) and writes to the "out"
-        // pipe (its fd 4); we hold the opposite ends.
-        AnonymousPipeServerStream? toBrowser = null;
-        AnonymousPipeServerStream? fromBrowser = null;
-        Process? process = null;
+        CdpPipeProcess? session = null;
         try
         {
-            toBrowser = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.Inheritable);
-            fromBrowser = new AnonymousPipeServerStream(PipeDirection.In, HandleInheritability.Inheritable);
+            var args = new List<string>(CdpProtocol.RequiredLaunchFlags);
+            args.AddRange(extraArgs);
+            session = CdpPipeProcess.Launch(browserExePath, args);
 
-            var psi = new ProcessStartInfo
-            {
-                FileName = browserExePath,
-                UseShellExecute = false
-            };
-            foreach (var f in CdpProtocol.RequiredLaunchFlags) psi.ArgumentList.Add(f);
-            foreach (var a in extraArgs) psi.ArgumentList.Add(a);
-
-            process = Process.Start(psi);
-            if (process is null) return CdpLoadResult.Skipped("browser process failed to start");
-
-            // Dispose the inheritable client handles on our side once the child owns them.
             var loaded = 0;
-            await using (var writer = toBrowser)
-            await using (var reader = fromBrowser)
+            var id = 0;
+            foreach (var path in extensionPaths)
             {
-                var id = 0;
-                foreach (var path in extensionPaths)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    var ok = await SendLoadUnpackedAsync(writer, reader, ++id, path, ct);
-                    if (ok) loaded++;
-                }
+                ct.ThrowIfCancellationRequested();
+                if (await SendLoadUnpackedAsync(session.Writer, session.Reader, ++id, path, ct))
+                    loaded++;
             }
 
             return loaded == extensionPaths.Count
@@ -89,9 +72,7 @@ public sealed class CdpExtensionLoader
         }
         finally
         {
-            // Streams disposed above on the happy path; guard the early-return paths.
-            toBrowser?.Dispose();
-            fromBrowser?.Dispose();
+            session?.Dispose();
         }
     }
 
