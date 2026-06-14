@@ -52,6 +52,42 @@ public sealed class GitHubService
     public static OwnerListing ResolveOwnerListing(AccountType? accountType) =>
         accountType == AccountType.Organization ? OwnerListing.Organization : OwnerListing.User;
 
+    /// <summary>The app's own repository, polled for self-update checks.</summary>
+    public const string SelfRepoOwner = "SysAdminDoc";
+    public const string SelfRepoName = "LocalChromeStore";
+
+    /// <summary>
+    /// Pure decision for the self-update banner: is <paramref name="latestTag"/> a strictly newer
+    /// release than <paramref name="currentVersion"/>? Tolerant of a leading <c>v</c> and tag/assembly
+    /// format drift (see <see cref="VersionCompare"/>). A missing tag yields <see cref="SelfUpdateInfo.None"/>.
+    /// </summary>
+    public static SelfUpdateInfo EvaluateSelfUpdate(string? currentVersion, string? latestTag, string? releaseUrl)
+    {
+        if (string.IsNullOrWhiteSpace(latestTag)) return SelfUpdateInfo.None;
+        var newer = VersionCompare.IsNewer(latestTag, currentVersion);
+        return new SelfUpdateInfo(newer, latestTag.Trim(), releaseUrl ?? string.Empty);
+    }
+
+    /// <summary>
+    /// Checks the app's own GitHub releases for a newer published build. Read-only and best-effort:
+    /// any failure (offline, rate limit, no releases) returns <see cref="SelfUpdateInfo.None"/> so it
+    /// never blocks or disrupts launch. Never downloads or installs anything — the banner only links
+    /// the user to the release page.
+    /// </summary>
+    public async Task<SelfUpdateInfo> CheckForAppUpdateAsync(AppSettings cfg, string currentVersion)
+    {
+        try
+        {
+            var client = GetClient(cfg);
+            var release = await client.Repository.Release.GetLatest(SelfRepoOwner, SelfRepoName);
+            return EvaluateSelfUpdate(currentVersion, release?.TagName, release?.HtmlUrl);
+        }
+        catch
+        {
+            return SelfUpdateInfo.None;
+        }
+    }
+
     /// <summary>
     /// Discover candidate extensions across the configured user(s).
     /// A repo is considered an extension candidate if it has a manifest.json

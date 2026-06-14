@@ -1,3 +1,4 @@
+using LocalChromeStore.Models;
 using LocalChromeStore.Services;
 using Octokit;
 using Xunit;
@@ -23,5 +24,27 @@ public sealed class GitHubServiceTests
         var expected = typeof(GitHubService).Assembly.GetName().Version?.ToString(3);
         Assert.Equal(expected, GitHubService.AppVersion);
         Assert.NotEqual("0.1.0", GitHubService.AppVersion);
+    }
+
+    [Theory]
+    [InlineData("0.3.0", "v0.4.0", true)]   // newer tag, leading v tolerated
+    [InlineData("0.3.0", "0.4.0", true)]    // newer tag, no v
+    [InlineData("0.3.0", "v0.3.0", false)]  // same version, format-insensitive
+    [InlineData("0.3.0", "v0.2.9", false)]  // older release never prompts
+    [InlineData("0.3.0", "v0.3.0-beta", false)] // prerelease of current ranks below it
+    public void EvaluateSelfUpdate_FlagsOnlyStrictlyNewerReleases(string current, string tag, bool expected)
+    {
+        var info = GitHubService.EvaluateSelfUpdate(current, tag, "https://github.com/SysAdminDoc/LocalChromeStore/releases/tag/" + tag);
+        Assert.Equal(expected, info.UpdateAvailable);
+        Assert.Equal(tag, info.LatestVersion);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void EvaluateSelfUpdate_MissingTag_IsNone(string? tag)
+    {
+        Assert.Same(SelfUpdateInfo.None, GitHubService.EvaluateSelfUpdate("0.3.0", tag, "url"));
     }
 }

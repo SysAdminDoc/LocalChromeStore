@@ -15,7 +15,40 @@
         <conv:EmptyStringToVisibilityConverter x:Key="EmptyStringToVis" />
     </Window.Resources>
 
-    <Grid Background="{StaticResource BaseBrush}">
+    <DockPanel Background="{StaticResource BaseBrush}">
+        <Border DockPanel.Dock="Top"
+                x:Name="SelfUpdateBanner"
+                Background="{StaticResource MauveSoftBrush}"
+                BorderBrush="{StaticResource MauveBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="22,10"
+                Visibility="{Binding SelfUpdateAvailable, Converter={StaticResource BoolToVis}}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           Foreground="{StaticResource TextBrush}"
+                           Text="{Binding SelfUpdateMessage}"
+                           AutomationProperties.Name="Application update notice" />
+                <Button Grid.Column="1"
+                        Content="Download update"
+                        Command="{Binding OpenSelfUpdateCommand}"
+                        Style="{StaticResource AccentButton}"
+                        Margin="12,0,8,0"
+                        AutomationProperties.Name="Open the LocalChromeStore release page" />
+                <Button Grid.Column="2"
+                        Content="Dismiss"
+                        Command="{Binding DismissSelfUpdateCommand}"
+                        AutomationProperties.Name="Dismiss the update notice" />
+            </Grid>
+        </Border>
+
+        <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -816,5 +849,6 @@
                            Text="{Binding AppVersionLabel}" />
             </Grid>
         </Border>
-    </Grid>
+        </Grid>
+    </DockPanel>
 </Window>

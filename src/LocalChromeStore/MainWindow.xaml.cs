@@ -16,6 +16,8 @@ public partial class MainWindow : Window
             HookLogAutoScroll();
             SyncTokenBoxFromViewModel();
             SetSettingsDrawerOpen(false);
+            if (DataContext is MainViewModel vm)
+                _ = vm.CheckForAppUpdateAsync(); // non-blocking self-update check
         };
         KeyDown += OnWindowKeyDown;
     }

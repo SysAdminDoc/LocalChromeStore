@@ -39,6 +39,9 @@ public sealed class MainViewModel : ViewModelBase
     private bool _launchWithTemporaryProfile;
     private LoadSet? _selectedLoadSet;
     private string _newLoadSetNameInput = string.Empty;
+    private bool _selfUpdateAvailable;
+    private string _selfUpdateMessage = string.Empty;
+    private string _selfUpdateUrl = string.Empty;
 
     private static readonly LoadSet SentinelLoadSet = LoadSetManager.CreateSentinel();
 
@@ -71,6 +74,8 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand CreateLoadSetCommand { get; }
     public ICommand DeleteLoadSetCommand { get; }
     public ICommand RestoreHiddenRepoCommand { get; }
+    public ICommand OpenSelfUpdateCommand { get; }
+    public ICommand DismissSelfUpdateCommand { get; }
 
     public MainViewModel() : this(null) { }
 
@@ -136,6 +141,8 @@ public sealed class MainViewModel : ViewModelBase
                 return target is not null && target.Id != SentinelLoadSet.Id;
             });
         RestoreHiddenRepoCommand = new RelayCommand(o => RestoreHiddenRepo(o as string), o => o is string { Length: > 0 });
+        OpenSelfUpdateCommand = new RelayCommand(_ => OpenSelfUpdate(), _ => SelfUpdateAvailable);
+        DismissSelfUpdateCommand = new RelayCommand(_ => SelfUpdateAvailable = false, _ => SelfUpdateAvailable);
 
         DetectBrowsers();
         Log($"LocalChromeStore v{AssemblyVersion} ready.");
@@ -183,6 +190,24 @@ public sealed class MainViewModel : ViewModelBase
 
     /// <summary>Footer label bound to the real assembly version so it never drifts from the build.</summary>
     public string AppVersionLabel => $"LocalChromeStore v{AssemblyVersion}";
+
+    /// <summary>True when a newer LocalChromeStore release exists; drives the dismissible update banner.</summary>
+    public bool SelfUpdateAvailable
+    {
+        get => _selfUpdateAvailable;
+        private set
+        {
+            if (SetField(ref _selfUpdateAvailable, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    /// <summary>Banner copy describing the available release.</summary>
+    public string SelfUpdateMessage
+    {
+        get => _selfUpdateMessage;
+        private set => SetField(ref _selfUpdateMessage, value);
+    }
 
     public string SearchText
     {
@@ -911,6 +936,37 @@ public sealed class MainViewModel : ViewModelBase
     {
         try { Process.Start(new ProcessStartInfo("explorer.exe", $"\"{_settingsService.ExtensionsRoot}\"") { UseShellExecute = true }); }
         catch (Exception ex) { Log($"! {ex.Message}"); }
+    }
+
+    /// <summary>
+    /// Non-blocking self-update check against LocalChromeStore's own GitHub releases (P3). Surfaces a
+    /// dismissible banner when a newer build exists; failures are silent and best-effort. The app
+    /// never downloads or installs itself — the banner only links to the release page.
+    /// </summary>
+    public async Task CheckForAppUpdateAsync()
+    {
+        var result = await _github.CheckForAppUpdateAsync(_settings, AssemblyVersion);
+        if (!result.UpdateAvailable) return;
+
+        _selfUpdateUrl = result.ReleaseUrl;
+        SelfUpdateMessage =
+            $"LocalChromeStore {result.LatestVersion} is available (you have v{AssemblyVersion}). Open the release page to download it.";
+        SelfUpdateAvailable = true;
+        Log($"A newer LocalChromeStore release is available: {result.LatestVersion} (current v{AssemblyVersion}).");
+    }
+
+    private void OpenSelfUpdate()
+    {
+        if (string.IsNullOrWhiteSpace(_selfUpdateUrl)) return;
+        try
+        {
+            Process.Start(new ProcessStartInfo(_selfUpdateUrl) { UseShellExecute = true });
+            Log($"Opened the LocalChromeStore release page: {_selfUpdateUrl}.");
+        }
+        catch (Exception ex)
+        {
+            Log($"! Could not open the release page: {ex.Message}");
+        }
     }
 
     private void ExportDiagnostics()
