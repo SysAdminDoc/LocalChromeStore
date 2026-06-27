@@ -66,6 +66,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand RemoveExtraOwnerCommand { get; }
     public ICommand OpenBrowserExtensionsPageCommand { get; }
     public ICommand OpenPolicyPageCommand { get; }
+    public ICommand ReviewPolicyReadinessCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
     public ICommand ExportEnvironmentCommand { get; }
     public ICommand ImportEnvironmentCommand { get; }
@@ -127,6 +128,7 @@ public sealed class MainViewModel : ViewModelBase
         RemoveExtraOwnerCommand = new RelayCommand(o => RemoveExtraOwner(o as string ?? SelectedExtraOwner), o => (o as string ?? SelectedExtraOwner) is { Length: > 0 });
         OpenBrowserExtensionsPageCommand = new RelayCommand(_ => OpenBrowserExtensionsPage(), _ => SelectedBrowser != null);
         OpenPolicyPageCommand = new RelayCommand(_ => OpenPolicyPage(), _ => SelectedBrowser != null);
+        ReviewPolicyReadinessCommand = new RelayCommand(_ => ReviewPolicyReadiness(), _ => SelectedBrowser != null);
         ExportDiagnosticsCommand = new RelayCommand(_ => ExportDiagnostics());
         ExportEnvironmentCommand = new RelayCommand(_ => ExportEnvironment());
         ImportEnvironmentCommand = new AsyncRelayCommand(_ => ImportEnvironmentAsync(), _ => !Busy);
@@ -932,6 +934,34 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    private void ReviewPolicyReadiness()
+    {
+        if (SelectedBrowser is null) return;
+
+        var enrollment = _policyEnrollment.DetectCurrent();
+        var support = PolicyEnrollmentService.EvaluateOffStoreForceInstall(enrollment);
+        Log("Policy readiness:");
+        if (PolicyInstallService.TryGetTarget(SelectedBrowser.Kind, out var target))
+        {
+            Log($"  Browser target: {target.DisplayName}");
+            Log($"  Registry key: HKLM\\{target.RegistrySubKey}");
+            Log($"  Native policy page: {target.PolicyPageUrl}");
+        }
+        else
+        {
+            Log($"  ! {SelectedBrowser.DisplayName} does not have a known policy install target in LocalChromeStore.");
+        }
+
+        Log($"  Domain joined: {enrollment.DomainJoined}");
+        Log($"  Entra joined: {enrollment.EntraJoined}");
+        Log($"  CBCM enrolled: {enrollment.CbcmEnrolled}");
+        Log($"  Off-store force-install supported: {support.Supported}");
+        Log($"  {support.Reason}");
+        StatusText = support.Supported
+            ? "Policy backend is ready for managed off-store force-install requests."
+            : "Policy backend is available, but this machine is not enrolled for off-store force-install.";
+    }
+
     private void OpenInstallDir()
     {
         try { Process.Start(new ProcessStartInfo("explorer.exe", $"\"{_settingsService.ExtensionsRoot}\"") { UseShellExecute = true }); }
@@ -1213,6 +1243,16 @@ public sealed class MainViewModel : ViewModelBase
         {
             var enrollment = _policyEnrollment.DetectCurrent();
             var support = PolicyEnrollmentService.EvaluateOffStoreForceInstall(enrollment);
+            if (SelectedBrowser is not null && PolicyInstallService.TryGetTarget(SelectedBrowser.Kind, out var target))
+            {
+                sb.AppendLine($"  Browser target: {target.DisplayName}");
+                sb.AppendLine($"  Registry key:   HKLM\\{target.RegistrySubKey}");
+                sb.AppendLine($"  Policy page:    {target.PolicyPageUrl}");
+            }
+            else
+            {
+                sb.AppendLine($"  Browser target: {(SelectedBrowser is null ? "(none selected)" : "unsupported by policy backend")}");
+            }
             sb.AppendLine($"  Domain joined:  {enrollment.DomainJoined}");
             sb.AppendLine($"  Entra joined:   {enrollment.EntraJoined}");
             sb.AppendLine($"  CBCM enrolled:  {enrollment.CbcmEnrolled}");

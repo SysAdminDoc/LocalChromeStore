@@ -168,6 +168,7 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
@@ -203,13 +204,19 @@
                             Margin="0,0,8,0"
                             ToolTip="Opens chrome://policy (or edge://policy) to inspect active browser policies." />
 
-                    <TextBlock Grid.Column="5"
+                    <Button Grid.Column="5"
+                            Content="Policy check"
+                            Command="{Binding ReviewPolicyReadinessCommand}"
+                            Margin="0,0,8,0"
+                            ToolTip="Logs Enterprise Policy registry target and off-store force-install enrollment readiness." />
+
+                    <TextBlock Grid.Column="6"
                                Text="Load set"
                                Style="{StaticResource InputLabel}"
                                Margin="8,0,6,0"
                                VerticalAlignment="Center" />
 
-                    <ComboBox Grid.Column="6"
+                    <ComboBox Grid.Column="7"
                               ItemsSource="{Binding LoadSets}"
                               SelectedItem="{Binding SelectedLoadSet}"
                               DisplayMemberPath="Name"
@@ -218,13 +225,13 @@
                               Margin="0,0,8,0"
                               ToolTip="{Binding ActiveLoadSetLabel}" />
 
-                    <Button Grid.Column="7"
+                    <Button Grid.Column="8"
                             Content="Launch session"
                             Command="{Binding LaunchBrowserCommand}"
                             Style="{StaticResource AccentButton}"
                             ToolTip="Launches the selected browser with installed extensions for the active load set loaded through --load-extension." />
 
-                    <Button Grid.Column="8"
+                    <Button Grid.Column="9"
                             Content="{Binding UpdateAllLabel}"
                             Command="{Binding UpdateAllCommand}"
                             HorizontalAlignment="Left"

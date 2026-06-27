@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.0-cba6f7?style=for-the-badge" alt="Version" /></a>
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.1-cba6f7?style=for-the-badge" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
@@ -27,9 +27,9 @@ Chromium 75+ blocks drag-and-drop install of self-signed CRX files with `CRX_REQ
 
 1. **Chrome Web Store** — useful for shipping, awful for testing your own dogfood
 2. **Load unpacked** — works, but clicking through the file picker for ten extensions every browser reset is friction
-3. **Enterprise Policy `ExtensionInstallForcelist`** — the only self-host path that actually works on stock Chrome / Brave / Edge
+3. **Enterprise Policy `ExtensionInstallForcelist`** — the only self-host path that actually works on managed Chrome / Brave / Edge machines
 
-LocalChromeStore wraps path 2 with a real store UI today; path 3 (Enterprise Policy auto-install) is planned.
+LocalChromeStore wraps path 2 with a real store UI today. The policy backend now exists for path 3, including CRX3 packaging primitives, registry writer/rollback, and health checks; full UI hosting workflow is still being wired.
 
 ---
 
@@ -40,6 +40,7 @@ LocalChromeStore wraps path 2 with a real store UI today; path 3 (Enterprise Pol
 - **One-click install** — downloads the latest release ZIP, extracts to a managed folder, tracks it
 - **One-click uninstall** — wipes the local copy and removes it from the load list
 - **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with every installed extension, version-gating the load strategy (plain `--load-extension`, the Chromium 137+ `--disable-features` override, or a guided warning on branded Chrome 142+, which removed command-line extension loading)
+- **Policy-ready backend** — packages CRX3 with RSA-2048, generates self-hosted `update.xml`, maps Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, checks policy/update/CRX health, and can roll back registry entries without deleting packaged artifacts
 - **Auditable launch sessions** — optional startup URL, clean temporary profile mode, and a copyable launch command preview
 - **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
 - **Update workflow** — update-available badges, permission-change review, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
@@ -153,12 +154,12 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history.
 
 - **v0.2.0** — Named load sets, per-repo hidden-repo restore, accessibility sweep, broader unit tests
 - **v0.3.0** — `localchromestore.json` repo manifest + validator, framework build-command dry-run, teal accent token
+- **v0.3.1** — CRX3 RSA signing primitives, deterministic extension ID derivation, self-hosted `update.xml` generation, Enterprise Policy registry writer/rollback, policy health checks, version-gated launch strategy, CDP loader groundwork, self-update checks, and hardened local state persistence
 
 **Planned**
 
-- Version-gated browser launch strategy and a CDP `Extensions.loadUnpacked` loader for branded Chrome 137+/142+ (which removed command-line `--load-extension`)
-- Enterprise Policy install path: write `HKLM\Software\Policies\Google\Chrome\ExtensionInstallForcelist` (and Brave / Edge equivalents) plus a self-hosted `update.xml`, gated on a domain/Entra/CBCM enrollment precondition check
-- CRX3 signing (RSA-2048) with deterministic extension-ID preview and same-key update checks
+- UI wiring for selecting packaged CRX/update-feed artifacts and applying policy installs from the main workflow
+- Static update hosting for policy-ready packages
 - Local folder source, custom update-feed source, light theme + accent picker
 
 ---
