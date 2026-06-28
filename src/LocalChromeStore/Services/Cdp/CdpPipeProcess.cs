@@ -274,6 +274,12 @@ internal sealed class CdpPipeProcess : IDisposable
         }
     }
 
+    public void Terminate()
+    {
+        if (_processHandle == IntPtr.Zero) return;
+        TerminateProcess(_processHandle, 0);
+    }
+
     private static void ThrowLastError(string what) =>
         throw new Win32Exception(Marshal.GetLastWin32Error(), $"{what} failed");
 
@@ -328,6 +334,9 @@ internal sealed class CdpPipeProcess : IDisposable
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool CloseHandle(IntPtr hObject);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool CreateProcess(

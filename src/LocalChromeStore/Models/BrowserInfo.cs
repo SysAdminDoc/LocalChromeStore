@@ -3,6 +3,7 @@ namespace LocalChromeStore.Models;
 public enum BrowserKind
 {
     Chrome,
+    ChromeForTesting,
     Brave,
     Edge,
     Chromium,
@@ -23,6 +24,9 @@ public sealed class BrowserInfo
     /// Null when the version could not be read.
     /// </summary>
     public int? MajorVersion { get; init; }
+
+    /// <summary>Full product/file version from the browser executable, when Windows exposes one.</summary>
+    public string? ProductVersion { get; init; }
 
     public override string ToString() => DisplayName;
 }

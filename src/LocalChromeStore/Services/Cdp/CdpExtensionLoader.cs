@@ -30,9 +30,13 @@ public interface ICdpExtensionLoader
 public sealed class CdpExtensionLoader : ICdpExtensionLoader
 {
     private readonly TimeSpan _responseTimeout;
+    private readonly bool _terminateBrowserOnDispose;
 
-    public CdpExtensionLoader(TimeSpan? responseTimeout = null)
-        => _responseTimeout = responseTimeout ?? TimeSpan.FromSeconds(10);
+    public CdpExtensionLoader(TimeSpan? responseTimeout = null, bool terminateBrowserOnDispose = false)
+    {
+        _responseTimeout = responseTimeout ?? TimeSpan.FromSeconds(10);
+        _terminateBrowserOnDispose = terminateBrowserOnDispose;
+    }
 
     /// <summary>
     /// Launches <paramref name="browserExePath"/> with the CDP pipe flags and loads each extension
@@ -75,6 +79,8 @@ public sealed class CdpExtensionLoader : ICdpExtensionLoader
         }
         finally
         {
+            if (_terminateBrowserOnDispose)
+                session?.Terminate();
             session?.Dispose();
         }
     }

@@ -46,6 +46,7 @@ public sealed class BrowserLauncher
             ProgramFiles86(@"Google\Chrome\Application\chrome.exe"),
             LocalAppData(@"Google\Chrome\Application\chrome.exe")
         });
+        AddChromeForTesting(results);
         TryAdd(results, BrowserKind.Brave, "Brave", new[]
         {
             ProgramFiles(@"BraveSoftware\Brave-Browser\Application\brave.exe"),
@@ -80,31 +81,103 @@ public sealed class BrowserLauncher
         {
             if (File.Exists(c))
             {
+                var version = TryReadVersion(c);
                 list.Add(new BrowserInfo
                 {
                     Kind = kind,
                     DisplayName = name,
                     ExecutablePath = c,
-                    MajorVersion = TryReadMajorVersion(c)
+                    MajorVersion = version.Major,
+                    ProductVersion = version.ProductVersion
                 });
                 return;
             }
         }
     }
 
-    private static int? TryReadMajorVersion(string executablePath)
+    private static void AddChromeForTesting(List<BrowserInfo> list)
+    {
+        foreach (var path in FindChromeForTestingExecutables())
+        {
+            var version = TryReadVersion(path);
+            var suffix = version.Major is { } major ? $" {major}" : string.Empty;
+            list.Add(new BrowserInfo
+            {
+                Kind = BrowserKind.ChromeForTesting,
+                DisplayName = $"Chrome for Testing{suffix}",
+                ExecutablePath = path,
+                MajorVersion = version.Major,
+                ProductVersion = version.ProductVersion
+            });
+        }
+    }
+
+    public static IReadOnlyList<string> FindChromeForTestingExecutables(IEnumerable<string>? roots = null)
+    {
+        var searchRoots = roots?.Where(r => !string.IsNullOrWhiteSpace(r)).ToArray() ?? ChromeForTestingSearchRoots();
+        var found = new List<string>();
+        foreach (var root in searchRoots.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                if (!Directory.Exists(root)) continue;
+                foreach (var exe in Directory.EnumerateFiles(root, "chrome.exe", SearchOption.AllDirectories))
+                {
+                    if (IsChromeForTestingPath(exe))
+                        found.Add(exe);
+                }
+            }
+            catch
+            {
+                // Ignore unreadable cache folders; browser detection should never block startup.
+            }
+        }
+
+        return found
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
+    private static string[] ChromeForTestingSearchRoots()
+    {
+        var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        return new[]
+        {
+            ProgramFiles(@"Google\Chrome for Testing"),
+            ProgramFiles86(@"Google\Chrome for Testing"),
+            LocalAppData(@"Google\Chrome for Testing"),
+            Path.Combine(userProfile, ".cache", "selenium", "chrome"),
+            Path.Combine(userProfile, ".cache", "chrome-for-testing"),
+            Path.Combine(userProfile, ".cache", "puppeteer", "chrome")
+        };
+    }
+
+    private static bool IsChromeForTestingPath(string path)
+    {
+        var normalized = path.Replace('/', '\\');
+        return normalized.Contains("Chrome for Testing", StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains("chrome-for-testing", StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains(@"\selenium\chrome\", StringComparison.OrdinalIgnoreCase)
+            || normalized.Contains(@"\puppeteer\chrome\", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static (int? Major, string? ProductVersion) TryReadVersion(string executablePath)
     {
         try
         {
             var info = FileVersionInfo.GetVersionInfo(executablePath);
+            var version = string.IsNullOrWhiteSpace(info.ProductVersion)
+                ? info.FileVersion
+                : info.ProductVersion;
             // ProductMajorPart is the Chromium milestone (e.g. 142) for Chrome/Edge/Brave/etc.
-            if (info.ProductMajorPart > 0) return info.ProductMajorPart;
-            if (info.FileMajorPart > 0) return info.FileMajorPart;
-            return null;
+            if (info.ProductMajorPart > 0) return (info.ProductMajorPart, version);
+            if (info.FileMajorPart > 0) return (info.FileMajorPart, version);
+            return (null, version);
         }
         catch
         {
-            return null;
+            return (null, null);
         }
     }
 
@@ -115,6 +188,8 @@ public sealed class BrowserLauncher
     /// </summary>
     public static LaunchStrategy ResolveStrategy(BrowserKind kind, int? majorVersion) => kind switch
     {
+        // Chrome for Testing intentionally keeps automation and extension-load flags available.
+        BrowserKind.ChromeForTesting => LaunchStrategy.CommandLineLoad,
         // Branded Chrome: 137 removed --load-extension, 142 removed the override workaround.
         BrowserKind.Chrome => majorVersion switch
         {

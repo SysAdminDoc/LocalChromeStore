@@ -57,15 +57,6 @@ Roadmap_Blocked.md.
 
 ## Research-Driven Additions
 
-### P1
-
-- [ ] P1 - Add browser loading conformance harness
-  Why: Chromium extension-loading behavior is changing faster than static unit tests can prove; CDP, command-line, and override strategies need live opt-in validation across installed browsers.
-  Evidence: `BrowserLauncher.ResolveStrategy`; `CdpExtensionLoader` live-validation note; Cypress issue 31690; WebdriverIO issue 14505; Chrome for Testing JSON endpoints.
-  Touches: `tests/LocalChromeStore.Tests`, `Services/BrowserLauncher.cs`, `Services/Cdp/*`, `ViewModels/MainViewModel.cs`, diagnostics export.
-  Acceptance: An opt-in local test command or debug action launches a tiny fixture extension in each detected browser/CfT build, records browser version, strategy, args, CDP result IDs/errors, and writes a JSON/text report usable in diagnostics.
-  Complexity: L
-
 ### P2
 
 - [ ] P2 - Gate policy installs on local package-risk preflight

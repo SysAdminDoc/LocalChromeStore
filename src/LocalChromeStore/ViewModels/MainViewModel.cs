@@ -18,6 +18,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly ExtensionService _extensions;
     private readonly BrowserLauncher _launcher;
     private readonly BrowserLaunchManager _launchManager;
+    private readonly BrowserConformanceService _conformance;
     private readonly LoadSetManager _loadSets;
     private readonly PolicyPackageService _policyPackages;
     private readonly PolicyInstallService _policyInstaller;
@@ -70,6 +71,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand OpenPolicyPageCommand { get; }
     public ICommand ReviewPolicyReadinessCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
+    public ICommand RunBrowserConformanceCommand { get; }
     public ICommand ExportEnvironmentCommand { get; }
     public ICommand ImportEnvironmentCommand { get; }
     public ICommand ExportCatalogCommand { get; }
@@ -91,6 +93,7 @@ public sealed class MainViewModel : ViewModelBase
         _extensions = new ExtensionService(_settingsService, _github);
         _launcher = new BrowserLauncher(_extensions);
         _launchManager = new BrowserLaunchManager(_launcher);
+        _conformance = new BrowserConformanceService(_settingsService);
         _loadSets = new LoadSetManager(_settingsService);
         _policyPackages = new PolicyPackageService(_settingsService);
         _policyInstaller = new PolicyInstallService();
@@ -134,6 +137,7 @@ public sealed class MainViewModel : ViewModelBase
         OpenPolicyPageCommand = new RelayCommand(_ => OpenPolicyPage(), _ => SelectedBrowser != null);
         ReviewPolicyReadinessCommand = new RelayCommand(_ => ReviewPolicyReadiness(), _ => SelectedBrowser != null);
         ExportDiagnosticsCommand = new RelayCommand(_ => ExportDiagnostics());
+        RunBrowserConformanceCommand = new AsyncRelayCommand(_ => RunBrowserConformanceAsync(), _ => !Busy && Browsers.Count > 0);
         ExportEnvironmentCommand = new RelayCommand(_ => ExportEnvironment());
         ImportEnvironmentCommand = new AsyncRelayCommand(_ => ImportEnvironmentAsync(), _ => !Busy);
         ExportCatalogCommand = new RelayCommand(_ => ExportCatalog());
@@ -1245,6 +1249,52 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    private async Task RunBrowserConformanceAsync()
+    {
+        if (Browsers.Count == 0)
+        {
+            StatusText = "No supported browsers detected for conformance testing.";
+            Log("! Browser conformance skipped: no supported Chromium browsers were detected.");
+            return;
+        }
+
+        Busy = true;
+        try
+        {
+            StatusText = "Running browser conformance harness...";
+            Log("Browser conformance: launching the fixture extension in isolated temporary profiles.");
+            var run = await _conformance.RunAsync(Browsers.ToList());
+            var passed = run.Report.Browsers.Count(b => b.Success);
+            StatusText = $"Browser conformance complete: {passed}/{run.Report.Browsers.Count} passed.";
+            foreach (var result in run.Report.Browsers)
+            {
+                var marker = result.Success ? "+" : "!";
+                Log($"{marker} Browser conformance {result.DisplayName}: {result.Strategy}, {result.Detail}");
+                foreach (var attempt in result.CdpAttempts)
+                {
+                    var id = string.IsNullOrWhiteSpace(attempt.ExtensionId) ? "no extension ID" : attempt.ExtensionId;
+                    Log($"{marker} CDP {result.DisplayName}: {id} - {attempt.Detail}");
+                }
+            }
+            Log($"Browser conformance JSON report: {run.JsonPath}");
+            Log($"Browser conformance text report: {run.TextPath}");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Browser conformance canceled.";
+            Log("! Browser conformance canceled.");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Browser conformance failed: {ex.Message}";
+            Log($"! Browser conformance failed: {ex.Message}");
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
     private void ExportEnvironment()
     {
         var defaultName = $"LocalChromeStore-environment-{DateTime.Now:yyyy-MM-dd-HHmm}.json";
@@ -1462,6 +1512,12 @@ public sealed class MainViewModel : ViewModelBase
         sb.AppendLine($"  Launch URL:    {NormalizeLaunchUrl(LaunchUrlInput) ?? "(none)"}");
         sb.AppendLine($"  Temp profile:  {LaunchWithTemporaryProfile}");
         sb.AppendLine($"  Launch command preview: {LaunchPreview}");
+        sb.AppendLine();
+
+        var latestConformance = BrowserConformanceService.FindLatestReports(_settingsService.LogsDir);
+        sb.AppendLine("== Browser conformance ==");
+        sb.AppendLine($"  Latest JSON report: {latestConformance.JsonPath ?? "(none)"}");
+        sb.AppendLine($"  Latest text report: {latestConformance.TextPath ?? "(none)"}");
         sb.AppendLine();
 
         sb.AppendLine("== Policy-mode readiness ==");

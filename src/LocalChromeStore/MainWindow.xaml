@@ -158,20 +158,7 @@
                             Click="ToggleSettings_Click" />
                 </Grid>
 
-                <Grid Grid.Row="1" Margin="0,10,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
+                <WrapPanel Grid.Row="1" Margin="0,10,0,0">
                     <TextBlock Grid.Column="0"
                                Text="{Binding BrowserSummary}"
                                Style="{StaticResource MuteText}"
@@ -237,7 +224,7 @@
                             HorizontalAlignment="Left"
                             Margin="8,0,0,0"
                             ToolTip="{Binding UpdateStatusSummary}" />
-                </Grid>
+                </WrapPanel>
 
                 <Grid Grid.Row="2" Margin="0,9,0,0">
                     <Grid.ColumnDefinitions>
@@ -801,6 +788,10 @@
                             Command="{Binding ExportDiagnosticsCommand}"
                             Style="{StaticResource LinkButton}"
                             ToolTip="Save a text bundle with paths, GitHub state, browsers, installed extensions, and the activity log." />
+                    <Button Content="Conformance"
+                            Command="{Binding RunBrowserConformanceCommand}"
+                            Style="{StaticResource LinkButton}"
+                            ToolTip="Launch a tiny fixture extension in isolated profiles and write browser loading reports." />
                     <Button Content="Catalog"
                             Command="{Binding ExportCatalogCommand}"
                             Style="{StaticResource LinkButton}"
