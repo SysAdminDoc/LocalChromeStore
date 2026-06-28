@@ -73,8 +73,8 @@ public static class CdpProtocol
     }
 
     /// <summary>
-    /// Parses a CDP response frame, returning whether it is the reply to <paramref name="expectedId"/>
-    /// and, if it carried an <c>error</c>, the error message.
+    /// Parses a CDP response frame. <c>Extensions.loadUnpacked</c> returns the loaded extension ID
+    /// as <c>result.id</c>; errors carry the exact browser message under <c>error.message</c>.
     /// </summary>
     public static CdpResponse ParseResponse(string json)
     {
@@ -83,14 +83,21 @@ public static class CdpProtocol
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
             int? id = root.TryGetProperty("id", out var idEl) && idEl.TryGetInt32(out var v) ? v : null;
+            string? extensionId = null;
+            if (root.TryGetProperty("result", out var resultEl) &&
+                resultEl.ValueKind == JsonValueKind.Object &&
+                resultEl.TryGetProperty("id", out var extensionIdEl))
+            {
+                extensionId = extensionIdEl.GetString();
+            }
             string? error = null;
             if (root.TryGetProperty("error", out var errEl) && errEl.ValueKind == JsonValueKind.Object)
                 error = errEl.TryGetProperty("message", out var msgEl) ? msgEl.GetString() : "unknown CDP error";
-            return new CdpResponse(id, error, IsEvent: id is null);
+            return new CdpResponse(id, extensionId, error, IsEvent: id is null);
         }
         catch (JsonException)
         {
-            return new CdpResponse(null, $"unparseable CDP frame: {json}", IsEvent: false);
+            return new CdpResponse(null, null, $"unparseable CDP frame: {json}", IsEvent: false);
         }
     }
 }
@@ -107,7 +114,7 @@ public sealed class CdpCommand
     public Dictionary<string, object>? Params { get; init; }
 }
 
-public sealed record CdpResponse(int? Id, string? Error, bool IsEvent)
+public sealed record CdpResponse(int? Id, string? ExtensionId, string? Error, bool IsEvent)
 {
     public bool IsError => Error is not null;
 }

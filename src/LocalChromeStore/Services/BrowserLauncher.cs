@@ -218,9 +218,9 @@ public sealed class BrowserLauncher
             var version = browser.MajorVersion is { } v ? $" {v}" : "";
             warnings.Add(
                 $"{browser.DisplayName}{version} no longer supports loading extensions from the command line " +
-                "(branded Chrome removed --load-extension in 137 and its override in 142). The browser will open, " +
-                "but the extensions will NOT load. Use Chrome for Testing, Brave/Chromium, a clean temporary profile, " +
-                "or enterprise policy mode instead.");
+                "(branded Chrome removed --load-extension in 137 and its override in 142). LocalChromeStore will use " +
+                "CDP Extensions.loadUnpacked with --remote-debugging-pipe; if CDP fails, use Chrome for Testing, " +
+                "Brave/Chromium, a clean temporary profile, or enterprise policy mode instead.");
         }
 
         if (!string.IsNullOrWhiteSpace(launchUrl))
@@ -295,7 +295,7 @@ public sealed class BrowserLauncher
             : escaped;
     }
 
-    private static string CreateTemporaryProfileDirectory()
+    public static string CreateTemporaryProfileDirectory()
     {
         var root = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

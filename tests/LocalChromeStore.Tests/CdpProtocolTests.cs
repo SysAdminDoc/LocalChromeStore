@@ -52,13 +52,15 @@ public sealed class CdpProtocolTests
     }
 
     [Theory]
-    [InlineData("{\"id\":5,\"result\":{}}", 5, false, false)]
-    [InlineData("{\"id\":5,\"error\":{\"message\":\"boom\"}}", 5, true, false)]
-    [InlineData("{\"method\":\"Target.attached\",\"params\":{}}", null, false, true)]
-    public void ParseResponse_IdentifiesRepliesEventsAndErrors(string json, int? id, bool isError, bool isEvent)
+    [InlineData("{\"id\":5,\"result\":{\"id\":\"abcdefghijklmnopabcdefghijklmnop\"}}", 5, "abcdefghijklmnopabcdefghijklmnop", false, false)]
+    [InlineData("{\"id\":5,\"result\":{}}", 5, null, false, false)]
+    [InlineData("{\"id\":5,\"error\":{\"message\":\"boom\"}}", 5, null, true, false)]
+    [InlineData("{\"method\":\"Target.attached\",\"params\":{}}", null, null, false, true)]
+    public void ParseResponse_IdentifiesRepliesEventsExtensionIdsAndErrors(string json, int? id, string? extensionId, bool isError, bool isEvent)
     {
         var resp = CdpProtocol.ParseResponse(json);
         Assert.Equal(id, resp.Id);
+        Assert.Equal(extensionId, resp.ExtensionId);
         Assert.Equal(isError, resp.IsError);
         Assert.Equal(isEvent, resp.IsEvent);
     }

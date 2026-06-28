@@ -57,15 +57,6 @@ Roadmap_Blocked.md.
 
 ## Research-Driven Additions
 
-### P0
-
-- [ ] P0 - Wire CDP load into branded-Chrome launch
-  Why: The CDP pipe/protocol backend exists, but the main launch path still only warns when `LaunchStrategy.CdpLoadUnpacked` is selected.
-  Evidence: `src/LocalChromeStore/Services/Cdp/CdpExtensionLoader.cs`; `src/LocalChromeStore/ViewModels/MainViewModel.cs:855`; Chrome DevTools Protocol `Extensions.loadUnpacked`; Mozilla `web-ext` issue 3388; SeleniumBase issue 4053.
-  Touches: `Services/BrowserLaunchManager.cs`, `Services/BrowserLauncher.cs`, `Services/Cdp/*`, `ViewModels/MainViewModel.cs`, `tests/LocalChromeStore.Tests/*`.
-  Acceptance: Selecting branded Chrome 142+ launches with `--remote-debugging-pipe --enable-unsafe-extension-debugging`, loads every active installed extension through CDP, logs returned extension IDs or exact CDP errors, and falls back with a clear status if live CDP fails.
-  Complexity: L
-
 ### P1
 
 - [ ] P1 - Add guided Enterprise Policy install workflow

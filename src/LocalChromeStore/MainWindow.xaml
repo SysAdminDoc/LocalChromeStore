@@ -229,7 +229,7 @@
                             Content="Launch session"
                             Command="{Binding LaunchBrowserCommand}"
                             Style="{StaticResource AccentButton}"
-                            ToolTip="Launches the selected browser with installed extensions for the active load set loaded through --load-extension." />
+                            ToolTip="Launches the selected browser with installed extensions for the active load set using the best supported load strategy." />
 
                     <Button Grid.Column="9"
                             Content="{Binding UpdateAllLabel}"

@@ -2,29 +2,32 @@ using System.IO;
 
 namespace LocalChromeStore.Services.Cdp;
 
-/// <summary>Outcome of a CDP load attempt — surfaced to the activity log.</summary>
-public sealed record CdpLoadResult(bool Success, int Loaded, int Total, string Detail)
+/// <summary>One unpacked-extension load attempt over CDP.</summary>
+public sealed record CdpLoadAttempt(string ExtensionPath, bool Success, string? ExtensionId, string Detail);
+
+/// <summary>Outcome of a CDP load attempt batch, surfaced to the activity log.</summary>
+public sealed record CdpLoadResult(bool Success, int Loaded, int Total, string Detail, IReadOnlyList<CdpLoadAttempt> Attempts)
 {
-    public static CdpLoadResult Skipped(string why) => new(false, 0, 0, why);
+    public static CdpLoadResult Skipped(string why) => new(false, 0, 0, why, []);
+}
+
+public interface ICdpExtensionLoader
+{
+    Task<CdpLoadResult> LaunchAndLoadAsync(
+        string browserExePath,
+        IReadOnlyList<string> extensionPaths,
+        IReadOnlyList<string> extraArgs,
+        CancellationToken ct = default);
 }
 
 /// <summary>
-/// Loads unpacked extensions into branded Chrome 137+/142+ over a <c>--remote-debugging-pipe</c>
-/// CDP connection — the only sanctioned dev-load path after command-line <c>--load-extension</c> was
-/// removed. On Windows, Chrome reads/writes CDP on two inherited anonymous-pipe handles exposed to
-/// its C runtime as fd 3 (read) and fd 4 (write); <see cref="CdpPipeProcess"/> creates those pipes
-/// and launches with the MSVCRT inheritance block so the handshake actually completes (plain
-/// <c>Process.Start</c> cannot map handles onto fd 3/4). We then issue
-/// <c>Extensions.loadUnpacked</c> for each directory.
-///
-/// IMPORTANT: end-to-end loading requires branded Chrome 142+ at runtime and could not be exercised
-/// in the build environment. Every failure path is non-fatal — callers fall back to the launch
-/// strategy resolver's manual/policy path (see <see cref="BrowserLauncher.ResolveStrategy"/>). The
-/// wire protocol and the fd-inheritance block are unit-tested in isolation (<c>CdpProtocolTests</c>,
-/// <c>CdpPipeProcessTests</c>). Two things still need a live Chrome 142+ host to confirm: whether the
-/// browser keeps running after the controlling pipe closes, and the actual load result frames.
+/// Loads unpacked extensions into branded Chrome 137+/142+ over a remote-debugging pipe CDP
+/// connection. On Windows, Chrome reads/writes CDP on inherited anonymous-pipe handles exposed to
+/// its C runtime as fd 3 and fd 4; <see cref="CdpPipeProcess"/> creates those pipes and launches
+/// with the MSVCRT inheritance block that <see cref="System.Diagnostics.ProcessStartInfo"/> cannot
+/// express.
 /// </summary>
-public sealed class CdpExtensionLoader
+public sealed class CdpExtensionLoader : ICdpExtensionLoader
 {
     private readonly TimeSpan _responseTimeout;
 
@@ -33,7 +36,7 @@ public sealed class CdpExtensionLoader
 
     /// <summary>
     /// Launches <paramref name="browserExePath"/> with the CDP pipe flags and loads each extension
-    /// directory. Returns a non-fatal result; on any error the caller should fall back.
+    /// directory. Returns a non-fatal result so callers can fall back to manual/policy guidance.
     /// </summary>
     public async Task<CdpLoadResult> LaunchAndLoadAsync(
         string browserExePath,
@@ -51,19 +54,19 @@ public sealed class CdpExtensionLoader
             args.AddRange(extraArgs);
             session = CdpPipeProcess.Launch(browserExePath, args);
 
-            var loaded = 0;
+            var attempts = new List<CdpLoadAttempt>();
             var id = 0;
             foreach (var path in extensionPaths)
             {
                 ct.ThrowIfCancellationRequested();
-                if (await SendLoadUnpackedAsync(session.Writer, session.Reader, ++id, path, ct))
-                    loaded++;
+                attempts.Add(await SendLoadUnpackedAsync(session.Writer, session.Reader, ++id, path, ct));
             }
 
+            var loaded = attempts.Count(a => a.Success);
             return loaded == extensionPaths.Count
-                ? new CdpLoadResult(true, loaded, extensionPaths.Count, "all extensions loaded via CDP")
+                ? new CdpLoadResult(true, loaded, extensionPaths.Count, "all extensions loaded via CDP", attempts)
                 : new CdpLoadResult(loaded > 0, loaded, extensionPaths.Count,
-                    $"loaded {loaded}/{extensionPaths.Count} extensions via CDP");
+                    $"loaded {loaded}/{extensionPaths.Count} extensions via CDP", attempts);
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
@@ -76,7 +79,7 @@ public sealed class CdpExtensionLoader
         }
     }
 
-    private async Task<bool> SendLoadUnpackedAsync(Stream writer, Stream reader, int id, string path, CancellationToken ct)
+    private async Task<CdpLoadAttempt> SendLoadUnpackedAsync(Stream writer, Stream reader, int id, string path, CancellationToken ct)
     {
         var frame = CdpProtocol.EncodeFrame(CdpProtocol.BuildLoadUnpacked(id, path));
         await writer.WriteAsync(frame, ct);
@@ -91,20 +94,28 @@ public sealed class CdpExtensionLoader
             while (true)
             {
                 var n = await reader.ReadAsync(buf, timeoutCts.Token);
-                if (n == 0) return false; // pipe closed
+                if (n == 0) return new CdpLoadAttempt(path, false, null, "CDP pipe closed before a response arrived");
+
                 var combined = Concat(pending, buf.AsSpan(0, n));
                 var (messages, remainder) = CdpProtocol.DecodeFrames(combined);
                 pending = remainder;
                 foreach (var msg in messages)
                 {
                     var resp = CdpProtocol.ParseResponse(msg);
-                    if (resp.Id == id) return !resp.IsError;
+                    if (resp.Id != id) continue;
+                    if (resp.IsError)
+                        return new CdpLoadAttempt(path, false, null, resp.Error ?? "unknown CDP error");
+
+                    var detail = string.IsNullOrWhiteSpace(resp.ExtensionId)
+                        ? "CDP loadUnpacked returned success without an extension ID"
+                        : $"CDP loadUnpacked returned extension ID {resp.ExtensionId}";
+                    return new CdpLoadAttempt(path, true, resp.ExtensionId, detail);
                 }
             }
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            return false; // response timeout — non-fatal
+            return new CdpLoadAttempt(path, false, null, "CDP response timed out");
         }
     }
 

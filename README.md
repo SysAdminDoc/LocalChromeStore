@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.1-cba6f7?style=for-the-badge" alt="Version" /></a>
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.2-cba6f7?style=for-the-badge" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
@@ -39,7 +39,7 @@ LocalChromeStore wraps path 2 with a real store UI today. The policy backend now
 - **Store-style cards** — extension logo, name, version, description, install / uninstall buttons, link to repo
 - **One-click install** — downloads the latest release ZIP, extracts to a managed folder, tracks it
 - **One-click uninstall** — wipes the local copy and removes it from the load list
-- **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with every installed extension, version-gating the load strategy (plain `--load-extension`, the Chromium 137+ `--disable-features` override, or a guided warning on branded Chrome 142+, which removed command-line extension loading)
+- **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with every installed extension, version-gating the load strategy (plain `--load-extension`, the Chromium 137+ `--disable-features` override, or CDP `Extensions.loadUnpacked` over `--remote-debugging-pipe` for branded Chrome 142+, which removed command-line extension loading)
 - **Policy-ready backend** — packages CRX3 with RSA-2048, generates self-hosted `update.xml`, maps Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, checks policy/update/CRX health, and can roll back registry entries without deleting packaged artifacts
 - **Auditable launch sessions** — optional startup URL, clean temporary profile mode, and a copyable launch command preview
 - **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
@@ -95,7 +95,7 @@ To load installed extensions into a browser:
 3. *(Optional)* Enable **Clean temp profile** to launch with an isolated browser profile under `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\`
 4. Click **Launch session**
 
-The browser opens with `--load-extension=<all installed paths>`. The browser will show its standard "developer mode extensions" banner — that is normal for `--load-extension` and not a sign anything is wrong. The extensions persist for that browsing session; close the browser and they unload (which is exactly what you want during dev/test).
+LocalChromeStore uses the best supported load strategy for the selected browser: plain `--load-extension` on older/pre-lockdown builds, the Chromium 137+ override where it still works, or CDP `Extensions.loadUnpacked` for branded Chrome builds that removed command-line extension loading. Command-line-loaded extensions can show the browser's standard developer-mode banner; that is normal and not a sign anything is wrong. The extensions persist for that browsing session; close the browser and they unload (which is exactly what you want during dev/test).
 
 Use **Copy args** to copy the exact command LocalChromeStore will run. This is useful when debugging extension load failures or reproducing a launch session outside the app.
 
@@ -155,6 +155,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history.
 - **v0.2.0** — Named load sets, per-repo hidden-repo restore, accessibility sweep, broader unit tests
 - **v0.3.0** — `localchromestore.json` repo manifest + validator, framework build-command dry-run, teal accent token
 - **v0.3.1** — CRX3 RSA signing primitives, deterministic extension ID derivation, self-hosted `update.xml` generation, Enterprise Policy registry writer/rollback, policy health checks, version-gated launch strategy, CDP loader groundwork, self-update checks, and hardened local state persistence
+- **v0.3.2** — Branded-Chrome launch now wires the CDP `Extensions.loadUnpacked` path, logs returned extension IDs or exact CDP errors, and shows the actual pipe/debug launch command
 
 **Planned**
 

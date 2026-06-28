@@ -115,8 +115,8 @@ public sealed class MainViewModel : ViewModelBase
             if (SaveSettings())
                 await RefreshAsync();
         }, _ => !Busy);
-        LaunchBrowserCommand = new RelayCommand(_ => LaunchBrowser(), _ => CanLaunchBrowser);
-        LaunchInstalledOnlyCommand = new RelayCommand(_ => LaunchBrowser(), _ => CanLaunchBrowser);
+        LaunchBrowserCommand = new AsyncRelayCommand(_ => LaunchBrowserAsync(), _ => CanLaunchBrowser);
+        LaunchInstalledOnlyCommand = new AsyncRelayCommand(_ => LaunchBrowserAsync(), _ => CanLaunchBrowser);
         OpenInstallDirCommand = new RelayCommand(_ => OpenInstallDir());
         ClearHiddenReposCommand = new AsyncRelayCommand(async _ =>
         {
@@ -469,7 +469,7 @@ public sealed class MainViewModel : ViewModelBase
                 extensions,
                 NormalizeLaunchUrl(LaunchUrlInput),
                 LaunchWithTemporaryProfile);
-            return plan.DisplayCommand;
+            return BrowserLaunchManager.DisplayCommandForPlan(plan);
         }
     }
     public bool ShowEmptyState => !Busy && VisibleCount == 0;
@@ -770,7 +770,7 @@ public sealed class MainViewModel : ViewModelBase
         StatusText = summary;
 
         if (updated > 0)
-            MaybeLaunchAfterInstall($"{updated} updated extension(s)");
+            await MaybeLaunchAfterInstallAsync($"{updated} updated extension(s)");
     }
 
     private static string FormatPermissionReviewList(IReadOnlyList<ExtensionCardViewModel> cards)
@@ -781,13 +781,9 @@ public sealed class MainViewModel : ViewModelBase
         return string.Join(Environment.NewLine, lines);
     }
 
-    private Task OnExtensionInstalledAsync()
-    {
-        MaybeLaunchAfterInstall("an installed extension");
-        return Task.CompletedTask;
-    }
+    private Task OnExtensionInstalledAsync() => MaybeLaunchAfterInstallAsync("an installed extension");
 
-    private void MaybeLaunchAfterInstall(string reason)
+    private async Task MaybeLaunchAfterInstallAsync(string reason)
     {
         if (!_settings.LaunchBrowserAfterInstall) return;
         if (SelectedBrowser is null)
@@ -798,7 +794,7 @@ public sealed class MainViewModel : ViewModelBase
         }
 
         Log($"Launch after install is enabled after {reason}.");
-        LaunchBrowser();
+        await LaunchBrowserAsync();
     }
 
     private void DetectBrowsers()
@@ -852,7 +848,7 @@ public sealed class MainViewModel : ViewModelBase
         return true;
     }
 
-    private void LaunchBrowser()
+    private async Task LaunchBrowserAsync()
     {
         if (SelectedBrowser is null) return;
         var set = GetActiveLoadSetExtensions(_extensions.Installed);
@@ -871,7 +867,7 @@ public sealed class MainViewModel : ViewModelBase
         _settings.LaunchWithTemporaryProfile = LaunchWithTemporaryProfile;
         _settingsService.Save(_settings);
 
-        ApplyLaunchOutcome(_launchManager.Launch(
+        ApplyLaunchOutcome(await _launchManager.LaunchAsync(
             SelectedBrowser, set, launchUrl, LaunchWithTemporaryProfile, isSentinel, _selectedLoadSet?.Name));
     }
 
