@@ -7,7 +7,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
-             Width="378" Height="356">
+             Width="378" Height="376">
     <UserControl.Resources>
         <conv:BoolToVisibilityConverter x:Key="BoolToVis" />
         <conv:NullToVisibilityConverter x:Key="NullToVis" />
@@ -389,12 +389,24 @@
                         IsEnabled="{Binding CanOpenInstallDir}"
                         Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}" />
 
-                <StackPanel Grid.Row="1"
-                            Grid.Column="0"
-                            Grid.ColumnSpan="4"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Right"
-                            Margin="0,7,0,0">
+                <WrapPanel Grid.Row="1"
+                           Grid.Column="0"
+                           Grid.ColumnSpan="4"
+                           Orientation="Horizontal"
+                           HorizontalAlignment="Right"
+                           Margin="0,7,0,0">
+                    <Button Content="Policy"
+                            Style="{StaticResource LinkButton}"
+                            Command="{Binding ApplyPolicyCommand}"
+                            Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}"
+                            ToolTip="Package this installed extension as CRX3/update.xml and apply Enterprise Policy force-install for the selected browser."
+                            Margin="0,0,4,0" />
+                    <Button Content="Rollback"
+                            Style="{StaticResource LinkButton}"
+                            Command="{Binding RollbackPolicyCommand}"
+                            Visibility="{Binding IsInstalled, Converter={StaticResource BoolToVis}}"
+                            ToolTip="Remove only this extension's Enterprise Policy registry entries for the selected browser."
+                            Margin="0,0,4,0" />
                     <Button Content="Inspect"
                             Style="{StaticResource LinkButton}"
                             Command="{Binding InspectCommand}"
@@ -435,7 +447,7 @@
                     <Button Content="Repo"
                             Style="{StaticResource LinkButton}"
                             Command="{Binding OpenRepoCommand}" />
-                </StackPanel>
+                </WrapPanel>
             </Grid>
         </Grid>
     </Border>

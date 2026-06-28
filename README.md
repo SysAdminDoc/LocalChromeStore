@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.2-cba6f7?style=for-the-badge" alt="Version" /></a>
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.3-cba6f7?style=for-the-badge" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
@@ -29,7 +29,7 @@ Chromium 75+ blocks drag-and-drop install of self-signed CRX files with `CRX_REQ
 2. **Load unpacked** — works, but clicking through the file picker for ten extensions every browser reset is friction
 3. **Enterprise Policy `ExtensionInstallForcelist`** — the only self-host path that actually works on managed Chrome / Brave / Edge machines
 
-LocalChromeStore wraps path 2 with a real store UI today. The policy backend now exists for path 3, including CRX3 packaging primitives, registry writer/rollback, and health checks; full UI hosting workflow is still being wired.
+LocalChromeStore wraps path 2 with a real store UI today. It also wires path 3 for managed machines: package/sign CRX3, generate or copy `update.xml`, write browser policy with consent, health-check the feed, and roll back only matching registry entries.
 
 ---
 
@@ -40,7 +40,7 @@ LocalChromeStore wraps path 2 with a real store UI today. The policy backend now
 - **One-click install** — downloads the latest release ZIP, extracts to a managed folder, tracks it
 - **One-click uninstall** — wipes the local copy and removes it from the load list
 - **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with every installed extension, version-gating the load strategy (plain `--load-extension`, the Chromium 137+ `--disable-features` override, or CDP `Extensions.loadUnpacked` over `--remote-debugging-pipe` for branded Chrome 142+, which removed command-line extension loading)
-- **Policy-ready backend** — packages CRX3 with RSA-2048, generates self-hosted `update.xml`, maps Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, checks policy/update/CRX health, and can roll back registry entries without deleting packaged artifacts
+- **Guided Enterprise Policy workflow** — per-card **Policy** / **Rollback** actions package CRX3 with RSA-2048, generate or copy self-hosted `update.xml`, map Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, write Edge `ExtensionSettings.override_update_url`, check policy/update/CRX health, and roll back registry entries without deleting packaged artifacts
 - **Auditable launch sessions** — optional startup URL, clean temporary profile mode, and a copyable launch command preview
 - **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
 - **Update workflow** — update-available badges, permission-change review, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
@@ -99,6 +99,16 @@ LocalChromeStore uses the best supported load strategy for the selected browser:
 
 Use **Copy args** to copy the exact command LocalChromeStore will run. This is useful when debugging extension load failures or reproducing a launch session outside the app.
 
+To apply Enterprise Policy mode for a managed browser:
+
+1. Install an extension locally, then select Chrome / Edge / Brave / Chromium in the browser dropdown
+2. Click **Policy** on that extension card
+3. Enter the hosted CRX URL and hosted `update.xml` URL you will publish
+4. Generate `update.xml` from the local package, or copy an existing file into the policy package folder
+5. Confirm the HKLM browser-policy impact; LocalChromeStore writes the force-install policy and runs health checks
+
+Use **Rollback** on the same card to remove only that extension's browser-policy registry entries. Local CRX/update artifacts and signing keys stay on disk.
+
 Use **Export environment** to save the installed extension set, manifest trust snapshot, GitHub owner list, topic filter, and launch options as a portable JSON file. Use **Import environment** on another machine to apply those discovery settings, refresh GitHub, and install matching ZIP/CRX release assets. If the current catalog release adds permissions compared with the exported snapshot or local installed copy, import asks for approval before installing it. GitHub tokens are never written to the export file.
 
 ---
@@ -156,11 +166,11 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history.
 - **v0.3.0** — `localchromestore.json` repo manifest + validator, framework build-command dry-run, teal accent token
 - **v0.3.1** — CRX3 RSA signing primitives, deterministic extension ID derivation, self-hosted `update.xml` generation, Enterprise Policy registry writer/rollback, policy health checks, version-gated launch strategy, CDP loader groundwork, self-update checks, and hardened local state persistence
 - **v0.3.2** — Branded-Chrome launch now wires the CDP `Extensions.loadUnpacked` path, logs returned extension IDs or exact CDP errors, and shows the actual pipe/debug launch command
+- **v0.3.3** — Guided Enterprise Policy workflow: per-card package/apply/rollback, generated or selected `update.xml`, Edge `override_update_url`, and post-write health checks
 
 **Planned**
 
-- UI wiring for selecting packaged CRX/update-feed artifacts and applying policy installs from the main workflow
-- Static update hosting for policy-ready packages
+- Static update hosting automation for policy-ready packages
 - Local folder source, custom update-feed source, light theme + accent picker
 
 ---

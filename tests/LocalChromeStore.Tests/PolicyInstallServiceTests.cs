@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using LocalChromeStore.Models;
 using LocalChromeStore.Services;
 using LocalChromeStore.Services.Crx;
@@ -46,6 +47,24 @@ public sealed class PolicyInstallServiceTests
     }
 
     [Fact]
+    public void Install_EdgeWritesExtensionSettingsOverrideUpdateUrl()
+    {
+        var registry = new MemoryPolicyRegistry();
+        var service = new PolicyInstallService(registry, new HttpClient(new StaticHttpHandler()));
+        var request = new PolicyInstallRequest(BrowserKind.Edge, ExtensionId, UpdateUrl, "Sample");
+
+        var result = service.Install(request, consentConfirmed: true);
+
+        Assert.True(result.EdgeExtensionSettingsWritten);
+        var edgeValues = registry.ReadStringValues(@"SOFTWARE\Policies\Microsoft\Edge");
+        using var json = JsonDocument.Parse(edgeValues["ExtensionSettings"]);
+        var extension = json.RootElement.GetProperty(ExtensionId);
+        Assert.Equal("force_installed", extension.GetProperty("installation_mode").GetString());
+        Assert.Equal(UpdateUrl.AbsoluteUri, extension.GetProperty("update_url").GetString());
+        Assert.True(extension.GetProperty("override_update_url").GetBoolean());
+    }
+
+    [Fact]
     public void Rollback_RemovesMatchingPolicyEntriesOnly()
     {
         var registry = new MemoryPolicyRegistry();
@@ -61,6 +80,46 @@ public sealed class PolicyInstallServiceTests
         var values = registry.ReadStringValues(target.RegistrySubKey);
         Assert.Single(values);
         Assert.Equal($"{keepId};https://updates.example.test/keep.xml", values["2"]);
+    }
+
+    [Fact]
+    public void Rollback_EdgeRemovesMatchingExtensionSettingsOnly()
+    {
+        var registry = new MemoryPolicyRegistry();
+        var service = new PolicyInstallService(registry, new HttpClient(new StaticHttpHandler()));
+        var keepId = "bcdefghijklmnopabcdefghijklmnopa";
+        var target = PolicyInstallService.SupportedTargets.Single(t => t.BrowserKind == BrowserKind.Edge);
+        registry.SetStringValue(target.RegistrySubKey, "1", $"{ExtensionId};https://updates.example.test/update.xml");
+        registry.SetStringValue(target.RegistrySubKey, "2", $"{keepId};https://updates.example.test/keep.xml");
+        registry.SetStringValue(
+            @"SOFTWARE\Policies\Microsoft\Edge",
+            "ExtensionSettings",
+            $$"""
+            {
+              "{{ExtensionId}}": {
+                "installation_mode": "force_installed",
+                "update_url": "https://updates.example.test/update.xml",
+                "override_update_url": true
+              },
+              "{{keepId}}": {
+                "installation_mode": "force_installed",
+                "update_url": "https://updates.example.test/keep.xml",
+                "override_update_url": true
+              }
+            }
+            """);
+
+        var result = service.Rollback(BrowserKind.Edge, new[] { ExtensionId });
+
+        Assert.Equal(new[] { "1" }, result.RemovedValueNames);
+        Assert.Equal(new[] { ExtensionId }, result.RemovedExtensionSettings);
+        var values = registry.ReadStringValues(target.RegistrySubKey);
+        Assert.Single(values);
+        Assert.Equal($"{keepId};https://updates.example.test/keep.xml", values["2"]);
+        var edgeValues = registry.ReadStringValues(@"SOFTWARE\Policies\Microsoft\Edge");
+        using var json = JsonDocument.Parse(edgeValues["ExtensionSettings"]);
+        Assert.False(json.RootElement.TryGetProperty(ExtensionId, out _));
+        Assert.True(json.RootElement.TryGetProperty(keepId, out _));
     }
 
     [Fact]
@@ -114,6 +173,26 @@ public sealed class PolicyInstallServiceTests
         Assert.Contains(report.Checks, c => c.Name == "Registry state" && c.Status == PolicyHealthStatus.Pass);
         Assert.Contains(report.Checks, c => c.Name == "Update XML" && c.Status == PolicyHealthStatus.Pass);
         Assert.Contains(report.Checks, c => c.Name == "CRX reachability" && c.Status == PolicyHealthStatus.Pass);
+    }
+
+    [Fact]
+    public async Task CheckHealthAsync_PassesEdgeOverrideUpdateUrlWhenInstalled()
+    {
+        var registry = new MemoryPolicyRegistry();
+        var handler = new StaticHttpHandler();
+        handler.Set(HttpMethod.Get, UpdateUrl, new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(UpdateXmlService.Create(ExtensionId, CrxUrl, "1.2.3"))
+        });
+        handler.Set(HttpMethod.Head, CrxUrl, new HttpResponseMessage(HttpStatusCode.OK));
+        var service = new PolicyInstallService(registry, new HttpClient(handler));
+        var request = new PolicyInstallRequest(BrowserKind.Edge, ExtensionId, UpdateUrl, "Sample");
+        service.Install(request, consentConfirmed: true);
+
+        var report = await service.CheckHealthAsync(request);
+
+        Assert.True(report.Healthy);
+        Assert.Contains(report.Checks, c => c.Name == "Edge override_update_url" && c.Status == PolicyHealthStatus.Pass);
     }
 
     [Fact]

@@ -19,6 +19,8 @@ public sealed class MainViewModel : ViewModelBase
     private readonly BrowserLauncher _launcher;
     private readonly BrowserLaunchManager _launchManager;
     private readonly LoadSetManager _loadSets;
+    private readonly PolicyPackageService _policyPackages;
+    private readonly PolicyInstallService _policyInstaller;
     private readonly PolicyEnrollmentService _policyEnrollment = new();
     private readonly IDialogService _dialogs;
     private readonly Dispatcher_LogSink _logSink;
@@ -90,6 +92,8 @@ public sealed class MainViewModel : ViewModelBase
         _launcher = new BrowserLauncher(_extensions);
         _launchManager = new BrowserLaunchManager(_launcher);
         _loadSets = new LoadSetManager(_settingsService);
+        _policyPackages = new PolicyPackageService(_settingsService);
+        _policyInstaller = new PolicyInstallService();
         _settings = _settingsService.Load();
         _logSink = new Dispatcher_LogSink(LogLines);
 
@@ -558,6 +562,8 @@ public sealed class MainViewModel : ViewModelBase
         Log,
         RefreshAfterChange,
         OnExtensionInstalledAsync,
+        ApplyPolicyInstallAsync,
+        RollbackPolicyInstallAsync,
         HideExtension);
 
     private void ApplyServiceState(GitHubServiceState state, int count)
@@ -956,6 +962,234 @@ public sealed class MainViewModel : ViewModelBase
         StatusText = support.Supported
             ? "Policy backend is ready for managed off-store force-install requests."
             : "Policy backend is available, but this machine is not enrolled for off-store force-install.";
+    }
+
+    private async Task ApplyPolicyInstallAsync(ExtensionCardViewModel card)
+    {
+        if (SelectedBrowser is not { } browser)
+        {
+            StatusText = "Select a browser before applying Enterprise Policy.";
+            Log("! Select a browser before applying Enterprise Policy.");
+            return;
+        }
+        if (card.Installed is not { } installed)
+        {
+            StatusText = "Install the extension before applying Enterprise Policy.";
+            Log($"! Policy install skipped for {card.Repo}: extension is not installed locally.");
+            return;
+        }
+        if (!PolicyInstallService.TryGetTarget(browser.Kind, out var target))
+        {
+            StatusText = $"{browser.DisplayName} does not have a known Enterprise Policy target.";
+            Log($"! {browser.DisplayName} does not have a known Enterprise Policy target.");
+            return;
+        }
+
+        var defaultCrxUrl = BuildDefaultPolicyUrl(installed, PolicyPackageService.DefaultCrxFileName(installed));
+        if (!PromptPolicyUrl(
+                "Policy CRX URL",
+                $"Enter the public URL where {PolicyPackageService.DefaultCrxFileName(installed)} will be hosted after LocalChromeStore packages it.",
+                defaultCrxUrl,
+                out var crxUrl))
+        {
+            return;
+        }
+
+        var defaultUpdateUrl = BuildDefaultPolicyUrl(installed, "update.xml");
+        if (!PromptPolicyUrl(
+                "Policy update.xml URL",
+                "Enter the public update.xml URL that the selected browser policy should use.",
+                defaultUpdateUrl,
+                out var updateXmlUrl))
+        {
+            return;
+        }
+
+        string? existingUpdateXmlPath = null;
+        var generateUpdateXml = _dialogs.Confirm(
+            "Generate update.xml from the CRX URL and installed manifest version?\n\nChoose No to copy an existing update.xml file into the local policy package folder instead.",
+            "Policy update.xml",
+            DialogIcon.Question);
+        if (!generateUpdateXml)
+        {
+            existingUpdateXmlPath = _dialogs.OpenFile(
+                "Select update.xml",
+                "Update XML (*.xml)|*.xml|All files (*.*)|*.*",
+                _settingsService.PolicyPackagesRoot,
+                ".xml");
+            if (string.IsNullOrWhiteSpace(existingUpdateXmlPath))
+            {
+                StatusText = "Policy install cancelled before selecting update.xml.";
+                Log($"Policy install cancelled for {card.Repo}: no update.xml selected.");
+                return;
+            }
+        }
+
+        Busy = true;
+        try
+        {
+            StatusText = $"Packaging {card.Title} for Enterprise Policy...";
+            Log($"Policy package started for {card.Repo} targeting {target.DisplayName}.");
+            var progress = new Progress<string>(Log);
+            var package = await Task.Run(() => _policyPackages.Prepare(
+                new PolicyPackageRequest(installed, crxUrl, updateXmlUrl, existingUpdateXmlPath),
+                progress));
+            var request = package.ToInstallRequest(browser.Kind);
+            var enrollment = _policyEnrollment.DetectCurrent();
+            var consentPrompt = PolicyInstallService.BuildConsentPrompt([request], enrollment) +
+                $"{Environment.NewLine}{Environment.NewLine}" +
+                $"Local package folder:{Environment.NewLine}{package.PackageDirectory}{Environment.NewLine}{Environment.NewLine}" +
+                $"Upload the CRX to:{Environment.NewLine}{package.CrxUrl.AbsoluteUri}{Environment.NewLine}{Environment.NewLine}" +
+                $"Upload/update the feed at:{Environment.NewLine}{package.UpdateXmlUrl.AbsoluteUri}{Environment.NewLine}{Environment.NewLine}" +
+                "Health checks will fail until those hosted URLs are reachable.";
+
+            if (!_dialogs.Confirm(consentPrompt, "Apply Enterprise Policy", DialogIcon.Warning))
+            {
+                StatusText = "Policy install cancelled before writing HKLM policy.";
+                Log($"Policy install cancelled for {card.Repo}: HKLM policy consent was not confirmed.");
+                return;
+            }
+
+            var install = _policyInstaller.Install(request, consentConfirmed: true);
+            Log($"Policy entry written: HKLM\\{install.Target.RegistrySubKey}\\{install.ValueName} = {install.PolicyEntry}");
+            if (install.EdgeExtensionSettingsWritten)
+                Log("Edge ExtensionSettings.override_update_url written for the same extension ID.");
+
+            var report = await _policyInstaller.CheckHealthAsync(request);
+            LogPolicyHealthReport(report);
+            StatusText = report.Healthy
+                ? $"Enterprise Policy install is healthy for {card.Title}."
+                : $"Enterprise Policy was written for {card.Title}; health checks need attention.";
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            StatusText = "Enterprise Policy write requires administrator elevation.";
+            Log($"! Policy install requires administrator elevation to write HKLM: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Policy install failed: {ex.Message}";
+            Log($"! Policy install failed for {card.Repo}: {ex.Message}");
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private async Task RollbackPolicyInstallAsync(ExtensionCardViewModel card)
+    {
+        if (SelectedBrowser is not { } browser)
+        {
+            StatusText = "Select a browser before rolling back Enterprise Policy.";
+            Log("! Select a browser before rolling back Enterprise Policy.");
+            return;
+        }
+        if (card.Installed is not { } installed)
+        {
+            StatusText = "Install the extension before rolling back Enterprise Policy.";
+            Log($"! Policy rollback skipped for {card.Repo}: extension is not installed locally.");
+            return;
+        }
+        if (!PolicyInstallService.TryGetTarget(browser.Kind, out var target))
+        {
+            StatusText = $"{browser.DisplayName} does not have a known Enterprise Policy target.";
+            Log($"! {browser.DisplayName} does not have a known Enterprise Policy target.");
+            return;
+        }
+        if (!_policyPackages.TryDeriveExtensionId(installed, out var extensionId, out var keyPath))
+        {
+            StatusText = "No policy signing key exists for this extension.";
+            Log($"! Policy rollback skipped for {card.Repo}: no CRX signing key found at {keyPath}. Use Policy first to package it.");
+            return;
+        }
+
+        var confirm = _dialogs.Confirm(
+            $"Rollback Enterprise Policy force-install for {card.Title}?\n\nThis removes only registry policy entries for extension ID {extensionId} under {target.DisplayName}. Local installed files, CRX packages, update.xml, and signing keys remain on disk.",
+            "Rollback Enterprise Policy",
+            DialogIcon.Warning);
+        if (!confirm) return;
+
+        Busy = true;
+        try
+        {
+            var result = await Task.Run(() => _policyInstaller.Rollback(browser.Kind, [extensionId]));
+            foreach (var valueName in result.RemovedValueNames)
+                Log($"Policy rollback removed: HKLM\\{result.Target.RegistrySubKey}\\{valueName}");
+            foreach (var removedId in result.RemovedExtensionSettings)
+                Log($"Policy rollback removed Edge ExtensionSettings entry: {removedId}");
+
+            if (result.RemovedValueNames.Count == 0 && result.RemovedExtensionSettings.Count == 0)
+            {
+                StatusText = $"No Enterprise Policy entries were found for {card.Title}.";
+                Log($"Policy rollback found no registry entries for {card.Repo} ({extensionId}).");
+            }
+            else
+            {
+                StatusText = $"Enterprise Policy rollback completed for {card.Title}.";
+            }
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            StatusText = "Enterprise Policy rollback requires administrator elevation.";
+            Log($"! Policy rollback requires administrator elevation to write HKLM: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Policy rollback failed: {ex.Message}";
+            Log($"! Policy rollback failed for {card.Repo}: {ex.Message}");
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
+    private bool PromptPolicyUrl(string title, string message, Uri defaultUrl, out Uri url)
+    {
+        url = defaultUrl;
+        var input = _dialogs.PromptText(title, message, defaultUrl.AbsoluteUri);
+        if (input is null)
+        {
+            StatusText = "Policy install cancelled before entering a hosted URL.";
+            Log("Policy install cancelled before entering a hosted URL.");
+            return false;
+        }
+
+        if (!Uri.TryCreate(input.Trim(), UriKind.Absolute, out var parsed)
+            || (parsed.Scheme != Uri.UriSchemeHttps && parsed.Scheme != Uri.UriSchemeHttp))
+        {
+            StatusText = "Policy URL must be an absolute http or https URL.";
+            Log($"! Policy URL rejected: {input}");
+            return false;
+        }
+
+        url = parsed;
+        return true;
+    }
+
+    private static Uri BuildDefaultPolicyUrl(InstalledExtension installed, string fileName)
+    {
+        var owner = Uri.EscapeDataString(installed.RepoOwner);
+        var repo = Uri.EscapeDataString(installed.RepoName);
+        var version = Uri.EscapeDataString(installed.Version);
+        var file = Uri.EscapeDataString(fileName);
+        return new Uri($"https://example.com/localchromestore/{owner}/{repo}/{version}/{file}");
+    }
+
+    private void LogPolicyHealthReport(PolicyHealthReport report)
+    {
+        Log("Policy health checks:");
+        foreach (var check in report.Checks)
+        {
+            var prefix = check.Status switch
+            {
+                PolicyHealthStatus.Pass => "+",
+                PolicyHealthStatus.Warning => "!",
+                _ => "!"
+            };
+            Log($"  {prefix} {check.Name}: {check.Detail}");
+        }
     }
 
     private void OpenInstallDir()

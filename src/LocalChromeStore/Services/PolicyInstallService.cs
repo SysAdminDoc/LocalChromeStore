@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Xml.Linq;
 using LocalChromeStore.Models;
 using LocalChromeStore.Services.Crx;
@@ -29,11 +31,13 @@ public sealed record PolicyInstallRequest(
 public sealed record PolicyInstallResult(
     PolicyBrowserTarget Target,
     string ValueName,
-    string PolicyEntry);
+    string PolicyEntry,
+    bool EdgeExtensionSettingsWritten);
 
 public sealed record PolicyRollbackResult(
     PolicyBrowserTarget Target,
-    IReadOnlyList<string> RemovedValueNames);
+    IReadOnlyList<string> RemovedValueNames,
+    IReadOnlyList<string> RemovedExtensionSettings);
 
 public sealed record PolicyHealthCheck(
     string Name,
@@ -90,6 +94,9 @@ public sealed class PolicyInstallService
 {
     private readonly IPolicyRegistry _registry;
     private readonly HttpClient _http;
+    private const string EdgeExtensionSettingsSubKey = @"SOFTWARE\Policies\Microsoft\Edge";
+    private const string EdgeExtensionSettingsValueName = "ExtensionSettings";
+    private static readonly JsonSerializerOptions EdgeExtensionSettingsJsonOptions = new() { WriteIndented = false };
 
     private static readonly IReadOnlyDictionary<BrowserKind, PolicyBrowserTarget> Targets =
         new Dictionary<BrowserKind, PolicyBrowserTarget>
@@ -167,6 +174,8 @@ public sealed class PolicyInstallService
 
         lines.Add("");
         lines.Add("Rollback removes only the browser policy registry entries. Packaged CRX/update artifacts remain on disk or on the hosting service.");
+        if (requestList.Any(r => r.BrowserKind == BrowserKind.Edge))
+            lines.Add("Microsoft Edge also receives ExtensionSettings.override_update_url so self-hosted updates are not redirected to the Edge Add-ons store.");
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -181,7 +190,8 @@ public sealed class PolicyInstallService
         var valueName = existing ?? NextValueName(values.Keys);
 
         _registry.SetStringValue(target.RegistrySubKey, valueName, entry);
-        return new PolicyInstallResult(target, valueName, entry);
+        var edgeSettingsWritten = request.BrowserKind == BrowserKind.Edge && WriteEdgeExtensionSettings(request);
+        return new PolicyInstallResult(target, valueName, entry, edgeSettingsWritten);
     }
 
     public PolicyRollbackResult Rollback(BrowserKind browserKind, IEnumerable<string> extensionIds)
@@ -192,7 +202,7 @@ public sealed class PolicyInstallService
             .Select(id => id.Trim())
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (idSet.Count == 0)
-            return new PolicyRollbackResult(target, []);
+            return new PolicyRollbackResult(target, [], []);
 
         var removed = new List<string>();
         foreach (var (name, value) in _registry.ReadStringValues(target.RegistrySubKey))
@@ -200,10 +210,13 @@ public sealed class PolicyInstallService
             var id = ParsePolicyEntry(value).ExtensionId;
             if (id is null || !idSet.Contains(id)) continue;
             _registry.DeleteValue(target.RegistrySubKey, name);
-            removed.Add(name);
+                removed.Add(name);
         }
 
-        return new PolicyRollbackResult(target, removed);
+        var removedEdgeSettings = browserKind == BrowserKind.Edge
+            ? RemoveEdgeExtensionSettings(idSet)
+            : [];
+        return new PolicyRollbackResult(target, removed, removedEdgeSettings);
     }
 
     public async Task<PolicyHealthReport> CheckHealthAsync(PolicyInstallRequest request, CancellationToken ct = default)
@@ -235,6 +248,8 @@ public sealed class PolicyInstallService
             ? BuildPolicyEntry(request.ExtensionId, request.UpdateXmlUrl)
             : null;
         checks.Add(CheckRegistryState(target, request.ExtensionId, expectedEntry));
+        if (request.BrowserKind == BrowserKind.Edge)
+            checks.Add(CheckEdgeExtensionSettings(request));
 
         Uri? crxUrl = null;
         if (IsSupportedUpdateUrl(request.UpdateXmlUrl))
@@ -291,6 +306,55 @@ public sealed class PolicyInstallService
             $"Value {existingName} is {value}, expected {expectedEntry ?? "a valid policy entry"}.");
     }
 
+    private PolicyHealthCheck CheckEdgeExtensionSettings(PolicyInstallRequest request)
+    {
+        try
+        {
+            var values = _registry.ReadStringValues(EdgeExtensionSettingsSubKey);
+            if (!values.TryGetValue(EdgeExtensionSettingsValueName, out var raw) || string.IsNullOrWhiteSpace(raw))
+            {
+                return new PolicyHealthCheck(
+                    "Edge override_update_url",
+                    PolicyHealthStatus.Fail,
+                    $"HKLM\\{EdgeExtensionSettingsSubKey}\\{EdgeExtensionSettingsValueName} is missing.");
+            }
+
+            var root = ReadEdgeExtensionSettings(raw);
+            if (root[request.ExtensionId] is not JsonObject extension)
+            {
+                return new PolicyHealthCheck(
+                    "Edge override_update_url",
+                    PolicyHealthStatus.Fail,
+                    $"ExtensionSettings has no entry for {request.ExtensionId}.");
+            }
+
+            var overrideUpdateUrl = TryGetBoolean(extension, "override_update_url");
+            var updateUrl = TryGetString(extension, "update_url");
+            var installMode = TryGetString(extension, "installation_mode");
+            if (overrideUpdateUrl == true
+                && string.Equals(updateUrl, request.UpdateXmlUrl.AbsoluteUri, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(installMode, "force_installed", StringComparison.OrdinalIgnoreCase))
+            {
+                return new PolicyHealthCheck(
+                    "Edge override_update_url",
+                    PolicyHealthStatus.Pass,
+                    $"ExtensionSettings forces {request.ExtensionId} to {request.UpdateXmlUrl.AbsoluteUri}.");
+            }
+
+            return new PolicyHealthCheck(
+                "Edge override_update_url",
+                PolicyHealthStatus.Fail,
+                $"ExtensionSettings entry must set installation_mode=force_installed, update_url={request.UpdateXmlUrl.AbsoluteUri}, and override_update_url=true.");
+        }
+        catch (Exception ex)
+        {
+            return new PolicyHealthCheck(
+                "Edge override_update_url",
+                PolicyHealthStatus.Fail,
+                $"Could not inspect Edge ExtensionSettings JSON: {ex.Message}");
+        }
+    }
+
     private async Task<PolicyHealthCheck> CheckCrxReachabilityAsync(Uri crxUrl, CancellationToken ct)
     {
         var response = await TrySendAsync(HttpMethod.Head, crxUrl, ct);
@@ -314,6 +378,74 @@ public sealed class PolicyInstallService
                 ? new PolicyHealthCheck("CRX reachability", PolicyHealthStatus.Pass, $"{crxUrl.AbsoluteUri} returned HTTP {(int)response.StatusCode}.")
                 : new PolicyHealthCheck("CRX reachability", PolicyHealthStatus.Fail, $"{crxUrl.AbsoluteUri} returned HTTP {(int)response.StatusCode}.");
         }
+    }
+
+    private bool WriteEdgeExtensionSettings(PolicyInstallRequest request)
+    {
+        var values = _registry.ReadStringValues(EdgeExtensionSettingsSubKey);
+        var root = values.TryGetValue(EdgeExtensionSettingsValueName, out var raw) && !string.IsNullOrWhiteSpace(raw)
+            ? ReadEdgeExtensionSettings(raw)
+            : new JsonObject();
+
+        root[request.ExtensionId] = new JsonObject
+        {
+            ["installation_mode"] = "force_installed",
+            ["update_url"] = request.UpdateXmlUrl.AbsoluteUri,
+            ["override_update_url"] = true
+        };
+        _registry.SetStringValue(
+            EdgeExtensionSettingsSubKey,
+            EdgeExtensionSettingsValueName,
+            root.ToJsonString(EdgeExtensionSettingsJsonOptions));
+        return true;
+    }
+
+    private IReadOnlyList<string> RemoveEdgeExtensionSettings(IReadOnlySet<string> extensionIds)
+    {
+        var values = _registry.ReadStringValues(EdgeExtensionSettingsSubKey);
+        if (!values.TryGetValue(EdgeExtensionSettingsValueName, out var raw) || string.IsNullOrWhiteSpace(raw))
+            return [];
+
+        var root = ReadEdgeExtensionSettings(raw);
+        var removed = new List<string>();
+        foreach (var extensionId in extensionIds)
+        {
+            if (root.Remove(extensionId))
+                removed.Add(extensionId);
+        }
+
+        if (removed.Count == 0) return removed;
+        if (root.Count == 0)
+        {
+            _registry.DeleteValue(EdgeExtensionSettingsSubKey, EdgeExtensionSettingsValueName);
+        }
+        else
+        {
+            _registry.SetStringValue(
+                EdgeExtensionSettingsSubKey,
+                EdgeExtensionSettingsValueName,
+                root.ToJsonString(EdgeExtensionSettingsJsonOptions));
+        }
+        return removed;
+    }
+
+    private static JsonObject ReadEdgeExtensionSettings(string raw)
+    {
+        var node = JsonNode.Parse(raw);
+        return node as JsonObject
+            ?? throw new InvalidOperationException("Edge ExtensionSettings policy value must be a JSON object.");
+    }
+
+    private static string? TryGetString(JsonObject obj, string propertyName)
+    {
+        try { return obj[propertyName]?.GetValue<string>(); }
+        catch (InvalidOperationException) { return null; }
+    }
+
+    private static bool? TryGetBoolean(JsonObject obj, string propertyName)
+    {
+        try { return obj[propertyName]?.GetValue<bool>(); }
+        catch (InvalidOperationException) { return null; }
     }
 
     private async Task<string?> TryDownloadTextAsync(Uri uri, CancellationToken ct)

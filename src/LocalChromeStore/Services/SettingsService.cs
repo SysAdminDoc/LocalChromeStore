@@ -16,6 +16,8 @@ public sealed class SettingsService
     public string ManifestPath { get; }
     public string LoadSetsPath { get; }
     public string IconCacheDir { get; }
+    public string PolicyPackagesRoot { get; }
+    public string PolicyKeysDir { get; }
 
     /// <summary>
     /// True when the most recently loaded settings file contained a plaintext
@@ -42,6 +44,8 @@ public sealed class SettingsService
         CacheDir = Path.Combine(localAppData, "LocalChromeStore", "cache");
         LogsDir = Path.Combine(localAppData, "LocalChromeStore", "logs");
         IconCacheDir = Path.Combine(CacheDir, "icons");
+        PolicyPackagesRoot = Path.Combine(localAppData, "LocalChromeStore", "policy-packages");
+        PolicyKeysDir = Path.Combine(SettingsDir, "policy-keys");
         ManifestPath = Path.Combine(SettingsDir, "installed.json");
         LoadSetsPath = Path.Combine(SettingsDir, "loadsets.json");
         Directory.CreateDirectory(SettingsDir);
@@ -49,6 +53,8 @@ public sealed class SettingsService
         Directory.CreateDirectory(CacheDir);
         Directory.CreateDirectory(LogsDir);
         Directory.CreateDirectory(IconCacheDir);
+        Directory.CreateDirectory(PolicyPackagesRoot);
+        Directory.CreateDirectory(PolicyKeysDir);
     }
 
     public AppSettings Load()

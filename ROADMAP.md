@@ -59,13 +59,6 @@ Roadmap_Blocked.md.
 
 ### P1
 
-- [ ] P1 - Add guided Enterprise Policy install workflow
-  Why: Policy writer, rollback, enrollment, CRX3, and health-check primitives are present, but users cannot yet apply a selected packaged extension from the main workflow.
-  Evidence: `src/LocalChromeStore/Services/PolicyInstallService.cs`; `src/LocalChromeStore/ViewModels/MainViewModel.cs:937`; Chrome Enterprise `ExtensionInstallForcelist`; Microsoft Edge self-host update docs.
-  Touches: `MainWindow.xaml`, `ViewModels/MainViewModel.cs`, `Services/PolicyInstallService.cs`, `Services/Crx/*`, `Models/*`, `tests/LocalChromeStore.Tests/*`.
-  Acceptance: For an installed extension, the UI can package/sign CRX3, generate or select `update.xml`, show enrollment and HKLM impact, write Chrome/Edge/Brave/Chromium policy with explicit consent/elevation, write Edge `ExtensionSettings.override_update_url` when needed, run health checks, and roll back only the registry policy entries.
-  Complexity: XL
-
 - [ ] P1 - Verify GitHub release assets with API digests
   Why: GitHub release assets expose `digest` values, but LocalChromeStore only verifies sidecar checksum files, leaving many assets unverifiable despite first-party API metadata.
   Evidence: GitHub release-assets REST docs; public v0.3.1 release asset JSON; `src/LocalChromeStore/Services/GitHubService.cs:272`; `src/LocalChromeStore/Services/ExtensionService.cs:27`.

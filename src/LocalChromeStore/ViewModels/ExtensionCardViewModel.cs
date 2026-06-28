@@ -18,6 +18,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     private readonly Action<string> _log;
     private readonly Action _refreshParent;
     private readonly Func<Task>? _afterInstall;
+    private readonly Func<ExtensionCardViewModel, Task>? _applyPolicy;
+    private readonly Func<ExtensionCardViewModel, Task>? _rollbackPolicy;
 
     private bool _busy;
     private string? _busyMessage;
@@ -34,6 +36,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         Action<string> log,
         Action refreshParent,
         Func<Task>? afterInstall,
+        Func<ExtensionCardViewModel, Task>? applyPolicy,
+        Func<ExtensionCardViewModel, Task>? rollbackPolicy,
         Action<ExtensionCardViewModel> hideRepository)
     {
         Info = info;
@@ -43,10 +47,14 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         _log = log;
         _refreshParent = refreshParent;
         _afterInstall = afterInstall;
+        _applyPolicy = applyPolicy;
+        _rollbackPolicy = rollbackPolicy;
         _installed = extensions.Find(info.RepoOwner, info.RepoName);
 
         InstallCommand = new AsyncRelayCommand(InstallAsync, _ => CanInstall);
         UninstallCommand = new RelayCommand(_ => Uninstall(), _ => IsInstalled && !Busy);
+        ApplyPolicyCommand = new AsyncRelayCommand(_ => ApplyPolicyAsync(), _ => CanApplyPolicy);
+        RollbackPolicyCommand = new AsyncRelayCommand(_ => RollbackPolicyAsync(), _ => CanApplyPolicy);
         OpenRepoCommand = new RelayCommand(_ => OpenUrl(Info.RepoUrl));
         OpenInstallDirCommand = new RelayCommand(_ => OpenDir(), _ => CanOpenInstallDir);
         HideRepositoryCommand = new RelayCommand(_ => hideRepository(this), _ => !Busy);
@@ -74,6 +82,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         && Services.VersionCompare.IsNewer(Info.DisplayVersion, _installed!.Version);
     public bool CanInstall => HasAsset && !Busy;
     public bool CanOpenInstallDir => IsInstalled && !Busy;
+    public bool CanApplyPolicy => IsInstalled && !Busy;
+    public InstalledExtension? Installed => _installed;
     public string InstallButtonLabel => IsInstalled
         ? (IsUpdateAvailable ? $"Update to {Info.DisplayVersion}" : "Reinstall")
         : (HasAsset ? "Install" : "Unavailable");
@@ -242,6 +252,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(CanInstall));
                 OnPropertyChanged(nameof(CanOpenInstallDir));
+                OnPropertyChanged(nameof(CanApplyPolicy));
                 CommandManager.InvalidateRequerySuggested();
             }
         }
@@ -255,6 +266,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
 
     public ICommand InstallCommand { get; }
     public ICommand UninstallCommand { get; }
+    public ICommand ApplyPolicyCommand { get; }
+    public ICommand RollbackPolicyCommand { get; }
     public ICommand OpenRepoCommand { get; }
     public ICommand OpenInstallDirCommand { get; }
     public ICommand HideRepositoryCommand { get; }
@@ -345,6 +358,18 @@ public sealed class ExtensionCardViewModel : ViewModelBase
 
         _log($"Update cancelled for {Repo}: permission expansion was not approved.");
         return false;
+    }
+
+    private async Task ApplyPolicyAsync()
+    {
+        if (_applyPolicy is null) return;
+        await _applyPolicy(this);
+    }
+
+    private async Task RollbackPolicyAsync()
+    {
+        if (_rollbackPolicy is null) return;
+        await _rollbackPolicy(this);
     }
 
     private void Uninstall()
@@ -451,6 +476,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasUpdatePermissionExpansion));
         OnPropertyChanged(nameof(HasHighRiskUpdatePermissionExpansion));
         OnPropertyChanged(nameof(CanOpenInstallDir));
+        OnPropertyChanged(nameof(CanApplyPolicy));
+        OnPropertyChanged(nameof(Installed));
         OnPropertyChanged(nameof(InstalledDetail));
         OnPropertyChanged(nameof(Trust));
         OnPropertyChanged(nameof(TrustBadge));
