@@ -11,6 +11,7 @@ public sealed class InstalledExtension
     public bool ChecksumVerified { get; set; }
     public string? ChecksumAlgorithm { get; set; }
     public string? ChecksumValue { get; set; }
+    public string? ChecksumSource { get; set; }
     public string? DisplayName { get; set; }
     public string? RepoUrl { get; set; }
     public int? ManifestVersionNumber { get; set; }

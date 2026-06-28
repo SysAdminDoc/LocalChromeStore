@@ -36,6 +36,7 @@ public sealed class ExtensionService
         // F006 — verify SHA256 against sidecar before extraction. Fail closed on mismatch.
         bool checksumVerified = false;
         string? checksumValue = null;
+        string? checksumSource = null;
         if (!string.IsNullOrEmpty(info.ChecksumUrl))
         {
             log?.Report($"Verifying checksum from {info.ChecksumName ?? "sidecar"}...");
@@ -57,6 +58,20 @@ public sealed class ExtensionService
             log?.Report($"Checksum OK (SHA256 {actual[..12]}…).");
             checksumVerified = true;
             checksumValue = actual;
+            checksumSource = "sidecar";
+        }
+        else if (TryParseSha256Digest(info.AssetDigest, out var apiDigest))
+        {
+            log?.Report("Verifying checksum from GitHub release asset digest...");
+            var actual = Convert.ToHexStringLower(SHA256.HashData(data));
+            if (!string.Equals(actual, apiDigest, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Refusing to install: GitHub API digest mismatch.\nExpected: {apiDigest}\nActual:   {actual}");
+            }
+            log?.Report($"Checksum OK (GitHub API SHA256 {actual[..12]}…).");
+            checksumVerified = true;
+            checksumValue = actual;
+            checksumSource = "api-digest";
         }
 
         var version = info.DisplayVersion.Replace('/', '_').Replace('\\', '_');
@@ -106,6 +121,7 @@ public sealed class ExtensionService
             ChecksumVerified = checksumVerified,
             ChecksumAlgorithm = checksumVerified ? "SHA256" : null,
             ChecksumValue = checksumValue,
+            ChecksumSource = checksumSource,
             DisplayName = info.DisplayName,
             RepoUrl = info.RepoUrl,
             ManifestVersionNumber = info.ManifestVersionNumber,
@@ -120,6 +136,24 @@ public sealed class ExtensionService
         PruneOldVersions(info.RepoOwner, info.RepoName, version, log);
         log?.Report($"Installed {info.DisplayName} v{info.DisplayVersion}");
         return entry;
+    }
+
+    public static bool TryParseSha256Digest(string? digest, out string sha256)
+    {
+        sha256 = string.Empty;
+        if (string.IsNullOrWhiteSpace(digest)) return false;
+        var trimmed = digest.Trim();
+        const string Prefix = "sha256:";
+        if (!trimmed.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase)) return false;
+        var value = trimmed[Prefix.Length..].Trim();
+        if (value.Length != 64) return false;
+        foreach (var c in value)
+        {
+            var isHex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+            if (!isHex) return false;
+        }
+        sha256 = value.ToLowerInvariant();
+        return true;
     }
 
     public void Uninstall(string repoOwner, string repoName, IProgress<string>? log = null)

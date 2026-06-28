@@ -64,6 +64,7 @@ publish-*/
 LocalChromeStore-*/
 LocalChromeStore-v*.zip
 LocalChromeStore-v*.zip.sha256.txt
+assets/screenshots/
 
 # Markdown files local-only (except README)
 *.md

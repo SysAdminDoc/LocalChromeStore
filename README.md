@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.3-cba6f7?style=for-the-badge" alt="Version" /></a>
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.4-cba6f7?style=for-the-badge" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
@@ -38,6 +38,7 @@ LocalChromeStore wraps path 2 with a real store UI today. It also wires path 3 f
 - **GitHub-sourced discovery** — lists every repo with a `manifest.json` or a release ZIP / CRX asset for any user or org
 - **Store-style cards** — extension logo, name, version, description, install / uninstall buttons, link to repo
 - **One-click install** — downloads the latest release ZIP, extracts to a managed folder, tracks it
+- **Integrity verification** — fails closed on SHA-256 sidecars, and falls back to GitHub release asset `sha256:` API digests when no sidecar exists
 - **One-click uninstall** — wipes the local copy and removes it from the load list
 - **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with every installed extension, version-gating the load strategy (plain `--load-extension`, the Chromium 137+ `--disable-features` override, or CDP `Extensions.loadUnpacked` over `--remote-debugging-pipe` for branded Chrome 142+, which removed command-line extension loading)
 - **Guided Enterprise Policy workflow** — per-card **Policy** / **Rollback** actions package CRX3 with RSA-2048, generate or copy self-hosted `update.xml`, map Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, write Edge `ExtensionSettings.override_update_url`, check policy/update/CRX health, and roll back registry entries without deleting packaged artifacts
@@ -133,7 +134,9 @@ Repos with no manifest and no release ZIP/CRX are skipped — they won't clutter
 | --- | --- |
 | `%APPDATA%\LocalChromeStore\settings.json` | User settings (GitHub user, DPAPI-protected token, preferred browser, launch/update options) |
 | `%APPDATA%\LocalChromeStore\installed.json` | Installed-extension manifest |
+| `%APPDATA%\LocalChromeStore\policy-keys\` | Persistent CRX3 signing keys for policy packages |
 | `%LOCALAPPDATA%\LocalChromeStore\extensions\<owner>\<repo>\<version>\` | Extracted extension files |
+| `%LOCALAPPDATA%\LocalChromeStore\policy-packages\<owner>\<repo>\<version>\` | Generated CRX/update.xml policy artifacts |
 | `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\` | Clean temporary Chromium profiles created for launch sessions |
 | `%LOCALAPPDATA%\LocalChromeStore\cache\icons\` | Cached extension icons |
 | `%LOCALAPPDATA%\LocalChromeStore\logs\` | Crash logs |
@@ -167,6 +170,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history.
 - **v0.3.1** — CRX3 RSA signing primitives, deterministic extension ID derivation, self-hosted `update.xml` generation, Enterprise Policy registry writer/rollback, policy health checks, version-gated launch strategy, CDP loader groundwork, self-update checks, and hardened local state persistence
 - **v0.3.2** — Branded-Chrome launch now wires the CDP `Extensions.loadUnpacked` path, logs returned extension IDs or exact CDP errors, and shows the actual pipe/debug launch command
 - **v0.3.3** — Guided Enterprise Policy workflow: per-card package/apply/rollback, generated or selected `update.xml`, Edge `override_update_url`, and post-write health checks
+- **v0.3.4** — GitHub release asset API `sha256:` digest verification, with sidecar/API/unverified trust details in risk review, diagnostics, and catalog export
 
 **Planned**
 

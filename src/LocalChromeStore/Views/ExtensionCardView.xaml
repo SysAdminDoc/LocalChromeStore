@@ -165,7 +165,7 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </Border>
-                <Border ToolTip="Source trust tier — based on configured owner, release asset shape, and SHA256 sidecar verification.">
+                <Border ToolTip="Source trust tier — based on configured owner, release asset shape, SHA256 sidecar verification, or GitHub API asset digest verification.">
                     <Border.Style>
                         <Style TargetType="Border" BasedOn="{StaticResource MetaBadge}">
                             <Style.Triggers>

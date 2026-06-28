@@ -19,4 +19,6 @@ public sealed class LoadSet
     public List<string>? ExtensionKeys { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+
+    public override string ToString() => Name;
 }

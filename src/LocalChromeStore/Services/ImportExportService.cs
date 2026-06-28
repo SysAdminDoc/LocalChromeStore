@@ -47,8 +47,10 @@ public sealed class ImportExportService
                 HasAsset: !string.IsNullOrEmpty(info.AssetUrl),
                 AssetName: info.AssetName,
                 AssetUrl: info.AssetUrl,
+                AssetDigest: info.AssetDigest,
                 AssetSizeBytes: info.AssetSizeBytes > 0 ? info.AssetSizeBytes : null,
                 ChecksumUrl: info.ChecksumUrl,
+                ChecksumName: info.ChecksumName,
                 DiscoverySource: info.DiscoverySource.ToString(),
                 HasRepoManifest: info.HasRepoManifest,
                 HomepageUrl: info.HomepageUrl,
@@ -58,7 +60,8 @@ public sealed class ImportExportService
                 Warnings: info.Warnings.Count > 0 ? info.Warnings : null,
                 InstalledVersion: inst?.Version,
                 InstalledAt: inst?.InstalledAt,
-                ChecksumVerified: inst?.ChecksumVerified);
+                ChecksumVerified: inst?.ChecksumVerified,
+                ChecksumSource: inst?.ChecksumSource);
         }).ToList();
 
         return new CatalogExport(JsonSerializer.Serialize(entries, IndentedJson), entries.Count);
@@ -92,8 +95,10 @@ public sealed record CatalogExportEntry(
     bool HasAsset,
     string? AssetName,
     string? AssetUrl,
+    string? AssetDigest,
     long? AssetSizeBytes,
     string? ChecksumUrl,
+    string? ChecksumName,
     string DiscoverySource,
     bool HasRepoManifest,
     string? HomepageUrl,
@@ -103,4 +108,5 @@ public sealed record CatalogExportEntry(
     List<string>? Warnings,
     string? InstalledVersion,
     DateTimeOffset? InstalledAt,
-    bool? ChecksumVerified);
+    bool? ChecksumVerified,
+    string? ChecksumSource);

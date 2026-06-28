@@ -1,6 +1,7 @@
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using LocalChromeStore.Models;
 using Octokit;
@@ -32,7 +33,7 @@ public sealed class GitHubService
     private GitHubClient GetClient(AppSettings cfg)
     {
         if (_client != null && _activeToken == cfg.GitHubToken) return _client;
-        var product = new ProductHeaderValue("LocalChromeStore", AppVersion);
+        var product = new Octokit.ProductHeaderValue("LocalChromeStore", AppVersion);
         var c = new GitHubClient(product);
         if (!string.IsNullOrWhiteSpace(cfg.GitHubToken))
             c.Credentials = new Credentials(cfg.GitHubToken);
@@ -254,6 +255,45 @@ public sealed class GitHubService
             a.Name.EndsWith(".sha256sum", StringComparison.OrdinalIgnoreCase));
     }
 
+    private async Task<string?> TryGetReleaseAssetDigestAsync(string owner, string repoName, long releaseId, string assetName, CancellationToken ct)
+    {
+        try
+        {
+            var url = $"https://api.github.com/repos/{Uri.EscapeDataString(owner)}/{Uri.EscapeDataString(repoName)}/releases/{releaseId}/assets?per_page=100";
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+            request.Headers.TryAddWithoutValidation("X-GitHub-Api-Version", "2022-11-28");
+            if (!string.IsNullOrWhiteSpace(_activeToken))
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _activeToken);
+
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!response.IsSuccessStatusCode) return null;
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            return TryFindReleaseAssetDigest(doc.RootElement, assetName);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    internal static string? TryFindReleaseAssetDigest(JsonElement assets, string assetName)
+    {
+        if (assets.ValueKind != JsonValueKind.Array || string.IsNullOrWhiteSpace(assetName)) return null;
+        foreach (var asset in assets.EnumerateArray())
+        {
+            if (!asset.TryGetProperty("name", out var name)
+                || !string.Equals(name.GetString(), assetName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            return asset.TryGetProperty("digest", out var digest) && digest.ValueKind == JsonValueKind.String
+                ? digest.GetString()
+                : null;
+        }
+        return null;
+    }
+
     private static async Task<List<string>?> SafeGetTopics(GitHubClient client, Repository repo)
     {
         try
@@ -274,6 +314,7 @@ public sealed class GitHubService
         ReleaseAsset? asset = null;
         AssetKind assetKind = AssetKind.None;
         ReleaseAsset? checksum = null;
+        string? assetDigest = null;
         if (release != null)
         {
             asset = release.Assets
@@ -286,6 +327,7 @@ public sealed class GitHubService
             {
                 assetKind = asset.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ? AssetKind.Zip : AssetKind.Crx;
                 checksum = FindChecksumSidecar(release.Assets, asset.Name);
+                assetDigest = await TryGetReleaseAssetDigestAsync(repo.Owner.Login, repo.Name, release.Id, asset.Name, ct);
             }
         }
 
@@ -305,6 +347,7 @@ public sealed class GitHubService
             LatestVersion = release?.TagName,
             AssetUrl = asset?.BrowserDownloadUrl,
             AssetName = asset?.Name,
+            AssetDigest = assetDigest,
             AssetSizeBytes = asset?.Size ?? 0,
             PublishedAt = release?.PublishedAt,
             AssetKind = assetKind,

@@ -9,6 +9,7 @@ public sealed class ExtensionInfo
     public string? LatestVersion { get; set; }
     public string? AssetUrl { get; set; }
     public string? AssetName { get; set; }
+    public string? AssetDigest { get; set; }
     public long AssetSizeBytes { get; set; }
     public DateTimeOffset? PublishedAt { get; set; }
     public string? IconUrl { get; set; }

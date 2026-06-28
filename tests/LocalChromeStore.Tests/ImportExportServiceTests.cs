@@ -16,7 +16,8 @@ public sealed class ImportExportServiceTests
             {
                 RepoOwner = "o", RepoName = "a", RepoUrl = "https://github.com/o/a",
                 ManifestName = "Alpha", ManifestVersion = "2.0",
-                AssetUrl = "https://x/a.zip", AssetName = "a.zip", AssetSizeBytes = 10
+                AssetUrl = "https://x/a.zip", AssetName = "a.zip", AssetDigest = "sha256:" + new string('a', 64),
+                AssetSizeBytes = 10, ChecksumName = "a.zip.sha256.txt"
             },
             new ExtensionInfo
             {
@@ -29,7 +30,7 @@ public sealed class ImportExportServiceTests
             {
                 RepoOwner = "o", RepoName = "a", Version = "1.5",
                 InstallPath = @"C:\ext\o\a", ManifestPath = @"C:\ext\o\a\manifest.json",
-                ChecksumVerified = true, InstalledAt = DateTimeOffset.UnixEpoch
+                ChecksumVerified = true, ChecksumSource = "api-digest", InstalledAt = DateTimeOffset.UnixEpoch
             }
         };
 
@@ -45,8 +46,11 @@ public sealed class ImportExportServiceTests
         Assert.Equal("Alpha", a.GetProperty("DisplayName").GetString());
         Assert.Equal("2.0", a.GetProperty("DisplayVersion").GetString());
         Assert.True(a.GetProperty("HasAsset").GetBoolean());
+        Assert.Equal("sha256:" + new string('a', 64), a.GetProperty("AssetDigest").GetString());
+        Assert.Equal("a.zip.sha256.txt", a.GetProperty("ChecksumName").GetString());
         Assert.Equal("1.5", a.GetProperty("InstalledVersion").GetString());
         Assert.True(a.GetProperty("ChecksumVerified").GetBoolean());
+        Assert.Equal("api-digest", a.GetProperty("ChecksumSource").GetString());
 
         var b = arr[1];
         Assert.Equal("b", b.GetProperty("RepoName").GetString());

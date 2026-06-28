@@ -59,13 +59,6 @@ Roadmap_Blocked.md.
 
 ### P1
 
-- [ ] P1 - Verify GitHub release assets with API digests
-  Why: GitHub release assets expose `digest` values, but LocalChromeStore only verifies sidecar checksum files, leaving many assets unverifiable despite first-party API metadata.
-  Evidence: GitHub release-assets REST docs; public v0.3.1 release asset JSON; `src/LocalChromeStore/Services/GitHubService.cs:272`; `src/LocalChromeStore/Services/ExtensionService.cs:27`.
-  Touches: `Models/ExtensionInfo.cs`, `Services/GitHubService.cs`, `Services/ExtensionService.cs`, `Views/ManifestRiskWindow.xaml`, `tests/LocalChromeStore.Tests/*`.
-  Acceptance: Discovery records release asset `digest` when available; install verifies `sha256:` digests when no sidecar is present; the risk window and diagnostics distinguish sidecar-verified, API-digest-verified, and unverified assets.
-  Complexity: M
-
 - [ ] P1 - Add browser loading conformance harness
   Why: Chromium extension-loading behavior is changing faster than static unit tests can prove; CDP, command-line, and override strategies need live opt-in validation across installed browsers.
   Evidence: `BrowserLauncher.ResolveStrategy`; `CdpExtensionLoader` live-validation note; Cypress issue 31690; WebdriverIO issue 14505; Chrome for Testing JSON endpoints.

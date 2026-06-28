@@ -114,7 +114,7 @@ public static class FrameworkLabels
     {
         TrustTier.SourceOnly => "Source only",
         TrustTier.ConfiguredRelease => "Configured release",
-        TrustTier.ChecksumVerifiable => "Checksum available",
+        TrustTier.ChecksumVerifiable => "Integrity check available",
         TrustTier.ChecksumVerified => "Checksum verified",
         _ => "Unknown source"
     };

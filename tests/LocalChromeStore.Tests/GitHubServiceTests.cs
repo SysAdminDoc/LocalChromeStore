@@ -1,3 +1,4 @@
+using System.Text.Json;
 using LocalChromeStore.Models;
 using LocalChromeStore.Services;
 using Octokit;
@@ -46,5 +47,30 @@ public sealed class GitHubServiceTests
     public void EvaluateSelfUpdate_MissingTag_IsNone(string? tag)
     {
         Assert.Same(SelfUpdateInfo.None, GitHubService.EvaluateSelfUpdate("0.3.0", tag, "url"));
+    }
+
+    [Fact]
+    public void TryFindReleaseAssetDigest_ReadsMatchingAssetDigest()
+    {
+        using var doc = JsonDocument.Parse(
+            """
+            [
+              { "name": "other.zip", "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+              { "name": "LocalChromeStore.zip", "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+            ]
+            """);
+
+        var digest = GitHubService.TryFindReleaseAssetDigest(doc.RootElement, "localchromestore.zip");
+
+        Assert.Equal("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", digest);
+    }
+
+    [Fact]
+    public void TryFindReleaseAssetDigest_MissingOrDigestlessAsset_ReturnsNull()
+    {
+        using var doc = JsonDocument.Parse("""[{ "name": "LocalChromeStore.zip" }]""");
+
+        Assert.Null(GitHubService.TryFindReleaseAssetDigest(doc.RootElement, "LocalChromeStore.zip"));
+        Assert.Null(GitHubService.TryFindReleaseAssetDigest(doc.RootElement, "missing.zip"));
     }
 }

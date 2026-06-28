@@ -444,12 +444,8 @@ public sealed class MainViewModel : ViewModelBase
         get => _isDegraded;
         private set => SetField(ref _isDegraded, value);
     }
-    public string ExtensionsPageLabel => SelectedBrowser is null
-        ? "Open browser extensions"
-        : $"Open {BrowserLauncher.ExtensionsPageUrl(SelectedBrowser.Kind)}";
-    public string PolicyPageLabel => SelectedBrowser is null
-        ? "Open policy page"
-        : $"Open {BrowserLauncher.PolicyPageUrl(SelectedBrowser.Kind)}";
+    public string ExtensionsPageLabel => "Extensions";
+    public string PolicyPageLabel => "Policy";
     public string LaunchProfileSummary
     {
         get
@@ -1502,7 +1498,7 @@ public sealed class MainViewModel : ViewModelBase
             sb.AppendLine($"  {inst.RepoOwner}/{inst.RepoName}@{inst.Version}");
             sb.AppendLine($"    InstalledAt:      {inst.InstalledAt:yyyy-MM-dd HH:mm:ss zzz}");
             sb.AppendLine($"    InstallPath:      {inst.InstallPath}");
-            sb.AppendLine($"    ChecksumVerified: {inst.ChecksumVerified}{(inst.ChecksumVerified ? $" ({inst.ChecksumAlgorithm})" : "")}");
+            sb.AppendLine($"    ChecksumVerified: {inst.ChecksumVerified}{(inst.ChecksumVerified ? $" ({inst.ChecksumAlgorithm}, {inst.ChecksumSource ?? "unknown source"})" : "")}");
             sb.AppendLine($"    ManifestVersion:  {(inst.ManifestVersionNumber.HasValue ? "MV" + inst.ManifestVersionNumber : "unknown")}");
             sb.AppendLine($"    Permissions:      {inst.Permissions.Count + inst.OptionalPermissions.Count} ({inst.HostPermissions.Count + inst.OptionalHostPermissions.Count} host)");
         }
@@ -1522,7 +1518,7 @@ public sealed class MainViewModel : ViewModelBase
             sb.AppendLine($"    Permissions:  {info.Permissions.Count + info.OptionalPermissions.Count} ({info.HostPermissions.Count + info.OptionalHostPermissions.Count} host)");
             if (ext.IsUpdateAvailable && ext.UpdatePermissionDiff.HasAdditions)
                 sb.AppendLine($"    Update adds:  {ext.UpdatePermissionDiff.AddedSummary}");
-            sb.AppendLine($"    Checksum:     {(string.IsNullOrEmpty(info.ChecksumUrl) ? "no sidecar" : info.ChecksumName)}");
+            sb.AppendLine($"    Checksum:     {DescribeCatalogChecksum(info)}");
             if (info.Warnings.Count > 0)
                 sb.AppendLine($"    Warnings:     {string.Join(" | ", info.Warnings)}");
         }
@@ -1715,6 +1711,15 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(LaunchPreview));
         OnPropertyChanged(nameof(LaunchProfileSummary));
         OnPropertyChanged(nameof(ActiveLoadSetLabel));
+    }
+
+    private static string DescribeCatalogChecksum(ExtensionInfo info)
+    {
+        if (!string.IsNullOrEmpty(info.ChecksumUrl))
+            return $"sidecar ({info.ChecksumName ?? "checksum asset"})";
+        return ExtensionService.TryParseSha256Digest(info.AssetDigest, out _)
+            ? $"GitHub API digest ({info.AssetDigest})"
+            : "unverified";
     }
 
     private static string? NormalizeLaunchUrl(string? value)

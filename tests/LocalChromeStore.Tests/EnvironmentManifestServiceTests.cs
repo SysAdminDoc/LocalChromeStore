@@ -37,7 +37,8 @@ public sealed class EnvironmentManifestServiceTests
                 HostPermissions = ["https://example.test/*"],
                 ChecksumVerified = true,
                 ChecksumAlgorithm = "SHA256",
-                ChecksumValue = new string('a', 64)
+                ChecksumValue = new string('a', 64),
+                ChecksumSource = "api-digest"
             }
         };
 
@@ -50,6 +51,7 @@ public sealed class EnvironmentManifestServiceTests
         Assert.Equal("https://example.test", manifest.Settings.LaunchUrl);
         Assert.Single(manifest.Extensions);
         Assert.Equal(3, manifest.Extensions[0].ManifestVersionNumber);
+        Assert.Equal("api-digest", manifest.Extensions[0].ChecksumSource);
         Assert.Equal(["storage"], manifest.Extensions[0].Permissions);
         Assert.Equal(["https://example.test/*"], manifest.Extensions[0].HostPermissions);
     }

@@ -118,6 +118,7 @@ public static class EnvironmentManifestService
         ChecksumVerified = e.ChecksumVerified,
         ChecksumAlgorithm = e.ChecksumAlgorithm,
         ChecksumValue = e.ChecksumValue,
+        ChecksumSource = e.ChecksumSource,
         Permissions = e.Permissions.ToList(),
         OptionalPermissions = e.OptionalPermissions.ToList(),
         HostPermissions = e.HostPermissions.ToList(),

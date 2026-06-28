@@ -185,11 +185,11 @@ public sealed class ExtensionCardViewModel : ViewModelBase
             sb.AppendLine();
             sb.AppendLine("Release readiness:");
             sb.AppendLine($"  {(HasAsset ? "+" : "-")} Release asset (ZIP or CRX)");
-            sb.AppendLine($"  {(!string.IsNullOrEmpty(Info.ChecksumUrl) ? "+" : "-")} SHA-256 checksum sidecar");
+            sb.AppendLine($"  {(HasIntegrityVerifier ? "+" : "-")} SHA-256 sidecar/API digest");
             sb.AppendLine($"  {(Info.ManifestVersionNumber == 3 ? "+" : "-")} Manifest V3");
             sb.AppendLine($"  {(Info.HasRepoManifest ? "+" : "-")} localchromestore.json catalog manifest");
             sb.AppendLine($"  {(Info.Freshness is RepoFreshness.Fresh or RepoFreshness.Aging && !Info.IsArchived ? "+" : "-")} Repository active within a year");
-            var score = new[] { HasAsset, !string.IsNullOrEmpty(Info.ChecksumUrl), Info.ManifestVersionNumber == 3, Info.HasRepoManifest, Info.Freshness is RepoFreshness.Fresh or RepoFreshness.Aging && !Info.IsArchived }.Count(x => x);
+            var score = new[] { HasAsset, HasIntegrityVerifier, Info.ManifestVersionNumber == 3, Info.HasRepoManifest, Info.Freshness is RepoFreshness.Fresh or RepoFreshness.Aging && !Info.IsArchived }.Count(x => x);
             sb.Append($"  Score: {score}/5");
             return sb.ToString().TrimEnd();
         }
@@ -206,7 +206,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         get
         {
             if (_installed?.ChecksumVerified == true) return TrustTier.ChecksumVerified;
-            if (!string.IsNullOrEmpty(Info.ChecksumUrl)) return TrustTier.ChecksumVerifiable;
+            if (HasIntegrityVerifier) return TrustTier.ChecksumVerifiable;
             if (HasAsset) return TrustTier.ConfiguredRelease;
             return TrustTier.SourceOnly;
         }
@@ -215,6 +215,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public bool IsTrustVerified => Trust == TrustTier.ChecksumVerified;
     public bool IsTrustVerifiable => Trust == TrustTier.ChecksumVerifiable;
     public bool IsTrustSourceOnly => Trust == TrustTier.SourceOnly;
+    public bool HasApiDigest => ExtensionService.TryParseSha256Digest(Info.AssetDigest, out _);
+    public bool HasIntegrityVerifier => !string.IsNullOrEmpty(Info.ChecksumUrl) || HasApiDigest;
 
     public int PermissionCount => Info.Permissions.Count + Info.OptionalPermissions.Count
         + Info.HostPermissions.Count + Info.OptionalHostPermissions.Count;

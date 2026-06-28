@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using LocalChromeStore.Models;
+using LocalChromeStore.Services;
 
 namespace LocalChromeStore.ViewModels;
 
@@ -34,9 +35,17 @@ public sealed class ManifestRiskViewModel : ViewModelBase
     public string AssetLabel => Info.AssetKind == AssetKind.None
         ? "Asset: none — no installable artifact yet."
         : $"Asset: {FrameworkLabels.AssetLabel(Info.AssetKind)} — {Info.AssetName}";
-    public string ChecksumLabel => string.IsNullOrEmpty(Info.ChecksumUrl)
-        ? "Checksum: no SHA256 sidecar in the release. Install proceeds without integrity verification."
-        : $"Checksum: SHA256 sidecar present ({Info.ChecksumName}). Install will fail closed on mismatch.";
+    public string ChecksumLabel
+    {
+        get
+        {
+            if (!string.IsNullOrEmpty(Info.ChecksumUrl))
+                return $"Checksum: SHA256 sidecar present ({Info.ChecksumName}). Install will fail closed on mismatch.";
+            return ExtensionService.TryParseSha256Digest(Info.AssetDigest, out _)
+                ? "Checksum: GitHub API SHA256 digest present. Install will fail closed on mismatch."
+                : "Checksum: no SHA256 sidecar or GitHub API digest in the release. Install proceeds without integrity verification.";
+        }
+    }
 
     public PermissionRisk OverallRisk { get; }
     public string OverallRiskLabel => OverallRisk switch

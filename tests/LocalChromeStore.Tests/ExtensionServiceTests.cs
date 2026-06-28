@@ -21,4 +21,26 @@ public sealed class ExtensionServiceTests
     {
         Assert.Null(ExtensionService.ParseExpectedSha256("not a checksum", "LocalChromeStore.zip"));
     }
+
+    [Theory]
+    [InlineData("sha256:" + Hash)]
+    [InlineData("SHA256:" + Hash)]
+    [InlineData(" sha256:" + Hash + " ")]
+    public void TryParseSha256Digest_AcceptsGitHubApiDigest(string digest)
+    {
+        Assert.True(ExtensionService.TryParseSha256Digest(digest, out var parsed));
+        Assert.Equal(Hash, parsed);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(Hash)]
+    [InlineData("sha512:" + Hash)]
+    [InlineData("sha256:not-hex")]
+    public void TryParseSha256Digest_RejectsUnsupportedOrInvalidDigest(string? digest)
+    {
+        Assert.False(ExtensionService.TryParseSha256Digest(digest, out var parsed));
+        Assert.Equal(string.Empty, parsed);
+    }
 }

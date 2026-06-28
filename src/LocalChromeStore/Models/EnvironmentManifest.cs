@@ -31,6 +31,7 @@ public sealed class EnvironmentExtensionSnapshot
     public bool ChecksumVerified { get; set; }
     public string? ChecksumAlgorithm { get; set; }
     public string? ChecksumValue { get; set; }
+    public string? ChecksumSource { get; set; }
     public List<string> Permissions { get; set; } = new();
     public List<string> OptionalPermissions { get; set; } = new();
     public List<string> HostPermissions { get; set; } = new();

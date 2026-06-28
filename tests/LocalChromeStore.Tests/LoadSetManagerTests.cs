@@ -27,6 +27,12 @@ public sealed class LoadSetManagerTests
     }
 
     [Fact]
+    public void ToString_ReturnsNameForComboBoxSelectionDisplay()
+    {
+        Assert.Equal("Selected Set", new LoadSet { Name = "Selected Set" }.ToString());
+    }
+
+    [Fact]
     public void ResolveActiveExtensions_SentinelOrNullKeys_ReturnsAll()
     {
         var installed = new[] { Ext("o", "a"), Ext("o", "b") };
