@@ -12,6 +12,16 @@ public sealed class InstalledExtension
     public string? ChecksumAlgorithm { get; set; }
     public string? ChecksumValue { get; set; }
     public string? ChecksumSource { get; set; }
+    public string? AssetName { get; set; }
+    public string? AssetDigest { get; set; }
+    public long? AssetSizeBytes { get; set; }
+    public long? AssetId { get; set; }
+    public string? AssetContentType { get; set; }
+    public string? AssetUploader { get; set; }
+    public DateTimeOffset? AssetCreatedAt { get; set; }
+    public DateTimeOffset? AssetUpdatedAt { get; set; }
+    public long? AssetDownloadCount { get; set; }
+    public DateTimeOffset? ReleasePublishedAt { get; set; }
     public string? DisplayName { get; set; }
     public string? RepoUrl { get; set; }
     public int? ManifestVersionNumber { get; set; }

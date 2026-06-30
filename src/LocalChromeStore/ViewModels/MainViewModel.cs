@@ -1581,6 +1581,7 @@ public sealed class MainViewModel : ViewModelBase
             sb.AppendLine($"    InstalledAt:      {inst.InstalledAt:yyyy-MM-dd HH:mm:ss zzz}");
             sb.AppendLine($"    InstallPath:      {inst.InstallPath}");
             sb.AppendLine($"    ChecksumVerified: {inst.ChecksumVerified}{(inst.ChecksumVerified ? $" ({inst.ChecksumAlgorithm}, {inst.ChecksumSource ?? "unknown source"})" : "")}");
+            sb.AppendLine($"    AssetProvenance:  {ReleaseProvenance.InstalledSummary(inst)}");
             sb.AppendLine($"    ManifestVersion:  {(inst.ManifestVersionNumber.HasValue ? "MV" + inst.ManifestVersionNumber : "unknown")}");
             sb.AppendLine($"    Permissions:      {inst.Permissions.Count + inst.OptionalPermissions.Count} ({inst.HostPermissions.Count + inst.OptionalHostPermissions.Count} host)");
             var riskReport = BuildPolicyRiskReportForDiagnostics(inst);
@@ -1604,6 +1605,7 @@ public sealed class MainViewModel : ViewModelBase
             sb.AppendLine($"    Framework:    {FrameworkLabels.Label(info.Framework)}");
             sb.AppendLine($"    Source:       {FrameworkLabels.DiscoveryLabel(info.DiscoverySource)}{(info.ManifestSourcePath is null ? "" : $" ({info.ManifestSourcePath})")}");
             sb.AppendLine($"    Asset:        {FrameworkLabels.AssetLabel(info.AssetKind)}{(info.AssetName is null ? "" : $" — {info.AssetName}")}");
+            sb.AppendLine($"    Provenance:   {ReleaseProvenance.DiagnosticsSummary(info, ext.Installed)}");
             sb.AppendLine($"    Manifest ver: {(info.ManifestVersionNumber.HasValue ? "MV" + info.ManifestVersionNumber : "unknown")}");
             sb.AppendLine($"    Freshness:    {FrameworkLabels.FreshnessLabel(info.Freshness)}{(info.IsArchived ? " (archived)" : "")}");
             sb.AppendLine($"    Permissions:  {info.Permissions.Count + info.OptionalPermissions.Count} ({info.HostPermissions.Count + info.OptionalHostPermissions.Count} host)");

@@ -38,7 +38,17 @@ public sealed class EnvironmentManifestServiceTests
                 ChecksumVerified = true,
                 ChecksumAlgorithm = "SHA256",
                 ChecksumValue = new string('a', 64),
-                ChecksumSource = "api-digest"
+                ChecksumSource = "api-digest",
+                AssetName = "Extension.zip",
+                AssetDigest = "sha256:" + new string('a', 64),
+                AssetSizeBytes = 1024,
+                AssetId = 99,
+                AssetContentType = "application/zip",
+                AssetUploader = "extra",
+                AssetCreatedAt = DateTimeOffset.UnixEpoch,
+                AssetUpdatedAt = DateTimeOffset.UnixEpoch.AddMinutes(1),
+                AssetDownloadCount = 3,
+                ReleasePublishedAt = DateTimeOffset.UnixEpoch.AddMinutes(2)
             }
         };
 
@@ -52,6 +62,10 @@ public sealed class EnvironmentManifestServiceTests
         Assert.Single(manifest.Extensions);
         Assert.Equal(3, manifest.Extensions[0].ManifestVersionNumber);
         Assert.Equal("api-digest", manifest.Extensions[0].ChecksumSource);
+        Assert.Equal(99, manifest.Extensions[0].AssetId);
+        Assert.Equal("Extension.zip", manifest.Extensions[0].AssetName);
+        Assert.Equal("application/zip", manifest.Extensions[0].AssetContentType);
+        Assert.Equal(3, manifest.Extensions[0].AssetDownloadCount);
         Assert.Equal(["storage"], manifest.Extensions[0].Permissions);
         Assert.Equal(["https://example.test/*"], manifest.Extensions[0].HostPermissions);
     }

@@ -56,13 +56,32 @@ public sealed class GitHubServiceTests
             """
             [
               { "name": "other.zip", "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-              { "name": "LocalChromeStore.zip", "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }
+              {
+                "id": 12345,
+                "name": "LocalChromeStore.zip",
+                "digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "size": 2048,
+                "content_type": "application/zip",
+                "uploader": { "login": "SysAdminDoc" },
+                "created_at": "2026-06-29T18:00:00Z",
+                "updated_at": "2026-06-29T18:05:00Z",
+                "download_count": 7
+              }
             ]
             """);
 
         var digest = GitHubService.TryFindReleaseAssetDigest(doc.RootElement, "localchromestore.zip");
+        var provenance = GitHubService.TryFindReleaseAssetProvenance(doc.RootElement, "localchromestore.zip");
 
         Assert.Equal("sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", digest);
+        Assert.NotNull(provenance);
+        Assert.Equal(12345, provenance.Id);
+        Assert.Equal(2048, provenance.SizeBytes);
+        Assert.Equal("application/zip", provenance.ContentType);
+        Assert.Equal("SysAdminDoc", provenance.Uploader);
+        Assert.Equal(DateTimeOffset.Parse("2026-06-29T18:00:00Z"), provenance.CreatedAt);
+        Assert.Equal(DateTimeOffset.Parse("2026-06-29T18:05:00Z"), provenance.UpdatedAt);
+        Assert.Equal(7, provenance.DownloadCount);
     }
 
     [Fact]

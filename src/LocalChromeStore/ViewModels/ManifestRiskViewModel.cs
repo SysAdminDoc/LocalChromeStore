@@ -8,6 +8,7 @@ namespace LocalChromeStore.ViewModels;
 public sealed class ManifestRiskViewModel : ViewModelBase
 {
     public ExtensionInfo Info { get; }
+    private readonly InstalledExtension? _installed;
 
     public ObservableCollection<PermissionRow> Permissions { get; } = new();
     public ObservableCollection<PermissionRow> HostPermissions { get; } = new();
@@ -35,6 +36,8 @@ public sealed class ManifestRiskViewModel : ViewModelBase
     public string AssetLabel => Info.AssetKind == AssetKind.None
         ? "Asset: none — no installable artifact yet."
         : $"Asset: {FrameworkLabels.AssetLabel(Info.AssetKind)} — {Info.AssetName}";
+    public string ReleaseProvenanceLabel => $"Provenance: {ReleaseProvenance.CardSummary(Info, _installed)}";
+    public string ReleaseProvenanceTooltip => ReleaseProvenance.Detail(Info, _installed);
     public string ChecksumLabel
     {
         get
@@ -65,9 +68,10 @@ public sealed class ManifestRiskViewModel : ViewModelBase
         set => SetField(ref _confirmed, value);
     }
 
-    public ManifestRiskViewModel(ExtensionInfo info, Action onInstall, Action onClose)
+    public ManifestRiskViewModel(ExtensionInfo info, Action onInstall, Action onClose, InstalledExtension? installed = null)
     {
         Info = info;
+        _installed = installed;
 
         foreach (var p in info.Permissions)
             Permissions.Add(PermissionRow.From(PermissionCatalog.Describe(p)));

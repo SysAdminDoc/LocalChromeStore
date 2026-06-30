@@ -255,7 +255,7 @@ public sealed class GitHubService
             a.Name.EndsWith(".sha256sum", StringComparison.OrdinalIgnoreCase));
     }
 
-    private async Task<string?> TryGetReleaseAssetDigestAsync(string owner, string repoName, long releaseId, string assetName, CancellationToken ct)
+    private async Task<ReleaseAssetProvenance?> TryGetReleaseAssetProvenanceAsync(string owner, string repoName, long releaseId, string assetName, CancellationToken ct)
     {
         try
         {
@@ -270,7 +270,7 @@ public sealed class GitHubService
             if (!response.IsSuccessStatusCode) return null;
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
-            return TryFindReleaseAssetDigest(doc.RootElement, assetName);
+            return TryFindReleaseAssetProvenance(doc.RootElement, assetName);
         }
         catch
         {
@@ -278,7 +278,10 @@ public sealed class GitHubService
         }
     }
 
-    internal static string? TryFindReleaseAssetDigest(JsonElement assets, string assetName)
+    internal static string? TryFindReleaseAssetDigest(JsonElement assets, string assetName) =>
+        TryFindReleaseAssetProvenance(assets, assetName)?.Digest;
+
+    internal static ReleaseAssetProvenance? TryFindReleaseAssetProvenance(JsonElement assets, string assetName)
     {
         if (assets.ValueKind != JsonValueKind.Array || string.IsNullOrWhiteSpace(assetName)) return null;
         foreach (var asset in assets.EnumerateArray())
@@ -287,11 +290,45 @@ public sealed class GitHubService
                 || !string.Equals(name.GetString(), assetName, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            return asset.TryGetProperty("digest", out var digest) && digest.ValueKind == JsonValueKind.String
-                ? digest.GetString()
-                : null;
+            return new ReleaseAssetProvenance(
+                Id: TryGetInt64(asset, "id"),
+                Digest: TryGetString(asset, "digest"),
+                SizeBytes: TryGetInt64(asset, "size"),
+                ContentType: TryGetString(asset, "content_type"),
+                Uploader: TryGetNestedString(asset, "uploader", "login"),
+                CreatedAt: TryGetDateTimeOffset(asset, "created_at"),
+                UpdatedAt: TryGetDateTimeOffset(asset, "updated_at"),
+                DownloadCount: TryGetInt64(asset, "download_count"));
         }
         return null;
+    }
+
+    private static string? TryGetString(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
+            ? value.GetString()
+            : null;
+    }
+
+    private static string? TryGetNestedString(JsonElement element, string parent, string child)
+    {
+        return element.TryGetProperty(parent, out var parentValue) && parentValue.ValueKind == JsonValueKind.Object
+            ? TryGetString(parentValue, child)
+            : null;
+    }
+
+    private static long? TryGetInt64(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out var parsed)
+            ? parsed
+            : null;
+    }
+
+    private static DateTimeOffset? TryGetDateTimeOffset(JsonElement element, string name)
+    {
+        return element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String && value.TryGetDateTimeOffset(out var parsed)
+            ? parsed
+            : null;
     }
 
     private static async Task<List<string>?> SafeGetTopics(GitHubClient client, Repository repo)
@@ -314,7 +351,7 @@ public sealed class GitHubService
         ReleaseAsset? asset = null;
         AssetKind assetKind = AssetKind.None;
         ReleaseAsset? checksum = null;
-        string? assetDigest = null;
+        ReleaseAssetProvenance? assetProvenance = null;
         if (release != null)
         {
             asset = release.Assets
@@ -327,7 +364,7 @@ public sealed class GitHubService
             {
                 assetKind = asset.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) ? AssetKind.Zip : AssetKind.Crx;
                 checksum = FindChecksumSidecar(release.Assets, asset.Name);
-                assetDigest = await TryGetReleaseAssetDigestAsync(repo.Owner.Login, repo.Name, release.Id, asset.Name, ct);
+                assetProvenance = await TryGetReleaseAssetProvenanceAsync(repo.Owner.Login, repo.Name, release.Id, asset.Name, ct);
             }
         }
 
@@ -347,8 +384,14 @@ public sealed class GitHubService
             LatestVersion = release?.TagName,
             AssetUrl = asset?.BrowserDownloadUrl,
             AssetName = asset?.Name,
-            AssetDigest = assetDigest,
-            AssetSizeBytes = asset?.Size ?? 0,
+            AssetDigest = assetProvenance?.Digest,
+            AssetSizeBytes = assetProvenance?.SizeBytes ?? asset?.Size ?? 0,
+            AssetId = assetProvenance?.Id,
+            AssetContentType = assetProvenance?.ContentType,
+            AssetUploader = assetProvenance?.Uploader,
+            AssetCreatedAt = assetProvenance?.CreatedAt,
+            AssetUpdatedAt = assetProvenance?.UpdatedAt,
+            AssetDownloadCount = assetProvenance?.DownloadCount,
             PublishedAt = release?.PublishedAt,
             AssetKind = assetKind,
             DiscoverySource = asset != null
@@ -752,3 +795,13 @@ public sealed class GitHubService
         catch { return null; }
     }
 }
+
+internal sealed record ReleaseAssetProvenance(
+    long? Id,
+    string? Digest,
+    long? SizeBytes,
+    string? ContentType,
+    string? Uploader,
+    DateTimeOffset? CreatedAt,
+    DateTimeOffset? UpdatedAt,
+    long? DownloadCount);

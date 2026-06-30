@@ -63,6 +63,11 @@
             <StackPanel>
                 <TextBlock Text="{Binding SourceLabel}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" />
                 <TextBlock Text="{Binding AssetLabel}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                <TextBlock Text="{Binding ReleaseProvenanceLabel}"
+                           ToolTip="{Binding ReleaseProvenanceTooltip}"
+                           Style="{StaticResource SubtleText}"
+                           TextWrapping="Wrap"
+                           Margin="0,4,0,0" />
                 <TextBlock Text="{Binding ChecksumLabel}" Style="{StaticResource SubtleText}" TextWrapping="Wrap" Margin="0,4,0,0" />
             </StackPanel>
         </Border>

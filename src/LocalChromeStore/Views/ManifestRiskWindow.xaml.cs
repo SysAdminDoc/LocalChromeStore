@@ -13,13 +13,14 @@ public partial class ManifestRiskWindow : Window
         DataContext = vm;
     }
 
-    public static bool? Show(Window owner, Models.ExtensionInfo info, out bool installRequested)
+    public static bool? Show(Window owner, Models.ExtensionInfo info, Models.InstalledExtension? installed, out bool installRequested)
     {
         var requested = false;
         ManifestRiskWindow? wnd = null;
         var vm = new ManifestRiskViewModel(info,
             onInstall: () => { requested = true; wnd?.Close(); },
-            onClose: () => wnd?.Close());
+            onClose: () => wnd?.Close(),
+            installed: installed);
         wnd = new ManifestRiskWindow(vm) { Owner = owner };
         var result = wnd.ShowDialog();
         installRequested = requested;

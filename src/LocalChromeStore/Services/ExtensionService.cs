@@ -122,6 +122,18 @@ public sealed class ExtensionService
             ChecksumAlgorithm = checksumVerified ? "SHA256" : null,
             ChecksumValue = checksumValue,
             ChecksumSource = checksumSource,
+            AssetName = info.AssetName,
+            AssetDigest = !string.IsNullOrWhiteSpace(info.AssetDigest)
+                ? info.AssetDigest
+                : (checksumVerified && checksumValue is not null ? $"sha256:{checksumValue}" : null),
+            AssetSizeBytes = info.AssetSizeBytes > 0 ? info.AssetSizeBytes : null,
+            AssetId = info.AssetId,
+            AssetContentType = info.AssetContentType,
+            AssetUploader = info.AssetUploader,
+            AssetCreatedAt = info.AssetCreatedAt,
+            AssetUpdatedAt = info.AssetUpdatedAt,
+            AssetDownloadCount = info.AssetDownloadCount,
+            ReleasePublishedAt = info.PublishedAt,
             DisplayName = info.DisplayName,
             RepoUrl = info.RepoUrl,
             ManifestVersionNumber = info.ManifestVersionNumber,

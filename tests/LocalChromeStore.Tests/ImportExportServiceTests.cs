@@ -17,7 +17,10 @@ public sealed class ImportExportServiceTests
                 RepoOwner = "o", RepoName = "a", RepoUrl = "https://github.com/o/a",
                 ManifestName = "Alpha", ManifestVersion = "2.0",
                 AssetUrl = "https://x/a.zip", AssetName = "a.zip", AssetDigest = "sha256:" + new string('a', 64),
-                AssetSizeBytes = 10, ChecksumName = "a.zip.sha256.txt"
+                AssetSizeBytes = 10, AssetId = 101, AssetContentType = "application/zip",
+                AssetUploader = "owner", AssetCreatedAt = DateTimeOffset.UnixEpoch,
+                AssetUpdatedAt = DateTimeOffset.UnixEpoch.AddMinutes(1), AssetDownloadCount = 4,
+                PublishedAt = DateTimeOffset.UnixEpoch.AddMinutes(2), ChecksumName = "a.zip.sha256.txt"
             },
             new ExtensionInfo
             {
@@ -30,7 +33,9 @@ public sealed class ImportExportServiceTests
             {
                 RepoOwner = "o", RepoName = "a", Version = "1.5",
                 InstallPath = @"C:\ext\o\a", ManifestPath = @"C:\ext\o\a\manifest.json",
-                ChecksumVerified = true, ChecksumSource = "api-digest", InstalledAt = DateTimeOffset.UnixEpoch
+                ChecksumVerified = true, ChecksumSource = "api-digest", InstalledAt = DateTimeOffset.UnixEpoch,
+                AssetName = "a.zip", AssetDigest = "sha256:" + new string('a', 64),
+                AssetSizeBytes = 10, AssetId = 101, AssetUpdatedAt = DateTimeOffset.UnixEpoch.AddMinutes(1)
             }
         };
 
@@ -47,6 +52,12 @@ public sealed class ImportExportServiceTests
         Assert.Equal("2.0", a.GetProperty("DisplayVersion").GetString());
         Assert.True(a.GetProperty("HasAsset").GetBoolean());
         Assert.Equal("sha256:" + new string('a', 64), a.GetProperty("AssetDigest").GetString());
+        Assert.Equal(101, a.GetProperty("AssetId").GetInt64());
+        Assert.Equal("application/zip", a.GetProperty("AssetContentType").GetString());
+        Assert.Equal("owner", a.GetProperty("AssetUploader").GetString());
+        Assert.Equal(4, a.GetProperty("AssetDownloadCount").GetInt64());
+        Assert.False(a.GetProperty("AssetChangedSinceInstall").GetBoolean());
+        Assert.Equal("unchanged since install", a.GetProperty("AssetChangeDetail").GetString());
         Assert.Equal("a.zip.sha256.txt", a.GetProperty("ChecksumName").GetString());
         Assert.Equal("1.5", a.GetProperty("InstalledVersion").GetString());
         Assert.True(a.GetProperty("ChecksumVerified").GetBoolean());

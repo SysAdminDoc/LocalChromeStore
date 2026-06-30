@@ -36,6 +36,7 @@ public sealed class ImportExportService
         var entries = catalog.Select(info =>
         {
             installedByKey.TryGetValue($"{info.RepoOwner}/{info.RepoName}", out var inst);
+            var assetChange = ReleaseProvenance.CompareAssetSnapshot(info, inst);
             return new CatalogExportEntry(
                 RepoOwner: info.RepoOwner,
                 RepoName: info.RepoName,
@@ -49,6 +50,15 @@ public sealed class ImportExportService
                 AssetUrl: info.AssetUrl,
                 AssetDigest: info.AssetDigest,
                 AssetSizeBytes: info.AssetSizeBytes > 0 ? info.AssetSizeBytes : null,
+                AssetId: info.AssetId,
+                AssetContentType: info.AssetContentType,
+                AssetUploader: info.AssetUploader,
+                AssetCreatedAt: info.AssetCreatedAt,
+                AssetUpdatedAt: info.AssetUpdatedAt,
+                AssetDownloadCount: info.AssetDownloadCount,
+                ReleasePublishedAt: info.PublishedAt,
+                AssetChangedSinceInstall: assetChange.CanCompare ? assetChange.Changed : null,
+                AssetChangeDetail: inst is null ? null : ReleaseProvenance.ChangeStatusLabel(assetChange),
                 ChecksumUrl: info.ChecksumUrl,
                 ChecksumName: info.ChecksumName,
                 DiscoverySource: info.DiscoverySource.ToString(),
@@ -97,6 +107,15 @@ public sealed record CatalogExportEntry(
     string? AssetUrl,
     string? AssetDigest,
     long? AssetSizeBytes,
+    long? AssetId,
+    string? AssetContentType,
+    string? AssetUploader,
+    DateTimeOffset? AssetCreatedAt,
+    DateTimeOffset? AssetUpdatedAt,
+    long? AssetDownloadCount,
+    DateTimeOffset? ReleasePublishedAt,
+    bool? AssetChangedSinceInstall,
+    string? AssetChangeDetail,
     string? ChecksumUrl,
     string? ChecksumName,
     string DiscoverySource,

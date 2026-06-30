@@ -11,6 +11,12 @@ public sealed class ExtensionInfo
     public string? AssetName { get; set; }
     public string? AssetDigest { get; set; }
     public long AssetSizeBytes { get; set; }
+    public long? AssetId { get; set; }
+    public string? AssetContentType { get; set; }
+    public string? AssetUploader { get; set; }
+    public DateTimeOffset? AssetCreatedAt { get; set; }
+    public DateTimeOffset? AssetUpdatedAt { get; set; }
+    public long? AssetDownloadCount { get; set; }
     public DateTimeOffset? PublishedAt { get; set; }
     public string? IconUrl { get; set; }
     public string? ManifestName { get; set; }

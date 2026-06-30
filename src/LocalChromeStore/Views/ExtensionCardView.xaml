@@ -203,6 +203,18 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </Border>
+                <Border Visibility="{Binding AssetChangedSinceInstall, Converter={StaticResource BoolToVis}}"
+                        ToolTip="{Binding ReleaseProvenanceTooltip}">
+                    <Border.Style>
+                        <Style TargetType="Border" BasedOn="{StaticResource MetaBadge}">
+                            <Setter Property="Background" Value="{StaticResource YellowSoftBrush}" />
+                            <Setter Property="BorderBrush" Value="{StaticResource YellowBrush}" />
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="Asset changed"
+                               Style="{StaticResource MetaBadgeText}"
+                               Foreground="{StaticResource YellowBrush}" />
+                </Border>
                 <Border Visibility="{Binding HasFreshnessBadge, Converter={StaticResource BoolToVis}}"
                         ToolTip="Repository freshness from GitHub push activity">
                     <Border.Style>
@@ -289,6 +301,7 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -308,11 +321,20 @@
                            Grid.Column="0"
                            Grid.ColumnSpan="2"
                            Margin="0,3,0,0"
-                           Text="{Binding SourceSummary}"
+                           Text="{Binding ReleaseProvenanceSummary}"
+                           ToolTip="{Binding ReleaseProvenanceTooltip}"
                            Style="{StaticResource MuteText}"
                            Foreground="{StaticResource OverlayBrush}"
                            TextTrimming="CharacterEllipsis" />
                 <TextBlock Grid.Row="2"
+                           Grid.Column="0"
+                           Grid.ColumnSpan="2"
+                           Margin="0,2,0,0"
+                           Text="{Binding SourceSummary}"
+                           Style="{StaticResource MuteText}"
+                           Foreground="{StaticResource OverlayBrush}"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Row="3"
                            Grid.Column="0"
                            Grid.ColumnSpan="2"
                            Margin="0,2,0,0"
@@ -330,7 +352,7 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-                <ProgressBar Grid.Row="3"
+                <ProgressBar Grid.Row="4"
                              Grid.Column="0"
                              Grid.ColumnSpan="2"
                              IsIndeterminate="True"

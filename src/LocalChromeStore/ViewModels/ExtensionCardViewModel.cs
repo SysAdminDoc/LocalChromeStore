@@ -75,6 +75,9 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public string ReleaseSummary => Info.PublishedAt.HasValue
         ? $"Released {Info.PublishedAt.Value.LocalDateTime:MMM d, yyyy}"
         : "Release date unavailable";
+    public string ReleaseProvenanceSummary => ReleaseProvenance.CardSummary(Info, _installed);
+    public string ReleaseProvenanceTooltip => ReleaseProvenance.Detail(Info, _installed);
+    public bool AssetChangedSinceInstall => ReleaseProvenance.CompareAssetSnapshot(Info, _installed).Changed;
     public string Stars => Info.Stars > 0 ? $"★ {Info.Stars}" : string.Empty;
     public bool HasAsset => !string.IsNullOrEmpty(Info.AssetUrl);
     public bool IsInstalled => _installed != null;
@@ -291,7 +294,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     {
         var owner = Application.Current?.MainWindow;
         if (owner is null) return;
-        ManifestRiskWindow.Show(owner, Info, out var requested);
+        ManifestRiskWindow.Show(owner, Info, _installed, out var requested);
         if (requested && CanInstall)
             _ = InstallAsync(null);
     }
@@ -486,6 +489,9 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsTrustVerified));
         OnPropertyChanged(nameof(IsTrustVerifiable));
         OnPropertyChanged(nameof(IsTrustSourceOnly));
+        OnPropertyChanged(nameof(ReleaseProvenanceSummary));
+        OnPropertyChanged(nameof(ReleaseProvenanceTooltip));
+        OnPropertyChanged(nameof(AssetChangedSinceInstall));
     }
 
     private static string FormatSize(long bytes)

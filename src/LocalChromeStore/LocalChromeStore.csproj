@@ -9,9 +9,9 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>LocalChromeStore</AssemblyName>
     <RootNamespace>LocalChromeStore</RootNamespace>
-    <Version>0.3.6</Version>
-    <FileVersion>0.3.6.0</FileVersion>
-    <AssemblyVersion>0.3.6.0</AssemblyVersion>
+    <Version>0.3.7</Version>
+    <FileVersion>0.3.7.0</FileVersion>
+    <AssemblyVersion>0.3.7.0</AssemblyVersion>
     <Product>LocalChromeStore</Product>
     <Company>SysAdminDoc</Company>
     <Copyright>Copyright (c) 2026 SysAdminDoc. MIT License.</Copyright>
