@@ -175,7 +175,6 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history.
 - **v0.3.4** — GitHub release asset API `sha256:` digest verification, with sidecar/API/unverified trust details in risk review, diagnostics, and catalog export
 - **v0.3.5** — Browser loading conformance harness with MV3 fixture generation, Chrome for Testing detection, isolated profile probes, CDP result capture, and JSON/text reports linked from diagnostics
 - **v0.3.6** — Policy package-risk preflight blocks MV2, remote executable code, dynamic eval/CSP hazards, and known malicious extension IDs before HKLM policy writes
-
 - **v0.3.7** — Release asset provenance on cards, inspect review, catalog/environment exports, and diagnostics, including GitHub asset IDs, upload/update timestamps, uploader/content type/downloads, checksum source, and changed-since-install status
 
 **Planned**
