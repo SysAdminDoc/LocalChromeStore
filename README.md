@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.5-cba6f7?style=for-the-badge" alt="Version" /></a>
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.6-cba6f7?style=for-the-badge" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
@@ -42,7 +42,7 @@ LocalChromeStore wraps path 2 with a real store UI today. It also wires path 3 f
 - **One-click uninstall** — wipes the local copy and removes it from the load list
 - **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with every installed extension, version-gating the load strategy (plain `--load-extension`, the Chromium 137+ `--disable-features` override, or CDP `Extensions.loadUnpacked` over `--remote-debugging-pipe` for branded Chrome 142+, which removed command-line extension loading)
 - **Browser loading conformance** — opt-in **Conformance** action creates a tiny MV3 fixture extension, launches every detected browser/Chrome for Testing build in an isolated profile, records strategy/arguments/CDP IDs or errors, and writes JSON/text reports into diagnostics logs
-- **Guided Enterprise Policy workflow** — per-card **Policy** / **Rollback** actions package CRX3 with RSA-2048, generate or copy self-hosted `update.xml`, map Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, write Edge `ExtensionSettings.override_update_url`, check policy/update/CRX health, and roll back registry entries without deleting packaged artifacts
+- **Guided Enterprise Policy workflow** — per-card **Policy** / **Rollback** actions package CRX3 with RSA-2048, run local package-risk preflight checks, generate or copy self-hosted `update.xml`, map Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, write Edge `ExtensionSettings.override_update_url`, check policy/update/CRX health, and roll back registry entries without deleting packaged artifacts
 - **Auditable launch sessions** — optional startup URL, clean temporary profile mode, and a copyable launch command preview
 - **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
 - **Update workflow** — update-available badges, permission-change review, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
@@ -140,7 +140,8 @@ Repos with no manifest and no release ZIP/CRX are skipped — they won't clutter
 | `%LOCALAPPDATA%\LocalChromeStore\policy-packages\<owner>\<repo>\<version>\` | Generated CRX/update.xml policy artifacts |
 | `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\` | Clean temporary Chromium profiles created for launch sessions |
 | `%LOCALAPPDATA%\LocalChromeStore\cache\icons\` | Cached extension icons |
-| `%LOCALAPPDATA%\LocalChromeStore\logs\` | Crash logs |
+| `%LOCALAPPDATA%\LocalChromeStore\cache\policy-risk\malicious-extension-ids.txt` | Optional local malicious-extension ID feed for policy preflight |
+| `%LOCALAPPDATA%\LocalChromeStore\logs\` | Crash logs, diagnostics exports, and browser conformance reports |
 
 To start fresh, just delete the two folders.
 
@@ -173,6 +174,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history.
 - **v0.3.3** — Guided Enterprise Policy workflow: per-card package/apply/rollback, generated or selected `update.xml`, Edge `override_update_url`, and post-write health checks
 - **v0.3.4** — GitHub release asset API `sha256:` digest verification, with sidecar/API/unverified trust details in risk review, diagnostics, and catalog export
 - **v0.3.5** — Browser loading conformance harness with MV3 fixture generation, Chrome for Testing detection, isolated profile probes, CDP result capture, and JSON/text reports linked from diagnostics
+- **v0.3.6** — Policy package-risk preflight blocks MV2, remote executable code, dynamic eval/CSP hazards, and known malicious extension IDs before HKLM policy writes
 
 **Planned**
 

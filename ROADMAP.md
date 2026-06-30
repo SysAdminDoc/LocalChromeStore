@@ -59,13 +59,6 @@ Roadmap_Blocked.md.
 
 ### P2
 
-- [ ] P2 - Gate policy installs on local package-risk preflight
-  Why: Force-installed extensions are harder for users to disable, so policy mode should reject obvious remote-code and high-risk package defects before writing HKLM policy.
-  Evidence: Chrome remote-hosted-code policy; `src/LocalChromeStore/Services/PolicyInstallService.cs`; existing roadmap static scanner item; MalExt Sentry and `chrome-mal-ids` feeds.
-  Touches: `Services/ExtensionService.cs`, `Services/PolicyInstallService.cs`, new scanner service, `Models/PermissionCatalog.cs`, `ViewModels/MainViewModel.cs`, tests.
-  Acceptance: Before policy install, LocalChromeStore scans the extracted package for remote executable code patterns, dangerous CSP/eval patterns, MV2 non-loadability, and known malicious extension IDs where derivable; policy write is blocked on fail findings and warnings are included in diagnostics.
-  Complexity: L
-
 - [ ] P2 - Enrich release provenance in cards and diagnostics
   Why: Trust decisions need more than repo name and checksum state; GitHub exposes asset ID, content type, uploader, upload/update timestamps, size, digest, and download count.
   Evidence: GitHub release-assets REST docs; `ImportExportService.BuildCatalog`; `BuildDiagnosticsBundle`; Obtainium verification/troubleshooting model.

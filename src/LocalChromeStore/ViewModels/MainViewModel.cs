@@ -21,6 +21,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly BrowserConformanceService _conformance;
     private readonly LoadSetManager _loadSets;
     private readonly PolicyPackageService _policyPackages;
+    private readonly PolicyPackageRiskScanner _policyRiskScanner;
     private readonly PolicyInstallService _policyInstaller;
     private readonly PolicyEnrollmentService _policyEnrollment = new();
     private readonly IDialogService _dialogs;
@@ -96,6 +97,7 @@ public sealed class MainViewModel : ViewModelBase
         _conformance = new BrowserConformanceService(_settingsService);
         _loadSets = new LoadSetManager(_settingsService);
         _policyPackages = new PolicyPackageService(_settingsService);
+        _policyRiskScanner = new PolicyPackageRiskScanner(_settingsService);
         _policyInstaller = new PolicyInstallService();
         _settings = _settingsService.Load();
         _logSink = new Dispatcher_LogSink(LogLines);
@@ -1035,8 +1037,19 @@ public sealed class MainViewModel : ViewModelBase
                 new PolicyPackageRequest(installed, crxUrl, updateXmlUrl, existingUpdateXmlPath),
                 progress));
             var request = package.ToInstallRequest(browser.Kind);
+            var riskReport = _policyRiskScanner.Scan(installed, [package.Package.ExtensionId]);
+            LogPolicyPackageRiskReport(riskReport);
+            if (riskReport.BlocksPolicyInstall)
+            {
+                StatusText = $"Policy install blocked by package-risk preflight for {card.Title}.";
+                Log($"! Policy install blocked before HKLM write for {card.Repo}: {riskReport.Summary}.");
+                return;
+            }
+
             var enrollment = _policyEnrollment.DetectCurrent();
             var consentPrompt = PolicyInstallService.BuildConsentPrompt([request], enrollment) +
+                $"{Environment.NewLine}{Environment.NewLine}" +
+                _policyRiskScanner.FormatForPrompt(riskReport) +
                 $"{Environment.NewLine}{Environment.NewLine}" +
                 $"Local package folder:{Environment.NewLine}{package.PackageDirectory}{Environment.NewLine}{Environment.NewLine}" +
                 $"Upload the CRX to:{Environment.NewLine}{package.CrxUrl.AbsoluteUri}{Environment.NewLine}{Environment.NewLine}" +
@@ -1074,6 +1087,19 @@ public sealed class MainViewModel : ViewModelBase
         finally
         {
             Busy = false;
+        }
+    }
+
+    private void LogPolicyPackageRiskReport(PolicyPackageRiskReport report)
+    {
+        Log($"Policy package-risk preflight for {report.ExtensionKey}: {report.Summary}.");
+        if (report.DerivedExtensionIds.Count > 0)
+            Log($"  Derived extension ID(s): {string.Join(", ", report.DerivedExtensionIds)}");
+        foreach (var finding in report.Findings)
+        {
+            var marker = finding.Severity == PolicyPackageRiskSeverity.Fail ? "!" : finding.Severity == PolicyPackageRiskSeverity.Warning ? "!" : " ";
+            var location = string.IsNullOrWhiteSpace(finding.Location) ? string.Empty : $" ({finding.Location})";
+            Log($"{marker} {finding.Severity}: {finding.Category}{location} - {finding.Detail}");
         }
     }
 
@@ -1557,6 +1583,15 @@ public sealed class MainViewModel : ViewModelBase
             sb.AppendLine($"    ChecksumVerified: {inst.ChecksumVerified}{(inst.ChecksumVerified ? $" ({inst.ChecksumAlgorithm}, {inst.ChecksumSource ?? "unknown source"})" : "")}");
             sb.AppendLine($"    ManifestVersion:  {(inst.ManifestVersionNumber.HasValue ? "MV" + inst.ManifestVersionNumber : "unknown")}");
             sb.AppendLine($"    Permissions:      {inst.Permissions.Count + inst.OptionalPermissions.Count} ({inst.HostPermissions.Count + inst.OptionalHostPermissions.Count} host)");
+            var riskReport = BuildPolicyRiskReportForDiagnostics(inst);
+            sb.AppendLine($"    PolicyRisk:       {riskReport.Summary}");
+            foreach (var finding in riskReport.Findings.Take(8))
+            {
+                var location = string.IsNullOrWhiteSpace(finding.Location) ? string.Empty : $" ({finding.Location})";
+                sb.AppendLine($"      - {finding.Severity}: {finding.Category}{location} - {finding.Detail}");
+            }
+            if (riskReport.Findings.Count > 8)
+                sb.AppendLine($"      - +{riskReport.Findings.Count - 8} more finding(s)");
         }
         sb.AppendLine();
 
@@ -1585,6 +1620,14 @@ public sealed class MainViewModel : ViewModelBase
         foreach (var line in LogLines) sb.AppendLine("  " + line);
 
         return sb.ToString();
+    }
+
+    private PolicyPackageRiskReport BuildPolicyRiskReportForDiagnostics(InstalledExtension installed)
+    {
+        var ids = new List<string>();
+        if (_policyPackages.TryDeriveExtensionId(installed, out var extensionId, out _))
+            ids.Add(extensionId);
+        return _policyRiskScanner.Scan(installed, ids);
     }
 
     private void Log(string line) => _logSink.Append(line);
