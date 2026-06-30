@@ -90,6 +90,11 @@ public sealed class SettingsService
             UseTopicFilter = settings.UseTopicFilter,
             TopicFilter = settings.TopicFilter,
             ExtraOwners = settings.ExtraOwners.ToList(),
+            LocalSourceFolders = settings.LocalSourceFolders
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => p.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList(),
             HiddenRepos = settings.HiddenRepos.ToList(),
             LaunchBrowserAfterInstall = settings.LaunchBrowserAfterInstall,
             AutoUpdateOnRefresh = settings.AutoUpdateOnRefresh,

@@ -9,7 +9,7 @@ public sealed record CatalogExport(string Json, int Count);
 /// <summary>
 /// What an environment-import target resolves to before any permission review:
 /// already installed at the requested version, missing from discovery, present but with no
-/// installable asset, or installable.
+    /// installable release asset/local source, or installable.
 /// </summary>
 public enum ImportAction { Install, AlreadyCurrent, Missing, MissingAsset }
 
@@ -46,6 +46,8 @@ public sealed class ImportExportService
                 Framework: info.Framework.ToString(),
                 ManifestVersion: info.ManifestVersionNumber,
                 HasAsset: !string.IsNullOrEmpty(info.AssetUrl),
+                HasInstallSource: !string.IsNullOrEmpty(info.AssetUrl) || !string.IsNullOrWhiteSpace(info.LocalSourcePath),
+                LocalSourcePath: info.LocalSourcePath,
                 AssetName: info.AssetName,
                 AssetUrl: info.AssetUrl,
                 AssetDigest: info.AssetDigest,
@@ -81,14 +83,14 @@ public sealed class ImportExportService
     /// Classifies an environment-import target from the current install/catalog state, independent of
     /// the permission-review prompt (which only applies to an <see cref="ImportAction.Install"/>).
     /// A target already installed at the requested version is current; one not surfaced by discovery is
-    /// missing; one without an installable ZIP/CRX asset is asset-less; otherwise it is installable.
+    /// missing; one without an installable ZIP/CRX asset or local source is asset-less; otherwise it is installable.
     /// </summary>
-    public static ImportAction ClassifyImportTarget(InstalledExtension? existing, string targetVersion, bool hasCard, bool cardHasAsset)
+    public static ImportAction ClassifyImportTarget(InstalledExtension? existing, string targetVersion, bool hasCard, bool cardHasInstallSource)
     {
         if (existing is not null && existing.Version.Equals(targetVersion, StringComparison.OrdinalIgnoreCase))
             return ImportAction.AlreadyCurrent;
         if (!hasCard) return ImportAction.Missing;
-        if (!cardHasAsset) return ImportAction.MissingAsset;
+        if (!cardHasInstallSource) return ImportAction.MissingAsset;
         return ImportAction.Install;
     }
 }
@@ -103,6 +105,8 @@ public sealed record CatalogExportEntry(
     string Framework,
     int? ManifestVersion,
     bool HasAsset,
+    bool HasInstallSource,
+    string? LocalSourcePath,
     string? AssetName,
     string? AssetUrl,
     string? AssetDigest,

@@ -8,16 +8,16 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.11-cba6f7?style=for-the-badge" alt="Version" /></a>
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.12-cba6f7?style=for-the-badge" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
 </p>
 
 > **A personal store for the Chromium extensions you build yourself.**
-> Lists every extension across your GitHub repos, downloads the latest release ZIP/CRX, and loads them into Chrome / Brave / Edge with a single click. Install. Uninstall. Move on.
+> Lists every extension across your GitHub repos and local source folders, downloads or links the latest install source, and loads them into Chrome / Brave / Edge with a single click. Install. Uninstall. Move on.
 
-LocalChromeStore exists for one reason: when you build a lot of Chrome extensions, "Load unpacked" gets old fast. This is a native Windows store UI for your own extensions — sourced from your GitHub releases, with proper install / uninstall semantics.
+LocalChromeStore exists for one reason: when you build a lot of Chrome extensions, "Load unpacked" gets old fast. This is a native Windows store UI for your own extensions — sourced from your GitHub releases or local unpacked folders, with proper install / uninstall semantics.
 
 ---
 
@@ -36,8 +36,9 @@ LocalChromeStore wraps path 2 with a real store UI today. It also wires path 3 f
 ## Features
 
 - **GitHub-sourced discovery** — lists every repo with a `manifest.json` or a release ZIP / CRX asset for any user or org
+- **Local source folders** — link unpacked extension folders with a root `manifest.json` directly into the catalog for active development
 - **Store-style cards** — extension logo, name, version, description, install / uninstall buttons, link to repo
-- **One-click install** — downloads the latest release ZIP, extracts to a managed folder, tracks it
+- **One-click install/link** — downloads the latest release ZIP, extracts to a managed folder, or links a configured local source folder without copying it
 - **Integrity verification** — fails closed on SHA-256 sidecars, and falls back to GitHub release asset `sha256:` API digests when no sidecar exists
 - **One-click uninstall** — wipes the local copy and removes it from the load list
 - **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with every installed extension, version-gating the load strategy (plain `--load-extension`, the Chromium 137+ `--disable-features` override, or CDP `Extensions.loadUnpacked` over `--remote-debugging-pipe` for branded Chrome 142+, which removed command-line extension loading)
@@ -45,10 +46,10 @@ LocalChromeStore wraps path 2 with a real store UI today. It also wires path 3 f
 - **Browser loading conformance** — opt-in **Conformance** action creates a tiny MV3 fixture extension, launches every detected browser/Chrome for Testing build in an isolated profile, records strategy/arguments/CDP IDs or errors, and writes JSON/text reports into diagnostics logs
 - **Guided Enterprise Policy workflow** — per-card **Policy** / **Rollback** actions package CRX3 with RSA-2048, run local package-risk preflight checks, generate or copy self-hosted `update.xml`, map Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, write Edge `ExtensionSettings.override_update_url`, check policy/update/CRX health, and roll back registry entries without deleting packaged artifacts
 - **Auditable launch sessions** — optional startup URL, default/persistent/clean-temp browser profile modes, a copyable launch command preview, a debug panel for browser path/profile/extensions/arguments, and live browser stdout/stderr/exit capture in the activity log
-- **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
+- **Environment portability** — export/import installed extension targets, local source folders, and portable discovery settings as JSON
 - **Update workflow** — update-available badges, permission-change review, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
 - **Self-update check** — on launch, compares the running build to the latest GitHub release and shows a dismissible banner with a download link when a newer version is available (never auto-installs itself)
-- **Search and filter** — by name, repo, or description; toggle to show only installed
+- **Search and filter** — by name, repo, description, or local source path; toggle to show only installed
 - **Topic filter (optional)** — restrict discovery to repos tagged with a specific GitHub topic (default `chrome-extension`)
 - **Optional GitHub PAT** — unauthenticated GitHub API caps at 60 req/h; a personal access token raises that to 5,000/h, unlocks private repos, and is stored with Windows DPAPI
 - **Catppuccin Mocha dark theme** — easy on the eyes; light theme planned
@@ -112,7 +113,7 @@ To apply Enterprise Policy mode for a managed browser:
 
 Use **Rollback** on the same card to remove only that extension's browser-policy registry entries. Local CRX/update artifacts and signing keys stay on disk.
 
-Use **Export environment** to save the installed extension set, manifest trust snapshot, GitHub owner list, topic filter, and launch options as a portable JSON file. Use **Import environment** on another machine to apply those discovery settings, refresh GitHub, and install matching ZIP/CRX release assets. If the current catalog release adds permissions compared with the exported snapshot or local installed copy, import asks for approval before installing it. GitHub tokens are never written to the export file.
+Use **Export environment** to save the installed extension set, manifest trust snapshot, GitHub owner list, topic filter, local source folders, and launch options as a portable JSON file. Use **Import environment** on another machine to apply those discovery settings, refresh GitHub/local sources, and install matching ZIP/CRX release assets or linked source folders. If the current catalog source adds permissions compared with the exported snapshot or local installed copy, import asks for approval before installing it. GitHub tokens are never written to the export file.
 
 ---
 
@@ -183,11 +184,12 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history.
 - **v0.3.9** — Optional Chrome for Testing downloader using the official latest-Stable metadata feed, LocalChromeStore cache extraction, browser auto-detection refresh, diagnostics path reporting, and installer unit tests
 - **v0.3.10** — Launch debug panel showing browser path, profile path, loaded extensions, startup URL, and resolved arguments from the same launch plan used by session launch/copy
 - **v0.3.11** — Browser stdout/stderr and process-exit capture for command-line launch sessions, streamed into the activity log with tests around stdout, stderr, and nonzero exit reporting
+- **v0.3.12** — Local source-folder discovery/linking for unpacked extension development, including settings UI, environment import/export persistence, diagnostics, and regression tests
 
 **Planned**
 
 - Static update hosting automation for policy-ready packages
-- Local folder source, custom update-feed source, light theme + accent picker
+- Custom update-feed source, light theme + accent picker
 
 ---
 

@@ -69,7 +69,10 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public string Description => Info.DisplayDescription;
     public string RepoUrl => Info.RepoUrl;
     public string Repo => $"{Info.RepoOwner}/{Info.RepoName}";
-    public string AssetSummary => Info.AssetUrl != null
+    public bool HasLocalSource => !string.IsNullOrWhiteSpace(Info.LocalSourcePath);
+    public string AssetSummary => HasLocalSource
+        ? $"Local source: {Info.LocalSourcePath}"
+        : Info.AssetUrl != null
         ? $"{Info.AssetName} • {FormatSize(Info.AssetSizeBytes)}"
         : "Add a ZIP or CRX release asset to enable install.";
     public string ReleaseSummary => Info.PublishedAt.HasValue
@@ -80,19 +83,20 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public bool AssetChangedSinceInstall => ReleaseProvenance.CompareAssetSnapshot(Info, _installed).Changed;
     public string Stars => Info.Stars > 0 ? $"★ {Info.Stars}" : string.Empty;
     public bool HasAsset => !string.IsNullOrEmpty(Info.AssetUrl);
+    public bool HasInstallSource => HasAsset || HasLocalSource;
     public bool IsInstalled => _installed != null;
     public bool IsUpdateAvailable => IsInstalled
         && Services.VersionCompare.IsNewer(Info.DisplayVersion, _installed!.Version);
-    public bool CanInstall => HasAsset && !Busy;
+    public bool CanInstall => HasInstallSource && !Busy;
     public bool CanOpenInstallDir => IsInstalled && !Busy;
     public bool CanApplyPolicy => IsInstalled && !Busy;
     public InstalledExtension? Installed => _installed;
     public string InstallButtonLabel => IsInstalled
         ? (IsUpdateAvailable ? $"Update to {Info.DisplayVersion}" : "Reinstall")
-        : (HasAsset ? "Install" : "Unavailable");
+        : (HasLocalSource ? "Link source" : HasAsset ? "Install" : "Unavailable");
     public string StatusBadge => IsInstalled
         ? (IsUpdateAvailable ? "Update available" : "Installed")
-        : (HasAsset ? "Ready to install" : "Release needed");
+        : (HasLocalSource ? "Local source" : HasAsset ? "Ready to install" : "Release needed");
     public string InstalledDetail => IsInstalled
         ? $"Local version {_installed!.Version}"
         : "Not installed locally";
@@ -158,7 +162,9 @@ public sealed class ExtensionCardViewModel : ViewModelBase
             if (Info.DiscoverySource == DiscoverySource.RepoManifest && !string.IsNullOrEmpty(Info.ManifestSourcePath))
                 sb.AppendLine($"  Manifest path: {Info.ManifestSourcePath}");
             if (Info.AssetKind != AssetKind.None)
-                sb.AppendLine($"Release asset: {FrameworkLabels.AssetLabel(Info.AssetKind)} ({Info.AssetName})");
+                sb.AppendLine(HasLocalSource
+                    ? $"Source folder: {Info.LocalSourcePath}"
+                    : $"Release asset: {FrameworkLabels.AssetLabel(Info.AssetKind)} ({Info.AssetName})");
             else
                 sb.AppendLine("Release asset: none — install will be unavailable until the repo publishes a ZIP/CRX.");
             sb.AppendLine($"Detected framework: {FrameworkLabels.Label(Info.Framework)}");
@@ -187,12 +193,12 @@ public sealed class ExtensionCardViewModel : ViewModelBase
             // F049: release readiness checklist
             sb.AppendLine();
             sb.AppendLine("Release readiness:");
-            sb.AppendLine($"  {(HasAsset ? "+" : "-")} Release asset (ZIP or CRX)");
+            sb.AppendLine($"  {(HasInstallSource ? "+" : "-")} Release asset or local source");
             sb.AppendLine($"  {(HasIntegrityVerifier ? "+" : "-")} SHA-256 sidecar/API digest");
             sb.AppendLine($"  {(Info.ManifestVersionNumber == 3 ? "+" : "-")} Manifest V3");
             sb.AppendLine($"  {(Info.HasRepoManifest ? "+" : "-")} localchromestore.json catalog manifest");
             sb.AppendLine($"  {(Info.Freshness is RepoFreshness.Fresh or RepoFreshness.Aging && !Info.IsArchived ? "+" : "-")} Repository active within a year");
-            var score = new[] { HasAsset, HasIntegrityVerifier, Info.ManifestVersionNumber == 3, Info.HasRepoManifest, Info.Freshness is RepoFreshness.Fresh or RepoFreshness.Aging && !Info.IsArchived }.Count(x => x);
+            var score = new[] { HasInstallSource, HasIntegrityVerifier, Info.ManifestVersionNumber == 3, Info.HasRepoManifest, Info.Freshness is RepoFreshness.Fresh or RepoFreshness.Aging && !Info.IsArchived }.Count(x => x);
             sb.Append($"  Score: {score}/5");
             return sb.ToString().TrimEnd();
         }
@@ -301,7 +307,7 @@ public sealed class ExtensionCardViewModel : ViewModelBase
 
     private async Task InstallAsync(object? _)
     {
-        if (!HasAsset) return;
+        if (!HasInstallSource) return;
         if (IsUpdateAvailable && !ConfirmUpdatePermissionExpansion()) return;
 
         var installed = false;
@@ -380,8 +386,10 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     private void Uninstall()
     {
         var confirm = MessageBox.Show(
-            $"Remove the local copy of {Title}?\n\nThe GitHub repository and release assets are not changed.",
-            "Uninstall extension",
+            HasLocalSource
+                ? $"Unlink {Title} from LocalChromeStore?\n\nThe source folder is not deleted."
+                : $"Remove the local copy of {Title}?\n\nThe GitHub repository and release assets are not changed.",
+            HasLocalSource ? "Unlink extension" : "Uninstall extension",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
         if (confirm != MessageBoxResult.Yes) return;
@@ -476,6 +484,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(InstallButtonLabel));
         OnPropertyChanged(nameof(StatusBadge));
         OnPropertyChanged(nameof(HasAsset));
+        OnPropertyChanged(nameof(HasLocalSource));
+        OnPropertyChanged(nameof(HasInstallSource));
         OnPropertyChanged(nameof(IsUpdateAvailable));
         OnPropertyChanged(nameof(UpdatePermissionDiff));
         OnPropertyChanged(nameof(HasUpdatePermissionExpansion));

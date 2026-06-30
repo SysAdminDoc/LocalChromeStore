@@ -109,4 +109,23 @@ public sealed class SettingsServiceTests
         Assert.Equal(BrowserProfileMode.Persistent, loaded.LaunchProfileMode);
         Assert.False(loaded.LaunchWithTemporaryProfile);
     }
+
+    [Fact]
+    public void Save_PersistsDistinctLocalSourceFolders()
+    {
+        var root = NewRoot();
+        var svc = new SettingsService(appDataRoot: root, localAppDataRoot: root);
+        var source = Path.Combine(root, "Source");
+        var other = Path.Combine(root, "Other");
+
+        svc.Save(new AppSettings
+        {
+            GitHubUser = "alice",
+            LocalSourceFolders = [$" {source} ", source.ToUpperInvariant(), other]
+        });
+
+        var loaded = svc.Load();
+
+        Assert.Equal([source, other], loaded.LocalSourceFolders);
+    }
 }

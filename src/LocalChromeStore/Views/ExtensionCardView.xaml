@@ -114,7 +114,7 @@
                                     <Setter Property="Background" Value="{StaticResource YellowSoftBrush}" />
                                     <Setter Property="BorderBrush" Value="{StaticResource YellowBrush}" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding HasAsset}" Value="False">
+                                <DataTrigger Binding="{Binding HasInstallSource}" Value="False">
                                     <Setter Property="Background" Value="{StaticResource RedSoftBrush}" />
                                     <Setter Property="BorderBrush" Value="{StaticResource RedBrush}" />
                                 </DataTrigger>

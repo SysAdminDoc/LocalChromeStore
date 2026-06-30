@@ -17,14 +17,16 @@ public enum DiscoverySource
     Unknown,
     ReleaseZipAsset,
     ReleaseCrxAsset,
-    RepoManifest
+    RepoManifest,
+    LocalSourceFolder
 }
 
 public enum AssetKind
 {
     None,
     Zip,
-    Crx
+    Crx,
+    LocalFolder
 }
 
 public enum RepoFreshness
@@ -91,6 +93,7 @@ public static class FrameworkLabels
         DiscoverySource.ReleaseZipAsset => "GitHub release ZIP asset",
         DiscoverySource.ReleaseCrxAsset => "GitHub release CRX asset",
         DiscoverySource.RepoManifest => "manifest.json in repo source",
+        DiscoverySource.LocalSourceFolder => "local source folder",
         _ => "Unknown"
     };
 
@@ -98,6 +101,7 @@ public static class FrameworkLabels
     {
         AssetKind.Zip => "ZIP",
         AssetKind.Crx => "CRX",
+        AssetKind.LocalFolder => "Local folder",
         _ => "No asset"
     };
 

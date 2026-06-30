@@ -27,6 +27,9 @@ public sealed class ExtensionService
 
     public async Task<InstalledExtension> InstallAsync(ExtensionInfo info, IProgress<string>? log = null, IProgress<long>? bytes = null, CancellationToken ct = default)
     {
+        if (!string.IsNullOrWhiteSpace(info.LocalSourcePath))
+            return InstallLocalSource(info, log);
+
         if (string.IsNullOrEmpty(info.AssetUrl))
             throw new InvalidOperationException("No release asset to install. The repo has no ZIP/CRX in its latest release yet.");
 
@@ -147,6 +150,50 @@ public sealed class ExtensionService
         _settings.SaveManifest(_manifest);
         PruneOldVersions(info.RepoOwner, info.RepoName, version, log);
         log?.Report($"Installed {info.DisplayName} v{info.DisplayVersion}");
+        return entry;
+    }
+
+    private InstalledExtension InstallLocalSource(ExtensionInfo info, IProgress<string>? log)
+    {
+        var sourcePath = Path.GetFullPath(info.LocalSourcePath!);
+        if (!Directory.Exists(sourcePath))
+            throw new InvalidOperationException($"Local source folder does not exist: {sourcePath}");
+        var manifestPath = Path.Combine(sourcePath, "manifest.json");
+        if (!File.Exists(manifestPath))
+            throw new InvalidOperationException($"Local source folder has no manifest.json: {sourcePath}");
+
+        _manifest.Extensions.RemoveAll(e =>
+            e.RepoOwner.Equals(info.RepoOwner, StringComparison.OrdinalIgnoreCase) &&
+            e.RepoName.Equals(info.RepoName, StringComparison.OrdinalIgnoreCase));
+
+        var entry = new InstalledExtension
+        {
+            RepoOwner = info.RepoOwner,
+            RepoName = info.RepoName,
+            Version = info.DisplayVersion,
+            InstallPath = sourcePath,
+            ManifestPath = manifestPath,
+            InstalledAt = DateTimeOffset.UtcNow,
+            ChecksumVerified = false,
+            ChecksumAlgorithm = null,
+            ChecksumValue = null,
+            ChecksumSource = "local-source",
+            AssetName = info.AssetName,
+            AssetDigest = null,
+            AssetSizeBytes = null,
+            ReleasePublishedAt = null,
+            DisplayName = info.DisplayName,
+            RepoUrl = info.RepoUrl,
+            ManifestVersionNumber = info.ManifestVersionNumber,
+            Framework = info.Framework,
+            Permissions = info.Permissions.ToList(),
+            OptionalPermissions = info.OptionalPermissions.ToList(),
+            HostPermissions = info.HostPermissions.ToList(),
+            OptionalHostPermissions = info.OptionalHostPermissions.ToList()
+        };
+        _manifest.Extensions.Add(entry);
+        _settings.SaveManifest(_manifest);
+        log?.Report($"Linked local source {info.DisplayName}: {sourcePath}");
         return entry;
     }
 

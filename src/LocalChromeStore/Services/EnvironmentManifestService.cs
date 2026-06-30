@@ -35,6 +35,7 @@ public static class EnvironmentManifestService
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(o => o, StringComparer.OrdinalIgnoreCase)
                     .ToList(),
+                LocalSourceFolders = NormalizePathList(settings.LocalSourceFolders),
                 LaunchUrl = string.IsNullOrWhiteSpace(settings.LaunchUrl) ? null : settings.LaunchUrl.Trim(),
                 LaunchProfileMode = settings.LaunchProfileMode,
                 LaunchWithTemporaryProfile = settings.LaunchProfileMode == BrowserProfileMode.Temporary
@@ -85,6 +86,7 @@ public static class EnvironmentManifestService
             .ToList();
 
         var importedKeys = new HashSet<string>(manifest.Extensions.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
+        var localSourceFolders = NormalizePathList(manifest.Settings.LocalSourceFolders.Concat(current.LocalSourceFolders));
 
         var launchProfileMode = ResolveProfileMode(manifest.Settings);
         return new AppSettings
@@ -97,6 +99,7 @@ public static class EnvironmentManifestService
                 ? current.TopicFilter
                 : manifest.Settings.TopicFilter.Trim(),
             ExtraOwners = extraOwners,
+            LocalSourceFolders = localSourceFolders,
             HiddenRepos = current.HiddenRepos
                 .Where(repo => !importedKeys.Contains(repo))
                 .OrderBy(repo => repo, StringComparer.OrdinalIgnoreCase)
@@ -108,6 +111,13 @@ public static class EnvironmentManifestService
             LaunchWithTemporaryProfile = launchProfileMode == BrowserProfileMode.Temporary
         };
     }
+
+    private static List<string> NormalizePathList(IEnumerable<string> paths) => paths
+        .Where(p => !string.IsNullOrWhiteSpace(p))
+        .Select(p => p.Trim())
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+        .ToList();
 
     private static EnvironmentExtensionSnapshot ToSnapshot(InstalledExtension e) => new()
     {

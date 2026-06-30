@@ -16,6 +16,7 @@ public sealed class EnvironmentManifestServiceTests
             UseTopicFilter = true,
             TopicFilter = "chrome-extension",
             ExtraOwners = ["extra", "primary"],
+            LocalSourceFolders = [" C:\\Source\\A ", "c:\\source\\a", "D:\\Source\\B"],
             LaunchUrl = " https://example.test ",
             LaunchProfileMode = BrowserProfileMode.Persistent
         };
@@ -58,6 +59,7 @@ public sealed class EnvironmentManifestServiceTests
         Assert.DoesNotContain("secret-token", json);
         Assert.Equal("primary", manifest.Settings.GitHubUser);
         Assert.Equal(["extra"], manifest.Settings.ExtraOwners);
+        Assert.Equal(["C:\\Source\\A", "D:\\Source\\B"], manifest.Settings.LocalSourceFolders);
         Assert.Equal("https://example.test", manifest.Settings.LaunchUrl);
         Assert.Equal(BrowserProfileMode.Persistent, manifest.Settings.LaunchProfileMode);
         Assert.False(manifest.Settings.LaunchWithTemporaryProfile);
@@ -81,6 +83,7 @@ public sealed class EnvironmentManifestServiceTests
             GitHubToken = "secret-token",
             PreferredBrowserPath = "C:\\Browser\\chrome.exe",
             HiddenRepos = ["primary/Imported", "someone/Other"],
+            LocalSourceFolders = ["C:\\Source\\Current", "C:\\Source\\Shared"],
             LaunchBrowserAfterInstall = true,
             AutoUpdateOnRefresh = true
         };
@@ -92,6 +95,7 @@ public sealed class EnvironmentManifestServiceTests
                 UseTopicFilter = false,
                 TopicFilter = "chrome-extension",
                 ExtraOwners = ["extra"],
+                LocalSourceFolders = ["c:\\source\\shared", "D:\\Source\\Imported"],
                 LaunchProfileMode = BrowserProfileMode.Persistent
             },
             Extensions =
@@ -121,6 +125,7 @@ public sealed class EnvironmentManifestServiceTests
         Assert.Equal(BrowserProfileMode.Persistent, applied.LaunchProfileMode);
         Assert.False(applied.LaunchWithTemporaryProfile);
         Assert.Equal(["extra"], applied.ExtraOwners);
+        Assert.Equal(["C:\\Source\\Current", "c:\\source\\shared", "D:\\Source\\Imported"], applied.LocalSourceFolders);
         Assert.Equal(["someone/Other"], applied.HiddenRepos);
     }
 }

@@ -25,6 +25,13 @@ public sealed class ImportExportServiceTests
             new ExtensionInfo
             {
                 RepoOwner = "o", RepoName = "b", RepoUrl = "https://github.com/o/b"
+            },
+            new ExtensionInfo
+            {
+                RepoOwner = "local", RepoName = "source-1234abcd", RepoUrl = @"C:\src\extension",
+                ManifestName = "Local Source", ManifestVersion = "0.0.5",
+                LocalSourcePath = @"C:\src\extension", DiscoverySource = DiscoverySource.LocalSourceFolder,
+                AssetKind = AssetKind.LocalFolder, AssetName = "extension"
             }
         };
         var installed = new[]
@@ -41,16 +48,17 @@ public sealed class ImportExportServiceTests
 
         var export = ImportExportService.BuildCatalog(infos, installed);
 
-        Assert.Equal(2, export.Count);
+        Assert.Equal(3, export.Count);
         using var doc = JsonDocument.Parse(export.Json);
         var arr = doc.RootElement;
-        Assert.Equal(2, arr.GetArrayLength());
+        Assert.Equal(3, arr.GetArrayLength());
 
         var a = arr[0];
         Assert.Equal("o", a.GetProperty("RepoOwner").GetString());
         Assert.Equal("Alpha", a.GetProperty("DisplayName").GetString());
         Assert.Equal("2.0", a.GetProperty("DisplayVersion").GetString());
         Assert.True(a.GetProperty("HasAsset").GetBoolean());
+        Assert.True(a.GetProperty("HasInstallSource").GetBoolean());
         Assert.Equal("sha256:" + new string('a', 64), a.GetProperty("AssetDigest").GetString());
         Assert.Equal(101, a.GetProperty("AssetId").GetInt64());
         Assert.Equal("application/zip", a.GetProperty("AssetContentType").GetString());
@@ -66,7 +74,15 @@ public sealed class ImportExportServiceTests
         var b = arr[1];
         Assert.Equal("b", b.GetProperty("RepoName").GetString());
         Assert.False(b.GetProperty("HasAsset").GetBoolean());
+        Assert.False(b.GetProperty("HasInstallSource").GetBoolean());
         Assert.Equal(JsonValueKind.Null, b.GetProperty("InstalledVersion").ValueKind);
+
+        var c = arr[2];
+        Assert.Equal("source-1234abcd", c.GetProperty("RepoName").GetString());
+        Assert.False(c.GetProperty("HasAsset").GetBoolean());
+        Assert.True(c.GetProperty("HasInstallSource").GetBoolean());
+        Assert.Equal(@"C:\src\extension", c.GetProperty("LocalSourcePath").GetString());
+        Assert.Equal("LocalSourceFolder", c.GetProperty("DiscoverySource").GetString());
     }
 
     [Fact]
@@ -90,31 +106,31 @@ public sealed class ImportExportServiceTests
     {
         // Case-insensitive version match counts as current.
         Assert.Equal(ImportAction.AlreadyCurrent,
-            ImportExportService.ClassifyImportTarget(Installed("1.0.0"), "1.0.0", hasCard: true, cardHasAsset: true));
+            ImportExportService.ClassifyImportTarget(Installed("1.0.0"), "1.0.0", hasCard: true, cardHasInstallSource: true));
     }
 
     [Fact]
     public void ClassifyImportTarget_NoCard_IsMissing()
     {
         Assert.Equal(ImportAction.Missing,
-            ImportExportService.ClassifyImportTarget(existing: null, "1.0.0", hasCard: false, cardHasAsset: false));
+            ImportExportService.ClassifyImportTarget(existing: null, "1.0.0", hasCard: false, cardHasInstallSource: false));
     }
 
     [Fact]
-    public void ClassifyImportTarget_CardWithoutAsset_IsMissingAsset()
+    public void ClassifyImportTarget_CardWithoutInstallSource_IsMissingAsset()
     {
         Assert.Equal(ImportAction.MissingAsset,
-            ImportExportService.ClassifyImportTarget(existing: null, "1.0.0", hasCard: true, cardHasAsset: false));
+            ImportExportService.ClassifyImportTarget(existing: null, "1.0.0", hasCard: true, cardHasInstallSource: false));
     }
 
     [Fact]
-    public void ClassifyImportTarget_NewerOrDifferentVersionWithAsset_IsInstall()
+    public void ClassifyImportTarget_NewerOrDifferentVersionWithInstallSource_IsInstall()
     {
-        // Installed but at a different version → install the catalog version.
+        // Installed but at a different version: install the catalog version.
         Assert.Equal(ImportAction.Install,
-            ImportExportService.ClassifyImportTarget(Installed("0.9.0"), "1.0.0", hasCard: true, cardHasAsset: true));
-        // Not installed at all → install.
+            ImportExportService.ClassifyImportTarget(Installed("0.9.0"), "1.0.0", hasCard: true, cardHasInstallSource: true));
+        // Not installed at all: install.
         Assert.Equal(ImportAction.Install,
-            ImportExportService.ClassifyImportTarget(existing: null, "1.0.0", hasCard: true, cardHasAsset: true));
+            ImportExportService.ClassifyImportTarget(existing: null, "1.0.0", hasCard: true, cardHasInstallSource: true));
     }
 }

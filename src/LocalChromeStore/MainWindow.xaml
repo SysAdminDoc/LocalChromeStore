@@ -433,12 +433,16 @@
                             VerticalAlignment="Top" />
                 </Grid>
 
-                <Grid Grid.Row="1">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1.1*" />
-                        <ColumnDefinition Width="1*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                <ScrollViewer Grid.Row="1"
+                              MaxHeight="360"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
                     <StackPanel Grid.Column="0" Margin="0,0,16,0">
                         <TextBlock Text="GitHub user or organization" Style="{StaticResource InputLabel}" />
@@ -553,6 +557,7 @@
                                            Visibility="{Binding HasExtraOwners, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
                             </Grid>
                         </Border>
+
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Margin="0,0,16,0">
@@ -575,6 +580,76 @@
                                    Margin="0,8,0,0"
                                    Text="When enabled, discovery only shows repos tagged with the selected topic. Otherwise any repo with a manifest.json or release ZIP/CRX can appear." />
 
+                        <TextBlock Text="Local source folders"
+                                   Style="{StaticResource InputLabel}"
+                                   Margin="0,16,0,5" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid Grid.Column="0">
+                                <TextBox x:Name="NewLocalSourceBox"
+                                         Text="{Binding NewLocalSourceInput, UpdateSourceTrigger=PropertyChanged}"
+                                         AutomationProperties.Name="Add local source folder" />
+                                <TextBlock Text="C:\dev\my-extension"
+                                           Style="{StaticResource MuteText}"
+                                           Margin="12,0,0,0"
+                                           VerticalAlignment="Center"
+                                           IsHitTestVisible="False"
+                                           Visibility="{Binding Text, ElementName=NewLocalSourceBox, Converter={StaticResource EmptyStringToVis}}" />
+                            </Grid>
+                            <Button Grid.Column="1"
+                                    Content="Add"
+                                    Command="{Binding AddLocalSourceFolderCommand}"
+                                    Margin="8,0,0,0" />
+                        </Grid>
+                        <TextBlock Text="Adds an unpacked extension folder that contains a root manifest.json."
+                                   Style="{StaticResource MuteText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,7,0,0" />
+                        <Border Background="{StaticResource CrustBrush}"
+                                BorderBrush="{StaticResource Surface0Brush}"
+                                BorderThickness="1"
+                                CornerRadius="7"
+                                Padding="6"
+                                Margin="0,8,0,0">
+                            <Grid>
+                                <ListBox ItemsSource="{Binding LocalSourceFolders}"
+                                         SelectedItem="{Binding SelectedLocalSourceFolder}"
+                                         MaxHeight="96"
+                                         BorderThickness="0"
+                                         Background="Transparent"
+                                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="2">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding}"
+                                                           Foreground="{StaticResource TextBrush}"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis" />
+                                                <Button Grid.Column="1"
+                                                        Content="Remove"
+                                                        Style="{StaticResource LinkButton}"
+                                                        Command="{Binding DataContext.RemoveLocalSourceFolderCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}" />
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <TextBlock Text="No local source folders. Add an unpacked extension folder above to link it during refresh."
+                                           Style="{StaticResource MuteText}"
+                                           TextWrapping="Wrap"
+                                           Margin="6"
+                                           Visibility="{Binding HasLocalSourceFolders, Converter={StaticResource BoolToVis}, ConverterParameter=invert}" />
+                            </Grid>
+                        </Border>
+
                         <Border Background="{StaticResource CrustBrush}"
                                 BorderBrush="{StaticResource Surface0Brush}"
                                 BorderThickness="1"
@@ -589,7 +664,7 @@
                                 <CheckBox Content="Auto-update on refresh"
                                           IsChecked="{Binding AutoUpdateOnRefresh}"
                                           Margin="0,8,0,0"
-                                          ToolTip="When refresh finds installed extensions with newer release assets, update them automatically. Updates that add permissions are skipped until manual review." />
+                                          ToolTip="When refresh finds installed extensions with newer release assets or local sources, update them automatically. Updates that add permissions are skipped until manual review." />
                                 <TextBlock Text="{Binding UpdateStatusSummary}"
                                            Style="{StaticResource MuteText}"
                                            TextWrapping="Wrap"
@@ -797,7 +872,8 @@
                         <Button Content="Save settings"
                                 Command="{Binding SaveSettingsCommand}" />
                     </StackPanel>
-                </Grid>
+                    </Grid>
+                </ScrollViewer>
             </Grid>
         </Border>
 

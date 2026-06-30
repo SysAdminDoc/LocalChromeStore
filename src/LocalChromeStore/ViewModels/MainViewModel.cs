@@ -15,6 +15,7 @@ public sealed class MainViewModel : ViewModelBase
 {
     private readonly SettingsService _settingsService;
     private readonly GitHubService _github;
+    private readonly LocalSourceService _localSources;
     private readonly ExtensionService _extensions;
     private readonly BrowserLauncher _launcher;
     private readonly BrowserLaunchManager _launchManager;
@@ -37,6 +38,8 @@ public sealed class MainViewModel : ViewModelBase
     private string _githubTokenInput = "";
     private string _newOwnerInput = "";
     private string? _selectedExtraOwner;
+    private string _newLocalSourceInput = "";
+    private string? _selectedLocalSourceFolder;
     private string _rateLimitSummary = "Rate limit: not yet measured.";
     private string _githubStatusSummary = "GitHub: ready.";
     private bool _isDegraded;
@@ -55,6 +58,7 @@ public sealed class MainViewModel : ViewModelBase
     public ObservableCollection<string> LogLines { get; } = new();
     public ObservableCollection<BrowserInfo> Browsers { get; } = new();
     public ObservableCollection<string> ExtraOwners { get; } = new();
+    public ObservableCollection<string> LocalSourceFolders { get; } = new();
     public ObservableCollection<LoadSet> LoadSets { get; } = new();
     public ObservableCollection<LaunchProfileModeOption> LaunchProfileModes { get; } = new(
     [
@@ -75,6 +79,8 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand ClearLogCommand { get; }
     public ICommand AddExtraOwnerCommand { get; }
     public ICommand RemoveExtraOwnerCommand { get; }
+    public ICommand AddLocalSourceFolderCommand { get; }
+    public ICommand RemoveLocalSourceFolderCommand { get; }
     public ICommand OpenBrowserExtensionsPageCommand { get; }
     public ICommand OpenPolicyPageCommand { get; }
     public ICommand ReviewPolicyReadinessCommand { get; }
@@ -99,6 +105,7 @@ public sealed class MainViewModel : ViewModelBase
         _dialogs = dialogs ?? new DialogService();
         _settingsService = new SettingsService();
         _github = new GitHubService(_settingsService);
+        _localSources = new LocalSourceService();
         _extensions = new ExtensionService(_settingsService, _github);
         _launcher = new BrowserLauncher(_extensions);
         _launchManager = new BrowserLaunchManager(_launcher);
@@ -116,6 +123,7 @@ public sealed class MainViewModel : ViewModelBase
         _launchUrlInput = _settings.LaunchUrl ?? string.Empty;
         _launchProfileMode = _settings.LaunchProfileMode;
         ReloadExtraOwnersFromSettings();
+        ReloadLocalSourceFoldersFromSettings();
         SyncHiddenReposCollection();
         ReloadLoadSetsFromService();
 
@@ -144,6 +152,8 @@ public sealed class MainViewModel : ViewModelBase
         ClearLogCommand = new RelayCommand(_ => LogLines.Clear());
         AddExtraOwnerCommand = new RelayCommand(_ => AddExtraOwner(), _ => !string.IsNullOrWhiteSpace(NewOwnerInput));
         RemoveExtraOwnerCommand = new RelayCommand(o => RemoveExtraOwner(o as string ?? SelectedExtraOwner), o => (o as string ?? SelectedExtraOwner) is { Length: > 0 });
+        AddLocalSourceFolderCommand = new RelayCommand(_ => AddLocalSourceFolder(), _ => !string.IsNullOrWhiteSpace(NewLocalSourceInput));
+        RemoveLocalSourceFolderCommand = new RelayCommand(o => RemoveLocalSourceFolder(o as string ?? SelectedLocalSourceFolder), o => (o as string ?? SelectedLocalSourceFolder) is { Length: > 0 });
         OpenBrowserExtensionsPageCommand = new RelayCommand(_ => OpenBrowserExtensionsPage(), _ => SelectedBrowser != null);
         OpenPolicyPageCommand = new RelayCommand(_ => OpenPolicyPage(), _ => SelectedBrowser != null);
         ReviewPolicyReadinessCommand = new RelayCommand(_ => ReviewPolicyReadiness(), _ => SelectedBrowser != null);
@@ -305,6 +315,26 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    public string NewLocalSourceInput
+    {
+        get => _newLocalSourceInput;
+        set
+        {
+            if (SetField(ref _newLocalSourceInput, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
+    public string? SelectedLocalSourceFolder
+    {
+        get => _selectedLocalSourceFolder;
+        set
+        {
+            if (SetField(ref _selectedLocalSourceFolder, value))
+                CommandManager.InvalidateRequerySuggested();
+        }
+    }
+
     public string LaunchUrlInput
     {
         get => _launchUrlInput;
@@ -436,8 +466,8 @@ public sealed class MainViewModel : ViewModelBase
     public int InstalledCount => _extensions.Installed.Count;
     public int AvailableCount => Extensions.Count;
     public int UpdateAvailableCount => Extensions.Count(e => e.IsUpdateAvailable);
-    public int InstallableUpdateCount => Extensions.Count(e => e.IsUpdateAvailable && e.HasAsset);
-    public int PermissionReviewUpdateCount => Extensions.Count(e => e.IsUpdateAvailable && e.HasAsset && e.HasUpdatePermissionExpansion);
+    public int InstallableUpdateCount => Extensions.Count(e => e.IsUpdateAvailable && e.HasInstallSource);
+    public int PermissionReviewUpdateCount => Extensions.Count(e => e.IsUpdateAvailable && e.HasInstallSource && e.HasUpdatePermissionExpansion);
     public int VisibleCount => ExtensionsView.Cast<object>().Count();
     public int HiddenRepoCount => _settings.HiddenRepos.Count;
     public bool HasInstalledExtensions => InstalledCount > 0;
@@ -451,7 +481,7 @@ public sealed class MainViewModel : ViewModelBase
         ? "No installed extensions have newer catalog versions."
         : InstallableUpdateCount == UpdateAvailableCount
             ? $"{UpdateAvailableCount} installed extension(s) can be updated.{PermissionReviewSuffix}"
-            : $"{InstallableUpdateCount} of {UpdateAvailableCount} update(s) have installable release assets.{PermissionReviewSuffix}";
+            : $"{InstallableUpdateCount} of {UpdateAvailableCount} update(s) have installable release assets or local sources.{PermissionReviewSuffix}";
     private string PermissionReviewSuffix => PermissionReviewUpdateCount == 0
         ? string.Empty
         : $" {PermissionReviewUpdateCount} add new permissions and require review.";
@@ -567,7 +597,8 @@ public sealed class MainViewModel : ViewModelBase
         var q = SearchText.Trim();
         return vm.Title.Contains(q, StringComparison.OrdinalIgnoreCase)
             || vm.Description.Contains(q, StringComparison.OrdinalIgnoreCase)
-            || vm.Repo.Contains(q, StringComparison.OrdinalIgnoreCase);
+            || vm.Repo.Contains(q, StringComparison.OrdinalIgnoreCase)
+            || (vm.Info.LocalSourcePath?.Contains(q, StringComparison.OrdinalIgnoreCase) ?? false);
     }
 
     private async Task RefreshAsync()
@@ -577,7 +608,7 @@ public sealed class MainViewModel : ViewModelBase
         try
         {
             var logProgress = new Progress<string>(Log);
-            var infos = (await _github.DiscoverAsync(_settings, logProgress)).ToList();
+            var infos = await DiscoverCatalogAsync(logProgress);
             RebuildExtensionCards(infos);
             ApplyServiceState(_github.LastState, infos.Count);
             if (_settings.AutoUpdateOnRefresh && HasInstallableUpdates)
@@ -599,6 +630,17 @@ public sealed class MainViewModel : ViewModelBase
         {
             Busy = false;
         }
+    }
+
+    private async Task<List<ExtensionInfo>> DiscoverCatalogAsync(IProgress<string> logProgress)
+    {
+        var infos = (await _github.DiscoverAsync(_settings, logProgress)).ToList();
+        var hidden = new HashSet<string>(_settings.HiddenRepos, StringComparer.OrdinalIgnoreCase);
+        var localInfos = _localSources.Discover(_settings.LocalSourceFolders, logProgress)
+            .Where(info => !hidden.Contains($"{info.RepoOwner}/{info.RepoName}"))
+            .ToList();
+        infos.AddRange(localInfos);
+        return infos;
     }
 
     private void RebuildExtensionCards(IEnumerable<ExtensionInfo> infos)
@@ -649,9 +691,13 @@ public sealed class MainViewModel : ViewModelBase
                 Log(StatusText);
                 break;
             case GitHubServiceStatus.Empty:
-                GitHubStatusSummary = "GitHub: connected, but no extension-shaped repos were returned.";
+                GitHubStatusSummary = count > 0
+                    ? "GitHub: connected, no GitHub repos; local sources loaded."
+                    : "GitHub: connected, but no extension-shaped repos were returned.";
                 IsDegraded = false;
-                StatusText = "No extension-shaped repos found for the configured owner(s).";
+                StatusText = count > 0
+                    ? $"Found {count} extension(s) including local source folders — {InstalledCount} installed."
+                    : "No extension-shaped repos found for the configured owner(s).";
                 Log(state.Detail ?? StatusText);
                 break;
             case GitHubServiceStatus.Unauthorized:
@@ -734,6 +780,7 @@ public sealed class MainViewModel : ViewModelBase
         _settings.AutoUpdateOnRefresh = AutoUpdateOnRefresh;
         // Persist current ExtraOwners ordering — already kept in sync with the ObservableCollection.
         _settings.ExtraOwners = ExtraOwners.ToList();
+        _settings.LocalSourceFolders = LocalSourceFolders.ToList();
         _settingsService.Save(_settings);
         OnPropertyChanged(nameof(TopicFilter));
         SyncSettingsInputs();
@@ -748,7 +795,7 @@ public sealed class MainViewModel : ViewModelBase
         string operationName = "Update")
     {
         var updateCards = Extensions.Where(c => c.IsUpdateAvailable).ToList();
-        var installableCards = updateCards.Where(c => c.HasAsset).ToList();
+        var installableCards = updateCards.Where(c => c.HasInstallSource).ToList();
         if (updateCards.Count == 0)
         {
             StatusText = "No extension updates are available.";
@@ -758,8 +805,8 @@ public sealed class MainViewModel : ViewModelBase
 
         if (installableCards.Count == 0)
         {
-            StatusText = "Updates were detected, but none have installable release assets.";
-            Log("Updates were detected, but none have installable release assets.");
+            StatusText = "Updates were detected, but none have installable release assets or local sources.";
+            Log("Updates were detected, but none have installable release assets or local sources.");
             return;
         }
 
@@ -1474,7 +1521,7 @@ public sealed class MainViewModel : ViewModelBase
         }
 
         var confirm = _dialogs.Confirm(
-            $"Import {manifest.Extensions.Count} extension(s) from this environment manifest?\n\nLocalChromeStore will update discovery settings, refresh GitHub, and install any matching release assets that are missing or outdated. Existing local installs are not removed.",
+            $"Import {manifest.Extensions.Count} extension(s) from this environment manifest?\n\nLocalChromeStore will update discovery settings, refresh GitHub/local sources, and install any matching sources that are missing or outdated. Existing local installs are not removed.",
             "Import environment");
         if (!confirm) return;
 
@@ -1486,6 +1533,7 @@ public sealed class MainViewModel : ViewModelBase
             _settingsService.Save(_settings);
             SyncSettingsInputs();
             ReloadExtraOwnersFromSettings();
+            ReloadLocalSourceFoldersFromSettings();
             Log($"Imported environment settings from {path}.");
 
             await RefreshCatalogForImportAsync();
@@ -1508,7 +1556,7 @@ public sealed class MainViewModel : ViewModelBase
     private async Task RefreshCatalogForImportAsync()
     {
         StatusText = "Refreshing catalog for import...";
-        var infos = await _github.DiscoverAsync(_settings, new Progress<string>(Log));
+        var infos = await DiscoverCatalogAsync(new Progress<string>(Log));
         RebuildExtensionCards(infos);
         ApplyServiceState(_github.LastState, infos.Count);
     }
@@ -1525,7 +1573,7 @@ public sealed class MainViewModel : ViewModelBase
             var existing = _extensions.Find(target.RepoOwner, target.RepoName);
             cards.TryGetValue(target.Key, out var card);
             var action = ImportExportService.ClassifyImportTarget(
-                existing, target.Version, hasCard: card is not null, cardHasAsset: card?.HasAsset ?? false);
+                existing, target.Version, hasCard: card is not null, cardHasInstallSource: card?.HasInstallSource ?? false);
 
             switch (action)
             {
@@ -1539,7 +1587,7 @@ public sealed class MainViewModel : ViewModelBase
                     continue;
                 case ImportAction.MissingAsset:
                     missing++;
-                    Log($"! Import missing asset: {target.Key} has no installable ZIP/CRX release asset.");
+                    Log($"! Import missing source: {target.Key} has no installable ZIP/CRX release asset or local source.");
                     continue;
             }
 
@@ -1614,6 +1662,7 @@ public sealed class MainViewModel : ViewModelBase
         sb.AppendLine($"  Primary user:  {_settings.GitHubUser}");
         sb.AppendLine($"  Token present: {(string.IsNullOrEmpty(_settings.GitHubToken) ? "no" : "yes (DPAPI on disk)")}");
         sb.AppendLine($"  Extra owners:  {(ExtraOwners.Count == 0 ? "(none)" : string.Join(", ", ExtraOwners))}");
+        sb.AppendLine($"  Local sources: {(LocalSourceFolders.Count == 0 ? "(none)" : string.Join(" | ", LocalSourceFolders))}");
         sb.AppendLine($"  Status:        {GitHubStatusSummary}");
         sb.AppendLine($"  Rate limit:    {RateLimitSummary}");
         sb.AppendLine($"  Topic filter:  {(_settings.UseTopicFilter ? _settings.TopicFilter : "(disabled)")}");
@@ -1696,6 +1745,8 @@ public sealed class MainViewModel : ViewModelBase
             sb.AppendLine($"  {info.RepoOwner}/{info.RepoName}");
             sb.AppendLine($"    Framework:    {FrameworkLabels.Label(info.Framework)}");
             sb.AppendLine($"    Source:       {FrameworkLabels.DiscoveryLabel(info.DiscoverySource)}{(info.ManifestSourcePath is null ? "" : $" ({info.ManifestSourcePath})")}");
+            if (!string.IsNullOrWhiteSpace(info.LocalSourcePath))
+                sb.AppendLine($"    Source path:  {info.LocalSourcePath}");
             sb.AppendLine($"    Asset:        {FrameworkLabels.AssetLabel(info.AssetKind)}{(info.AssetName is null ? "" : $" — {info.AssetName}")}");
             sb.AppendLine($"    Provenance:   {ReleaseProvenance.DiagnosticsSummary(info, ext.Installed)}");
             sb.AppendLine($"    Manifest ver: {(info.ManifestVersionNumber.HasValue ? "MV" + info.ManifestVersionNumber : "unknown")}");
@@ -1727,6 +1778,10 @@ public sealed class MainViewModel : ViewModelBase
     private void Log(string line) => _logSink.Append(line);
 
     public bool HasExtraOwners => ExtraOwners.Count > 0;
+    public bool HasLocalSourceFolders => LocalSourceFolders.Count > 0;
+    public string LocalSourceSummary => LocalSourceFolders.Count == 0
+        ? "No local source folders configured."
+        : $"{LocalSourceFolders.Count} local source folder(s) configured.";
 
     private void ReloadExtraOwnersFromSettings()
     {
@@ -1736,12 +1791,22 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasExtraOwners));
     }
 
+    private void ReloadLocalSourceFoldersFromSettings()
+    {
+        LocalSourceFolders.Clear();
+        foreach (var path in _settings.LocalSourceFolders.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct(StringComparer.OrdinalIgnoreCase))
+            LocalSourceFolders.Add(path.Trim());
+        OnPropertyChanged(nameof(HasLocalSourceFolders));
+        OnPropertyChanged(nameof(LocalSourceSummary));
+    }
+
     private void SyncSettingsInputs()
     {
         GitHubUserInput = _settings.GitHubUser;
         GitHubTokenInput = _settings.GitHubToken ?? string.Empty;
         LaunchUrlInput = _settings.LaunchUrl ?? string.Empty;
         LaunchProfileMode = _settings.LaunchProfileMode;
+        ReloadLocalSourceFoldersFromSettings();
         OnPropertyChanged(nameof(LaunchBrowserAfterInstall));
         OnPropertyChanged(nameof(AutoUpdateOnRefresh));
         OnPropertyChanged(nameof(UseTopicFilter));
@@ -1788,6 +1853,84 @@ public sealed class MainViewModel : ViewModelBase
             SelectedExtraOwner = null;
         StatusText = $"Removed '{match}' from extra owners.";
         Log($"Removed extra owner '{match}'.");
+    }
+
+    private void AddLocalSourceFolder()
+    {
+        var raw = NewLocalSourceInput.Trim();
+        if (string.IsNullOrWhiteSpace(raw)) return;
+        if (!TryNormalizeLocalSourceFolder(raw, out var folder, out var error))
+        {
+            StatusText = error;
+            Log($"! Local source not added: {error}");
+            NewLocalSourceInput = string.Empty;
+            return;
+        }
+
+        if (!Directory.Exists(folder))
+        {
+            StatusText = $"Local source folder does not exist: {folder}";
+            Log($"! Local source not added: folder does not exist: {folder}");
+            NewLocalSourceInput = string.Empty;
+            return;
+        }
+
+        if (!File.Exists(Path.Combine(folder, "manifest.json")))
+        {
+            StatusText = $"Local source folder has no manifest.json: {folder}";
+            Log($"! Local source not added: manifest.json not found in {folder}");
+            NewLocalSourceInput = string.Empty;
+            return;
+        }
+
+        if (LocalSourceFolders.Any(p => p.Equals(folder, StringComparison.OrdinalIgnoreCase)))
+        {
+            StatusText = $"Local source folder is already configured: {folder}";
+            Log($"! Local source not added: already configured: {folder}");
+            NewLocalSourceInput = string.Empty;
+            return;
+        }
+
+        LocalSourceFolders.Add(folder);
+        _settings.LocalSourceFolders = LocalSourceFolders.ToList();
+        _settingsService.Save(_settings);
+        OnPropertyChanged(nameof(HasLocalSourceFolders));
+        OnPropertyChanged(nameof(LocalSourceSummary));
+        NewLocalSourceInput = string.Empty;
+        StatusText = $"Added local source folder: {folder}";
+        Log($"Added local source folder '{folder}'. Run Refresh to link it into the catalog.");
+    }
+
+    private void RemoveLocalSourceFolder(string? folder)
+    {
+        if (string.IsNullOrWhiteSpace(folder)) return;
+        var match = LocalSourceFolders.FirstOrDefault(p => p.Equals(folder, StringComparison.OrdinalIgnoreCase));
+        if (match is null) return;
+        LocalSourceFolders.Remove(match);
+        _settings.LocalSourceFolders = LocalSourceFolders.ToList();
+        _settingsService.Save(_settings);
+        OnPropertyChanged(nameof(HasLocalSourceFolders));
+        OnPropertyChanged(nameof(LocalSourceSummary));
+        if (string.Equals(SelectedLocalSourceFolder, match, StringComparison.OrdinalIgnoreCase))
+            SelectedLocalSourceFolder = null;
+        StatusText = $"Removed local source folder: {match}";
+        Log($"Removed local source folder '{match}'.");
+    }
+
+    private static bool TryNormalizeLocalSourceFolder(string raw, out string folder, out string error)
+    {
+        folder = string.Empty;
+        error = string.Empty;
+        try
+        {
+            folder = Path.GetFullPath(Environment.ExpandEnvironmentVariables(raw.Trim().Trim('"')));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = $"Invalid local source folder path: {ex.Message}";
+            return false;
+        }
     }
 
     private void ReloadLoadSetsFromService()
