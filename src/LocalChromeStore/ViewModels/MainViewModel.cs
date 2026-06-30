@@ -19,6 +19,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly BrowserLauncher _launcher;
     private readonly BrowserLaunchManager _launchManager;
     private readonly BrowserConformanceService _conformance;
+    private readonly IChromeForTestingInstaller _chromeForTesting;
     private readonly LoadSetManager _loadSets;
     private readonly PolicyPackageService _policyPackages;
     private readonly PolicyPackageRiskScanner _policyRiskScanner;
@@ -79,6 +80,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand ReviewPolicyReadinessCommand { get; }
     public ICommand ExportDiagnosticsCommand { get; }
     public ICommand RunBrowserConformanceCommand { get; }
+    public ICommand InstallChromeForTestingCommand { get; }
     public ICommand ExportEnvironmentCommand { get; }
     public ICommand ImportEnvironmentCommand { get; }
     public ICommand ExportCatalogCommand { get; }
@@ -92,7 +94,7 @@ public sealed class MainViewModel : ViewModelBase
     public MainViewModel() : this(null) { }
 
     /// <summary>Test/DI seam: inject a fake <see cref="IDialogService"/> to run the view model headlessly.</summary>
-    public MainViewModel(IDialogService? dialogs)
+    public MainViewModel(IDialogService? dialogs, IChromeForTestingInstaller? chromeForTestingInstaller = null)
     {
         _dialogs = dialogs ?? new DialogService();
         _settingsService = new SettingsService();
@@ -101,6 +103,7 @@ public sealed class MainViewModel : ViewModelBase
         _launcher = new BrowserLauncher(_extensions);
         _launchManager = new BrowserLaunchManager(_launcher);
         _conformance = new BrowserConformanceService(_settingsService);
+        _chromeForTesting = chromeForTestingInstaller ?? new ChromeForTestingInstaller(_settingsService);
         _loadSets = new LoadSetManager(_settingsService);
         _policyPackages = new PolicyPackageService(_settingsService);
         _policyRiskScanner = new PolicyPackageRiskScanner(_settingsService);
@@ -146,6 +149,7 @@ public sealed class MainViewModel : ViewModelBase
         ReviewPolicyReadinessCommand = new RelayCommand(_ => ReviewPolicyReadiness(), _ => SelectedBrowser != null);
         ExportDiagnosticsCommand = new RelayCommand(_ => ExportDiagnostics());
         RunBrowserConformanceCommand = new AsyncRelayCommand(_ => RunBrowserConformanceAsync(), _ => !Busy && Browsers.Count > 0);
+        InstallChromeForTestingCommand = new AsyncRelayCommand(_ => InstallChromeForTestingAsync(), _ => !Busy);
         ExportEnvironmentCommand = new RelayCommand(_ => ExportEnvironment());
         ImportEnvironmentCommand = new AsyncRelayCommand(_ => ImportEnvironmentAsync(), _ => !Busy);
         ExportCatalogCommand = new RelayCommand(_ => ExportCatalog());
@@ -1348,6 +1352,41 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    private async Task InstallChromeForTestingAsync()
+    {
+        Busy = true;
+        try
+        {
+            StatusText = "Installing Chrome for Testing...";
+            Log("Chrome for Testing install: resolving the latest Stable Windows build.");
+            var result = await _chromeForTesting.InstallLatestStableAsync(new Progress<string>(Log));
+            DetectBrowsers();
+
+            var installedBrowser = Browsers.FirstOrDefault(b =>
+                string.Equals(b.ExecutablePath, result.ExecutablePath, StringComparison.OrdinalIgnoreCase));
+            if (installedBrowser is not null)
+                SelectedBrowser = installedBrowser;
+
+            var verb = result.AlreadyInstalled ? "already available" : "installed";
+            StatusText = $"Chrome for Testing {result.Version} {verb}.";
+            Log($"Chrome for Testing {result.Version} {verb}: {result.ExecutablePath}");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "Chrome for Testing install canceled.";
+            Log("! Chrome for Testing install canceled.");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Chrome for Testing install failed: {ex.Message}";
+            Log($"! Chrome for Testing install failed: {ex.Message}");
+        }
+        finally
+        {
+            Busy = false;
+        }
+    }
+
     private void ExportEnvironment()
     {
         var defaultName = $"LocalChromeStore-environment-{DateTime.Now:yyyy-MM-dd-HHmm}.json";
@@ -1542,6 +1581,7 @@ public sealed class MainViewModel : ViewModelBase
         sb.AppendLine($"  Installed manifest: {_settingsService.ManifestPath}");
         sb.AppendLine($"  Extensions root:  {_settingsService.ExtensionsRoot}");
         sb.AppendLine($"  Icon cache:       {_settingsService.IconCacheDir}");
+        sb.AppendLine($"  Chrome for Testing cache: {_chromeForTesting.InstallRoot}");
         sb.AppendLine($"  Log directory:    {_settingsService.LogsDir}");
         sb.AppendLine();
 

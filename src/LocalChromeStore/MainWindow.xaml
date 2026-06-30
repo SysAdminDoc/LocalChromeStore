@@ -197,6 +197,11 @@
                             Margin="0,0,8,0"
                             ToolTip="Logs Enterprise Policy registry target and off-store force-install enrollment readiness." />
 
+                    <Button Content="Get CfT"
+                            Command="{Binding InstallChromeForTestingCommand}"
+                            Margin="0,0,8,0"
+                            ToolTip="Downloads the latest Stable Chrome for Testing into LocalChromeStore's cache and selects it." />
+
                     <TextBlock Grid.Column="6"
                                Text="Load set"
                                Style="{StaticResource InputLabel}"

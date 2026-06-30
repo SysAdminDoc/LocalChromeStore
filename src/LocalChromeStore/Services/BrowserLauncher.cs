@@ -148,6 +148,7 @@ public sealed class BrowserLauncher
             ProgramFiles(@"Google\Chrome for Testing"),
             ProgramFiles86(@"Google\Chrome for Testing"),
             LocalAppData(@"Google\Chrome for Testing"),
+            LocalAppData(@"LocalChromeStore\cache\chrome-for-testing"),
             Path.Combine(userProfile, ".cache", "selenium", "chrome"),
             Path.Combine(userProfile, ".cache", "chrome-for-testing"),
             Path.Combine(userProfile, ".cache", "puppeteer", "chrome")
