@@ -253,10 +253,14 @@
                                    Visibility="{Binding Text, ElementName=LaunchUrlBox, Converter={StaticResource EmptyStringToVis}}" />
                     </Grid>
 
-                    <CheckBox Grid.Column="2"
-                              Content="Clean temp profile"
-                              IsChecked="{Binding LaunchWithTemporaryProfile}"
-                              ToolTip="Creates a new isolated browser profile under LocalChromeStore for each launch."
+                    <ComboBox Grid.Column="2"
+                              ItemsSource="{Binding LaunchProfileModes}"
+                              SelectedValue="{Binding LaunchProfileMode}"
+                              SelectedValuePath="Mode"
+                              DisplayMemberPath="Label"
+                              AutomationProperties.Name="Browser profile mode"
+                              MinWidth="130"
+                              ToolTip="{Binding LaunchProfileModeToolTip}"
                               VerticalAlignment="Center"
                               Margin="14,0,10,0" />
 

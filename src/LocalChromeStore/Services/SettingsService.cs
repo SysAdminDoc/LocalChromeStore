@@ -73,6 +73,8 @@ public sealed class SettingsService
                 TokenWasMigratedFromPlaintext = true;
             }
         }
+        if (s.LaunchWithTemporaryProfile && s.LaunchProfileMode == BrowserProfileMode.Default)
+            s.LaunchProfileMode = BrowserProfileMode.Temporary;
         return s;
     }
 
@@ -92,7 +94,8 @@ public sealed class SettingsService
             LaunchBrowserAfterInstall = settings.LaunchBrowserAfterInstall,
             AutoUpdateOnRefresh = settings.AutoUpdateOnRefresh,
             LaunchUrl = string.IsNullOrWhiteSpace(settings.LaunchUrl) ? null : settings.LaunchUrl.Trim(),
-            LaunchWithTemporaryProfile = settings.LaunchWithTemporaryProfile
+            LaunchProfileMode = settings.LaunchProfileMode,
+            LaunchWithTemporaryProfile = settings.LaunchProfileMode == BrowserProfileMode.Temporary
         };
         var json = JsonSerializer.Serialize(copy, JsonOpts);
         WriteAtomic(SettingsPath, json);

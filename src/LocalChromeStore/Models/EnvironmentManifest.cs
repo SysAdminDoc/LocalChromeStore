@@ -16,6 +16,7 @@ public sealed class EnvironmentSettingsSnapshot
     public string TopicFilter { get; set; } = "chrome-extension";
     public List<string> ExtraOwners { get; set; } = new();
     public string? LaunchUrl { get; set; }
+    public BrowserProfileMode LaunchProfileMode { get; set; } = BrowserProfileMode.Default;
     public bool LaunchWithTemporaryProfile { get; set; }
 }
 

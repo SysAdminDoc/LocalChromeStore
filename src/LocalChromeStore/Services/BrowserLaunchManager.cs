@@ -57,8 +57,7 @@ public sealed class BrowserLaunchManager
             log.Add($"Launched {plan.Browser.DisplayName} without loading {extensionCount} extension(s) - see warning above.");
         }
 
-        if (!string.IsNullOrEmpty(plan.TemporaryProfilePath))
-            log.Add($"Temporary browser profile: {plan.TemporaryProfilePath}");
+        AddProfileLog(log, plan);
         log.Add($"Launch command: {DisplayCommandForPlan(plan)}");
         return (status, log);
     }
@@ -86,33 +85,56 @@ public sealed class BrowserLaunchManager
         bool isSentinel,
         string? loadSetName,
         CancellationToken ct = default)
+        => await LaunchAsync(
+            browser,
+            set,
+            launchUrl,
+            useTemporaryProfile ? BrowserProfileMode.Temporary : BrowserProfileMode.Default,
+            isSentinel,
+            loadSetName,
+            ct);
+
+    public async Task<Outcome> LaunchAsync(
+        BrowserInfo browser,
+        IReadOnlyList<InstalledExtension> set,
+        string? launchUrl,
+        BrowserProfileMode profileMode,
+        bool isSentinel,
+        string? loadSetName,
+        CancellationToken ct = default)
     {
         if (set.Count == 0) return EmptySet(isSentinel, loadSetName);
 
-        var temporaryProfilePath = useTemporaryProfile ? BrowserLauncher.CreateTemporaryProfileDirectory() : null;
-        var plan = BrowserLauncher.BuildLaunchPlan(browser, set, launchUrl, useTemporaryProfile, temporaryProfilePath);
+        var profilePath = profileMode switch
+        {
+            BrowserProfileMode.Temporary => BrowserLauncher.CreateTemporaryProfileDirectory(),
+            BrowserProfileMode.Persistent => BrowserLauncher.CreatePersistentProfileDirectory(browser, LoadSetKey(isSentinel, loadSetName), loadSetName: null),
+            _ => null
+        };
+        var plan = BrowserLauncher.BuildLaunchPlan(browser, set, launchUrl, profileMode, profilePath);
         if (plan.Strategy == LaunchStrategy.CdpLoadUnpacked)
             return await LaunchViaCdpAsync(plan, set, isSentinel, loadSetName, ct);
 
-        return LaunchViaCommandLine(browser, set, launchUrl, useTemporaryProfile, isSentinel, loadSetName);
+        return LaunchViaCommandLine(browser, set, launchUrl, profileMode, profilePath, isSentinel, loadSetName);
     }
 
     private Outcome LaunchViaCommandLine(
         BrowserInfo browser,
         IReadOnlyList<InstalledExtension> set,
         string? launchUrl,
-        bool useTemporaryProfile,
+        BrowserProfileMode profileMode,
+        string? profilePath,
         bool isSentinel,
         string? loadSetName)
     {
         var log = new List<string>();
         try
         {
-            if (!useTemporaryProfile && BrowserLauncher.IsBrowserRunning(browser))
+            if (profileMode == BrowserProfileMode.Default && BrowserLauncher.IsBrowserRunning(browser))
                 log.Add($"! {browser.DisplayName} is already running. Chromium forwards arguments to the existing " +
-                    "window and drops --load-extension, so the extensions may not load. Close it first or enable 'Clean temp profile'.");
+                    "window and drops --load-extension, so the extensions may not load. Close it first or choose an isolated profile mode.");
 
-            var result = _launcher.Launch(browser, set, launchUrl, useTemporaryProfile);
+            var result = _launcher.Launch(browser, set, launchUrl, profileMode, profilePath);
             var (status, describeLog) = DescribeLaunch(result.Plan, set.Count, isSentinel, loadSetName);
             log.AddRange(describeLog);
             return new Outcome(status, log, Launched: true);
@@ -137,8 +159,7 @@ public sealed class BrowserLaunchManager
             "CDP loader selected: launching with --remote-debugging-pipe and Extensions.loadUnpacked."
         };
         foreach (var warning in plan.Warnings) log.Add($"! {warning}");
-        if (!string.IsNullOrEmpty(plan.TemporaryProfilePath))
-            log.Add($"Temporary browser profile: {plan.TemporaryProfilePath}");
+        AddProfileLog(log, plan);
 
         var extensionPaths = ResolveExtensionPaths(set);
         if (extensionPaths.Count == 0)
@@ -147,8 +168,8 @@ public sealed class BrowserLaunchManager
         var command = DisplayCommandForPlan(plan);
         log.Add($"Launch command: {command}");
 
-        if (BrowserLauncher.IsBrowserRunning(plan.Browser) && string.IsNullOrEmpty(plan.TemporaryProfilePath))
-            log.Add($"! {plan.Browser.DisplayName} is already running. CDP pipe launch may attach to no usable pipe; close it first or enable 'Clean temp profile'.");
+        if (BrowserLauncher.IsBrowserRunning(plan.Browser) && plan.ProfileMode == BrowserProfileMode.Default)
+            log.Add($"! {plan.Browser.DisplayName} is already running. CDP pipe launch may attach to no usable pipe; close it first or choose an isolated profile mode.");
 
         try
         {
@@ -195,4 +216,20 @@ public sealed class BrowserLaunchManager
             .Where(p => !string.IsNullOrWhiteSpace(p) && Directory.Exists(p))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+
+    private static void AddProfileLog(List<string> log, BrowserLaunchPlan plan)
+    {
+        var profilePath = plan.ProfilePath ?? plan.TemporaryProfilePath;
+        if (string.IsNullOrWhiteSpace(profilePath)) return;
+        var label = plan.ProfileMode == BrowserProfileMode.Persistent
+            ? "Persistent browser profile"
+            : "Temporary browser profile";
+        log.Add($"{label}: {profilePath}");
+    }
+
+    private static string? LoadSetKey(bool isSentinel, string? loadSetName)
+    {
+        if (isSentinel) return null;
+        return string.IsNullOrWhiteSpace(loadSetName) ? "load-set" : loadSetName;
+    }
 }

@@ -86,6 +86,25 @@ public sealed class BrowserLaunchManagerTests
     }
 
     [Fact]
+    public void DescribeLaunch_SurfacesPersistentProfile()
+    {
+        var plan = new BrowserLaunchPlan
+        {
+            Browser = Chrome(),
+            Arguments = new[] { "--user-data-dir=C:\\profiles\\dev", "--load-extension=C:\\e" },
+            ExtensionCount = 1,
+            Strategy = LaunchStrategy.CommandLineLoad,
+            LoadsExtensions = true,
+            ProfileMode = BrowserProfileMode.Persistent,
+            ProfilePath = @"C:\profiles\dev"
+        };
+
+        var (_, log) = BrowserLaunchManager.DescribeLaunch(plan, 1, isSentinel: false, "Dev");
+
+        Assert.Contains(@"Persistent browser profile: C:\profiles\dev", log);
+    }
+
+    [Fact]
     public void DisplayCommandForPlan_CdpStrategy_AddsPipeFlags()
     {
         var plan = new BrowserLaunchPlan
@@ -172,6 +191,43 @@ public sealed class BrowserLaunchManagerTests
             var log = string.Join("\n", outcome.Log);
             Assert.Contains("Cannot load extension with file or directory name _metadata", log);
             Assert.Contains("Fallback: use Chrome for Testing", log);
+        }
+        finally
+        {
+            TryDelete(root);
+        }
+    }
+
+    [Fact]
+    public async Task LaunchAsync_CdpStrategy_PersistentProfilePassesStableUserDataDir()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "LocalChromeStore.Tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var ext = Path.Combine(root, "ext");
+            Directory.CreateDirectory(ext);
+            var fake = new FakeCdpLoader(new CdpLoadResult(
+                true,
+                1,
+                1,
+                "loaded",
+                new[] { new CdpLoadAttempt(ext, true, "abcdefghijklmnopabcdefghijklmnop", "loaded") }));
+            var manager = CreateManager(root, fake);
+
+            var outcome = await manager.LaunchAsync(
+                Chrome(142),
+                new[] { Installed("owner", "one", ext) },
+                launchUrl: null,
+                profileMode: BrowserProfileMode.Persistent,
+                isSentinel: false,
+                loadSetName: "Dev");
+
+            Assert.True(outcome.Launched);
+            Assert.Contains("Persistent browser profile:", string.Join("\n", outcome.Log));
+            Assert.Contains(fake.ExtraArgs, a => a.StartsWith("--user-data-dir=", StringComparison.Ordinal)
+                && a.Contains("persistent", StringComparison.OrdinalIgnoreCase)
+                && a.Contains("load-set-dev", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {

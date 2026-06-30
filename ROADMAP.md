@@ -6,7 +6,6 @@ Roadmap_Blocked.md.
 ## P2
 
 1. **Local/source-aware extension development**
-   - Add persistent per-project browser profile launches.
    - Detect and optionally download Chrome for Testing.
    - Add a debug session panel with browser path, profile path, loaded extensions, startup URL, and launch arguments.
    - Capture browser stdout/stderr and policy/load errors into the activity log.

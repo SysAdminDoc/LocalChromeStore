@@ -74,4 +74,39 @@ public sealed class SettingsServiceTests
         Assert.True(File.Exists(svc.ManifestPath + ".bak"));
         Assert.Equal("2.0.0", svc.LoadManifest().Extensions[0].Version);
     }
+
+    [Fact]
+    public void Load_MigratesLegacyTemporaryProfileFlagToProfileMode()
+    {
+        var root = NewRoot();
+        var svc = new SettingsService(appDataRoot: root, localAppDataRoot: root);
+        File.WriteAllText(svc.SettingsPath,
+            """
+            {
+              "GitHubUser": "alice",
+              "LaunchWithTemporaryProfile": true
+            }
+            """);
+
+        var loaded = svc.Load();
+
+        Assert.True(loaded.LaunchWithTemporaryProfile);
+        Assert.Equal(BrowserProfileMode.Temporary, loaded.LaunchProfileMode);
+    }
+
+    [Fact]
+    public void Save_PersistsProfileModeAndLegacyFlag()
+    {
+        var root = NewRoot();
+        var svc = new SettingsService(appDataRoot: root, localAppDataRoot: root);
+
+        svc.Save(new AppSettings { GitHubUser = "alice", LaunchProfileMode = BrowserProfileMode.Persistent });
+        var json = File.ReadAllText(svc.SettingsPath);
+        var loaded = svc.Load();
+
+        Assert.Contains("\"LaunchProfileMode\": 1", json);
+        Assert.Contains("\"LaunchWithTemporaryProfile\": false", json);
+        Assert.Equal(BrowserProfileMode.Persistent, loaded.LaunchProfileMode);
+        Assert.False(loaded.LaunchWithTemporaryProfile);
+    }
 }

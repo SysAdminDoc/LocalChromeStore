@@ -86,6 +86,46 @@ public sealed class BrowserLauncherTests
     }
 
     [Fact]
+    public void BuildLaunchPlan_PersistentProfile_AddsStableUserDataDir()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "LocalChromeStore.Tests", Guid.NewGuid().ToString("N"));
+        var ext = Path.Combine(root, "ext");
+        var profile = Path.Combine(root, "profiles", "persistent", "chrome", "dev");
+        Directory.CreateDirectory(ext);
+        var chrome = new BrowserInfo { Kind = BrowserKind.Chrome, DisplayName = "Chrome", ExecutablePath = Path.Combine(root, "chrome.exe"), MajorVersion = 120 };
+
+        var plan = BrowserLauncher.BuildLaunchPlan(
+            chrome,
+            new[] { Installed("owner", "one", ext) },
+            launchUrl: null,
+            profileMode: BrowserProfileMode.Persistent,
+            browserProfilePath: profile);
+
+        Assert.Equal(BrowserProfileMode.Persistent, plan.ProfileMode);
+        Assert.Equal(profile, plan.ProfilePath);
+        Assert.Null(plan.TemporaryProfilePath);
+        Assert.Contains($"--user-data-dir={profile}", plan.Arguments);
+        Assert.Contains("--no-first-run", plan.Arguments);
+        Assert.Contains($"--load-extension={ext}", plan.Arguments);
+    }
+
+    [Fact]
+    public void BuildPersistentProfilePath_IsStableForBrowserAndLoadSet()
+    {
+        var browser = new BrowserInfo
+        {
+            Kind = BrowserKind.ChromeForTesting,
+            DisplayName = "Chrome for Testing",
+            ExecutablePath = @"C:\Browser\chrome.exe",
+            MajorVersion = 149
+        };
+
+        var path = BrowserLauncher.BuildPersistentProfilePath(@"C:\LocalData", browser, "Dev Tools", null);
+
+        Assert.Equal(Path.Combine(@"C:\LocalData", "LocalChromeStore", "profiles", "persistent", "chromefortesting", "load-set-dev-tools"), path);
+    }
+
+    [Fact]
     public void BuildLaunchPlan_BrandedChrome142_OmitsLoadAndWarns()
     {
         var root = Path.Combine(Path.GetTempPath(), "LocalChromeStore.Tests", Guid.NewGuid().ToString("N"));

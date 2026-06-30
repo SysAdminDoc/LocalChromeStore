@@ -36,7 +36,8 @@ public static class EnvironmentManifestService
                     .OrderBy(o => o, StringComparer.OrdinalIgnoreCase)
                     .ToList(),
                 LaunchUrl = string.IsNullOrWhiteSpace(settings.LaunchUrl) ? null : settings.LaunchUrl.Trim(),
-                LaunchWithTemporaryProfile = settings.LaunchWithTemporaryProfile
+                LaunchProfileMode = settings.LaunchProfileMode,
+                LaunchWithTemporaryProfile = settings.LaunchProfileMode == BrowserProfileMode.Temporary
             },
             Extensions = installed
                 .OrderBy(e => e.RepoOwner, StringComparer.OrdinalIgnoreCase)
@@ -85,6 +86,7 @@ public static class EnvironmentManifestService
 
         var importedKeys = new HashSet<string>(manifest.Extensions.Select(e => e.Key), StringComparer.OrdinalIgnoreCase);
 
+        var launchProfileMode = ResolveProfileMode(manifest.Settings);
         return new AppSettings
         {
             GitHubUser = primary,
@@ -102,7 +104,8 @@ public static class EnvironmentManifestService
             LaunchBrowserAfterInstall = current.LaunchBrowserAfterInstall,
             AutoUpdateOnRefresh = current.AutoUpdateOnRefresh,
             LaunchUrl = string.IsNullOrWhiteSpace(manifest.Settings.LaunchUrl) ? current.LaunchUrl : manifest.Settings.LaunchUrl.Trim(),
-            LaunchWithTemporaryProfile = manifest.Settings.LaunchWithTemporaryProfile
+            LaunchProfileMode = launchProfileMode,
+            LaunchWithTemporaryProfile = launchProfileMode == BrowserProfileMode.Temporary
         };
     }
 
@@ -134,6 +137,12 @@ public static class EnvironmentManifestService
         HostPermissions = e.HostPermissions.ToList(),
         OptionalHostPermissions = e.OptionalHostPermissions.ToList()
     };
+
+    private static BrowserProfileMode ResolveProfileMode(EnvironmentSettingsSnapshot settings)
+    {
+        if (settings.LaunchProfileMode != BrowserProfileMode.Default) return settings.LaunchProfileMode;
+        return settings.LaunchWithTemporaryProfile ? BrowserProfileMode.Temporary : BrowserProfileMode.Default;
+    }
 
     private static void Validate(EnvironmentManifest manifest)
     {

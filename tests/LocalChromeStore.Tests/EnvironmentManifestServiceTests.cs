@@ -17,7 +17,7 @@ public sealed class EnvironmentManifestServiceTests
             TopicFilter = "chrome-extension",
             ExtraOwners = ["extra", "primary"],
             LaunchUrl = " https://example.test ",
-            LaunchWithTemporaryProfile = true
+            LaunchProfileMode = BrowserProfileMode.Persistent
         };
         var installed = new[]
         {
@@ -59,6 +59,8 @@ public sealed class EnvironmentManifestServiceTests
         Assert.Equal("primary", manifest.Settings.GitHubUser);
         Assert.Equal(["extra"], manifest.Settings.ExtraOwners);
         Assert.Equal("https://example.test", manifest.Settings.LaunchUrl);
+        Assert.Equal(BrowserProfileMode.Persistent, manifest.Settings.LaunchProfileMode);
+        Assert.False(manifest.Settings.LaunchWithTemporaryProfile);
         Assert.Single(manifest.Extensions);
         Assert.Equal(3, manifest.Extensions[0].ManifestVersionNumber);
         Assert.Equal("api-digest", manifest.Extensions[0].ChecksumSource);
@@ -89,7 +91,8 @@ public sealed class EnvironmentManifestServiceTests
                 GitHubUser = "primary",
                 UseTopicFilter = false,
                 TopicFilter = "chrome-extension",
-                ExtraOwners = ["extra"]
+                ExtraOwners = ["extra"],
+                LaunchProfileMode = BrowserProfileMode.Persistent
             },
             Extensions =
             [
@@ -115,6 +118,8 @@ public sealed class EnvironmentManifestServiceTests
         Assert.Equal("C:\\Browser\\chrome.exe", applied.PreferredBrowserPath);
         Assert.True(applied.LaunchBrowserAfterInstall);
         Assert.True(applied.AutoUpdateOnRefresh);
+        Assert.Equal(BrowserProfileMode.Persistent, applied.LaunchProfileMode);
+        Assert.False(applied.LaunchWithTemporaryProfile);
         Assert.Equal(["extra"], applied.ExtraOwners);
         Assert.Equal(["someone/Other"], applied.HiddenRepos);
     }

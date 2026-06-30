@@ -31,6 +31,7 @@ public sealed class BrowserLauncher
 
     private readonly ExtensionService _extensions;
     private const string TemporaryProfilePlaceholder = "<new temporary LocalChromeStore profile>";
+    private const string PersistentProfilePlaceholder = "<persistent LocalChromeStore browser profile>";
 
     public BrowserLauncher(ExtensionService extensions)
     {
@@ -233,8 +234,19 @@ public sealed class BrowserLauncher
         string? launchUrl = null,
         bool useTemporaryProfile = false)
     {
-        var temporaryProfilePath = useTemporaryProfile ? CreateTemporaryProfileDirectory() : null;
-        var plan = BuildLaunchPlan(browser, overrideSet ?? _extensions.Installed, launchUrl, useTemporaryProfile, temporaryProfilePath);
+        var mode = useTemporaryProfile ? BrowserProfileMode.Temporary : BrowserProfileMode.Default;
+        return Launch(browser, overrideSet, launchUrl, mode, browserProfilePath: null);
+    }
+
+    public BrowserLaunchResult Launch(
+        BrowserInfo browser,
+        IEnumerable<InstalledExtension>? overrideSet,
+        string? launchUrl,
+        BrowserProfileMode profileMode,
+        string? browserProfilePath = null)
+    {
+        var resolvedProfilePath = ResolveProfilePath(browser, profileMode, browserProfilePath);
+        var plan = BuildLaunchPlan(browser, overrideSet ?? _extensions.Installed, launchUrl, profileMode, resolvedProfilePath);
 
         var psi = new ProcessStartInfo
         {
@@ -258,6 +270,19 @@ public sealed class BrowserLauncher
         string? launchUrl = null,
         bool useTemporaryProfile = false,
         string? temporaryProfilePath = null)
+        => BuildLaunchPlan(
+            browser,
+            installed,
+            launchUrl,
+            useTemporaryProfile ? BrowserProfileMode.Temporary : BrowserProfileMode.Default,
+            temporaryProfilePath);
+
+    public static BrowserLaunchPlan BuildLaunchPlan(
+        BrowserInfo browser,
+        IEnumerable<InstalledExtension> installed,
+        string? launchUrl,
+        BrowserProfileMode profileMode,
+        string? browserProfilePath = null)
     {
         var paths = installed
             .Select(e => e.InstallPath)
@@ -270,11 +295,11 @@ public sealed class BrowserLauncher
 
         var args = new List<string>();
         string? profilePath = null;
-        if (useTemporaryProfile)
+        if (profileMode != BrowserProfileMode.Default)
         {
-            profilePath = string.IsNullOrWhiteSpace(temporaryProfilePath)
-                ? TemporaryProfilePlaceholder
-                : temporaryProfilePath;
+            profilePath = string.IsNullOrWhiteSpace(browserProfilePath)
+                ? (profileMode == BrowserProfileMode.Temporary ? TemporaryProfilePlaceholder : PersistentProfilePlaceholder)
+                : browserProfilePath;
             args.Add($"--user-data-dir={profilePath}");
             args.Add("--no-first-run");
             args.Add("--no-default-browser-check");
@@ -306,7 +331,9 @@ public sealed class BrowserLauncher
             Browser = browser,
             Arguments = args,
             ExtensionCount = paths.Count,
-            TemporaryProfilePath = profilePath,
+            ProfileMode = profileMode,
+            ProfilePath = profilePath,
+            TemporaryProfilePath = profileMode == BrowserProfileMode.Temporary ? profilePath : null,
             Strategy = strategy,
             LoadsExtensions = paths.Count == 0 || loadsViaCommandLine,
             Warnings = warnings
@@ -383,6 +410,55 @@ public sealed class BrowserLauncher
         return path;
     }
 
+    public static string CreatePersistentProfileDirectory(BrowserInfo browser, string? loadSetId, string? loadSetName)
+    {
+        var path = BuildPersistentProfilePath(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            browser,
+            loadSetId,
+            loadSetName);
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    public static string BuildPersistentProfilePath(string localAppDataRoot, BrowserInfo browser, string? loadSetId, string? loadSetName)
+    {
+        var setPart = string.IsNullOrWhiteSpace(loadSetId)
+            ? "all-installed"
+            : $"{SanitizePathPart(loadSetName ?? "load-set")}-{SanitizePathPart(loadSetId)}";
+        return Path.Combine(
+            localAppDataRoot,
+            "LocalChromeStore",
+            "profiles",
+            "persistent",
+            SanitizePathPart(browser.Kind.ToString()),
+            setPart);
+    }
+
+    private static string? ResolveProfilePath(BrowserInfo browser, BrowserProfileMode profileMode, string? browserProfilePath) => profileMode switch
+    {
+        BrowserProfileMode.Temporary => string.IsNullOrWhiteSpace(browserProfilePath)
+            ? CreateTemporaryProfileDirectory()
+            : browserProfilePath,
+        BrowserProfileMode.Persistent => string.IsNullOrWhiteSpace(browserProfilePath)
+            ? CreatePersistentProfileDirectory(browser, loadSetId: null, loadSetName: null)
+            : browserProfilePath,
+        _ => null
+    };
+
+    private static string SanitizePathPart(string value)
+    {
+        var invalid = Path.GetInvalidFileNameChars();
+        Span<char> buffer = stackalloc char[value.Length];
+        var length = 0;
+        foreach (var c in value)
+        {
+            buffer[length++] = Array.IndexOf(invalid, c) >= 0 || char.IsWhiteSpace(c) ? '-' : char.ToLowerInvariant(c);
+        }
+        var result = new string(buffer[..length]).Trim('-');
+        return string.IsNullOrWhiteSpace(result) ? "profile" : result;
+    }
+
     private static string ProgramFiles(string rel) =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), rel);
     private static string ProgramFiles86(string rel) =>
@@ -396,6 +472,8 @@ public sealed class BrowserLaunchPlan
     public required BrowserInfo Browser { get; init; }
     public required IReadOnlyList<string> Arguments { get; init; }
     public required int ExtensionCount { get; init; }
+    public BrowserProfileMode ProfileMode { get; init; } = BrowserProfileMode.Default;
+    public string? ProfilePath { get; init; }
     public string? TemporaryProfilePath { get; init; }
     public LaunchStrategy Strategy { get; init; }
 

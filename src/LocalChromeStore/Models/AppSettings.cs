@@ -1,5 +1,12 @@
 namespace LocalChromeStore.Models;
 
+public enum BrowserProfileMode
+{
+    Default,
+    Persistent,
+    Temporary
+}
+
 public sealed class AppSettings
 {
     public string GitHubUser { get; set; } = "SysAdminDoc";
@@ -12,5 +19,6 @@ public sealed class AppSettings
     public bool LaunchBrowserAfterInstall { get; set; } = false;
     public bool AutoUpdateOnRefresh { get; set; } = false;
     public string? LaunchUrl { get; set; }
+    public BrowserProfileMode LaunchProfileMode { get; set; } = BrowserProfileMode.Default;
     public bool LaunchWithTemporaryProfile { get; set; } = false;
 }

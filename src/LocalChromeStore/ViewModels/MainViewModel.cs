@@ -40,7 +40,7 @@ public sealed class MainViewModel : ViewModelBase
     private string _githubStatusSummary = "GitHub: ready.";
     private bool _isDegraded;
     private string _launchUrlInput = string.Empty;
-    private bool _launchWithTemporaryProfile;
+    private BrowserProfileMode _launchProfileMode;
     private LoadSet? _selectedLoadSet;
     private string _newLoadSetNameInput = string.Empty;
     private bool _selfUpdateAvailable;
@@ -55,6 +55,12 @@ public sealed class MainViewModel : ViewModelBase
     public ObservableCollection<BrowserInfo> Browsers { get; } = new();
     public ObservableCollection<string> ExtraOwners { get; } = new();
     public ObservableCollection<LoadSet> LoadSets { get; } = new();
+    public ObservableCollection<LaunchProfileModeOption> LaunchProfileModes { get; } = new(
+    [
+        new(BrowserProfileMode.Default, "Default", "Use the selected browser's normal profile."),
+        new(BrowserProfileMode.Persistent, "Persistent", "Reuse a LocalChromeStore profile for this browser and load set."),
+        new(BrowserProfileMode.Temporary, "Clean temp", "Create a fresh isolated profile for each launch.")
+    ]);
     public ObservableCollection<string> HiddenRepos { get; } = new();
 
     public ICommand RefreshCommand { get; }
@@ -105,7 +111,7 @@ public sealed class MainViewModel : ViewModelBase
         _githubUserInput = _settings.GitHubUser;
         _githubTokenInput = _settings.GitHubToken ?? string.Empty;
         _launchUrlInput = _settings.LaunchUrl ?? string.Empty;
-        _launchWithTemporaryProfile = _settings.LaunchWithTemporaryProfile;
+        _launchProfileMode = _settings.LaunchProfileMode;
         ReloadExtraOwnersFromSettings();
         SyncHiddenReposCollection();
         ReloadLoadSetsFromService();
@@ -311,17 +317,32 @@ public sealed class MainViewModel : ViewModelBase
 
     public bool LaunchWithTemporaryProfile
     {
-        get => _launchWithTemporaryProfile;
+        get => LaunchProfileMode == BrowserProfileMode.Temporary;
         set
         {
-            if (SetField(ref _launchWithTemporaryProfile, value))
+            LaunchProfileMode = value ? BrowserProfileMode.Temporary : BrowserProfileMode.Default;
+        }
+    }
+
+    public BrowserProfileMode LaunchProfileMode
+    {
+        get => _launchProfileMode;
+        set
+        {
+            if (SetField(ref _launchProfileMode, value))
             {
-                _settings.LaunchWithTemporaryProfile = value;
+                _settings.LaunchProfileMode = value;
+                _settings.LaunchWithTemporaryProfile = value == BrowserProfileMode.Temporary;
                 _settingsService.Save(_settings);
+                OnPropertyChanged(nameof(LaunchWithTemporaryProfile));
+                OnPropertyChanged(nameof(LaunchProfileModeToolTip));
                 RefreshLaunchPreviewProperties();
             }
         }
     }
+
+    public string LaunchProfileModeToolTip =>
+        LaunchProfileModes.FirstOrDefault(m => m.Mode == LaunchProfileMode)?.Description ?? LaunchProfileSummary;
 
     public LoadSet? SelectedLoadSet
     {
@@ -331,6 +352,7 @@ public sealed class MainViewModel : ViewModelBase
             if (SetField(ref _selectedLoadSet, value))
             {
                 OnPropertyChanged(nameof(ActiveLoadSetLabel));
+                OnPropertyChanged(nameof(LaunchProfileModeToolTip));
                 RefreshLaunchPreviewProperties();
                 CommandManager.InvalidateRequerySuggested();
             }
@@ -458,7 +480,9 @@ public sealed class MainViewModel : ViewModelBase
         {
             var profilePart = LaunchWithTemporaryProfile
                 ? "Clean profile: each launch uses a new isolated browser profile under LocalChromeStore."
-                : "Default profile: launch uses the selected browser's normal profile.";
+                : LaunchProfileMode == BrowserProfileMode.Persistent
+                    ? "Persistent profile: reuses a LocalChromeStore browser profile for this browser and load set."
+                    : "Default profile: launch uses the selected browser's normal profile.";
             if (_selectedLoadSet is not null && _selectedLoadSet.Id != SentinelLoadSet.Id)
                 return $"{profilePart} Load set: {_selectedLoadSet.Name} ({_selectedLoadSet.ExtensionKeys?.Count ?? 0} extension(s)).";
             return profilePart;
@@ -470,11 +494,12 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SelectedBrowser is null) return "Select a supported Chromium browser to preview launch arguments.";
             var extensions = GetActiveLoadSetExtensions(_extensions.Installed);
-            var plan = _launcher.BuildLaunchPlan(
+            var plan = BrowserLauncher.BuildLaunchPlan(
                 SelectedBrowser,
                 extensions,
                 NormalizeLaunchUrl(LaunchUrlInput),
-                LaunchWithTemporaryProfile);
+                LaunchProfileMode,
+                PreviewProfilePath(SelectedBrowser));
             return BrowserLaunchManager.DisplayCommandForPlan(plan);
         }
     }
@@ -674,7 +699,8 @@ public sealed class MainViewModel : ViewModelBase
         _settings.GitHubToken = string.IsNullOrWhiteSpace(GitHubTokenInput) ? null : GitHubTokenInput.Trim();
         _settings.TopicFilter = topic;
         _settings.LaunchUrl = NormalizeLaunchUrl(LaunchUrlInput);
-        _settings.LaunchWithTemporaryProfile = LaunchWithTemporaryProfile;
+        _settings.LaunchProfileMode = LaunchProfileMode;
+        _settings.LaunchWithTemporaryProfile = LaunchProfileMode == BrowserProfileMode.Temporary;
         _settings.LaunchBrowserAfterInstall = LaunchBrowserAfterInstall;
         _settings.AutoUpdateOnRefresh = AutoUpdateOnRefresh;
         // Persist current ExtraOwners ordering — already kept in sync with the ObservableCollection.
@@ -872,11 +898,12 @@ public sealed class MainViewModel : ViewModelBase
         // this keeps the saved state consistent with what is actually launched).
         var launchUrl = NormalizeLaunchUrl(LaunchUrlInput);
         _settings.LaunchUrl = launchUrl;
-        _settings.LaunchWithTemporaryProfile = LaunchWithTemporaryProfile;
+        _settings.LaunchProfileMode = LaunchProfileMode;
+        _settings.LaunchWithTemporaryProfile = LaunchProfileMode == BrowserProfileMode.Temporary;
         _settingsService.Save(_settings);
 
         ApplyLaunchOutcome(await _launchManager.LaunchAsync(
-            SelectedBrowser, set, launchUrl, LaunchWithTemporaryProfile, isSentinel, _selectedLoadSet?.Name));
+            SelectedBrowser, set, launchUrl, LaunchProfileMode, isSentinel, _selectedLoadSet?.Name));
     }
 
     private void ApplyLaunchOutcome(BrowserLaunchManager.Outcome outcome)
@@ -1536,7 +1563,7 @@ public sealed class MainViewModel : ViewModelBase
             sb.AppendLine($"  {b.Kind,-8} {b.DisplayName,-18} {b.ExecutablePath}");
         sb.AppendLine($"  Selected:      {SelectedBrowser?.DisplayName ?? "(none)"}");
         sb.AppendLine($"  Launch URL:    {NormalizeLaunchUrl(LaunchUrlInput) ?? "(none)"}");
-        sb.AppendLine($"  Temp profile:  {LaunchWithTemporaryProfile}");
+        sb.AppendLine($"  Profile mode:  {LaunchProfileMode}");
         sb.AppendLine($"  Launch command preview: {LaunchPreview}");
         sb.AppendLine();
 
@@ -1649,7 +1676,7 @@ public sealed class MainViewModel : ViewModelBase
         GitHubUserInput = _settings.GitHubUser;
         GitHubTokenInput = _settings.GitHubToken ?? string.Empty;
         LaunchUrlInput = _settings.LaunchUrl ?? string.Empty;
-        LaunchWithTemporaryProfile = _settings.LaunchWithTemporaryProfile;
+        LaunchProfileMode = _settings.LaunchProfileMode;
         OnPropertyChanged(nameof(LaunchBrowserAfterInstall));
         OnPropertyChanged(nameof(AutoUpdateOnRefresh));
         OnPropertyChanged(nameof(UseTopicFilter));
@@ -1811,7 +1838,22 @@ public sealed class MainViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(LaunchPreview));
         OnPropertyChanged(nameof(LaunchProfileSummary));
+        OnPropertyChanged(nameof(LaunchProfileModeToolTip));
         OnPropertyChanged(nameof(ActiveLoadSetLabel));
+    }
+
+    private string? PreviewProfilePath(BrowserInfo browser)
+    {
+        return LaunchProfileMode switch
+        {
+            BrowserProfileMode.Persistent => BrowserLauncher.BuildPersistentProfilePath(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                browser,
+                LoadSetManager.IsSentinel(_selectedLoadSet) ? null : _selectedLoadSet?.Name,
+                loadSetName: null),
+            BrowserProfileMode.Temporary => null,
+            _ => null
+        };
     }
 
     private static string DescribeCatalogChecksum(ExtensionInfo info)
@@ -1828,6 +1870,11 @@ public sealed class MainViewModel : ViewModelBase
         var trimmed = value?.Trim();
         return string.IsNullOrWhiteSpace(trimmed) ? null : trimmed;
     }
+}
+
+public sealed record LaunchProfileModeOption(BrowserProfileMode Mode, string Label, string Description)
+{
+    public override string ToString() => Label;
 }
 
 internal sealed class Dispatcher_LogSink

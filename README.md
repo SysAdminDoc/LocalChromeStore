@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.7-cba6f7?style=for-the-badge" alt="Version" /></a>
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.8-cba6f7?style=for-the-badge" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
@@ -43,7 +43,7 @@ LocalChromeStore wraps path 2 with a real store UI today. It also wires path 3 f
 - **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with every installed extension, version-gating the load strategy (plain `--load-extension`, the Chromium 137+ `--disable-features` override, or CDP `Extensions.loadUnpacked` over `--remote-debugging-pipe` for branded Chrome 142+, which removed command-line extension loading)
 - **Browser loading conformance** — opt-in **Conformance** action creates a tiny MV3 fixture extension, launches every detected browser/Chrome for Testing build in an isolated profile, records strategy/arguments/CDP IDs or errors, and writes JSON/text reports into diagnostics logs
 - **Guided Enterprise Policy workflow** — per-card **Policy** / **Rollback** actions package CRX3 with RSA-2048, run local package-risk preflight checks, generate or copy self-hosted `update.xml`, map Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, write Edge `ExtensionSettings.override_update_url`, check policy/update/CRX health, and roll back registry entries without deleting packaged artifacts
-- **Auditable launch sessions** — optional startup URL, clean temporary profile mode, and a copyable launch command preview
+- **Auditable launch sessions** — optional startup URL, default/persistent/clean-temp browser profile modes, and a copyable launch command preview
 - **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
 - **Update workflow** — update-available badges, permission-change review, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
 - **Self-update check** — on launch, compares the running build to the latest GitHub release and shows a dismissible banner with a download link when a newer version is available (never auto-installs itself)
@@ -94,7 +94,7 @@ To load installed extensions into a browser:
 
 1. Pick the browser from the dropdown
 2. *(Optional)* Enter a startup URL to open after the extensions load
-3. *(Optional)* Enable **Clean temp profile** to launch with an isolated browser profile under `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\`
+3. Pick a **Browser profile mode**: **Default** uses the browser's normal profile, **Persistent** reuses a LocalChromeStore profile for the selected browser/load set, and **Clean temp** creates a fresh isolated profile under `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\`
 4. Click **Launch session**
 
 LocalChromeStore uses the best supported load strategy for the selected browser: plain `--load-extension` on older/pre-lockdown builds, the Chromium 137+ override where it still works, or CDP `Extensions.loadUnpacked` for branded Chrome builds that removed command-line extension loading. Command-line-loaded extensions can show the browser's standard developer-mode banner; that is normal and not a sign anything is wrong. The extensions persist for that browsing session; close the browser and they unload (which is exactly what you want during dev/test).
@@ -138,6 +138,7 @@ Repos with no manifest and no release ZIP/CRX are skipped — they won't clutter
 | `%APPDATA%\LocalChromeStore\policy-keys\` | Persistent CRX3 signing keys for policy packages |
 | `%LOCALAPPDATA%\LocalChromeStore\extensions\<owner>\<repo>\<version>\` | Extracted extension files |
 | `%LOCALAPPDATA%\LocalChromeStore\policy-packages\<owner>\<repo>\<version>\` | Generated CRX/update.xml policy artifacts |
+| `%LOCALAPPDATA%\LocalChromeStore\profiles\persistent\` | Reusable browser profiles for persistent launch sessions |
 | `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\` | Clean temporary Chromium profiles created for launch sessions |
 | `%LOCALAPPDATA%\LocalChromeStore\cache\icons\` | Cached extension icons |
 | `%LOCALAPPDATA%\LocalChromeStore\cache\policy-risk\malicious-extension-ids.txt` | Optional local malicious-extension ID feed for policy preflight |
@@ -176,6 +177,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history.
 - **v0.3.5** — Browser loading conformance harness with MV3 fixture generation, Chrome for Testing detection, isolated profile probes, CDP result capture, and JSON/text reports linked from diagnostics
 - **v0.3.6** — Policy package-risk preflight blocks MV2, remote executable code, dynamic eval/CSP hazards, and known malicious extension IDs before HKLM policy writes
 - **v0.3.7** — Release asset provenance on cards, inspect review, catalog/environment exports, and diagnostics, including GitHub asset IDs, upload/update timestamps, uploader/content type/downloads, checksum source, and changed-since-install status
+- **v0.3.8** — Persistent per-browser/load-set launch profiles with a Default/Persistent/Clean-temp selector, diagnostics/export persistence, and stable `--user-data-dir` preview/logging
 
 **Planned**
 
