@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Collections.ObjectModel;
 using LocalChromeStore.Models;
 
 namespace LocalChromeStore.Services;
@@ -233,10 +234,11 @@ public sealed class BrowserLauncher
         BrowserInfo browser,
         IEnumerable<InstalledExtension>? overrideSet = null,
         string? launchUrl = null,
-        bool useTemporaryProfile = false)
+        bool useTemporaryProfile = false,
+        IProgress<string>? outputLog = null)
     {
         var mode = useTemporaryProfile ? BrowserProfileMode.Temporary : BrowserProfileMode.Default;
-        return Launch(browser, overrideSet, launchUrl, mode, browserProfilePath: null);
+        return Launch(browser, overrideSet, launchUrl, mode, browserProfilePath: null, outputLog);
     }
 
     public BrowserLaunchResult Launch(
@@ -244,7 +246,8 @@ public sealed class BrowserLauncher
         IEnumerable<InstalledExtension>? overrideSet,
         string? launchUrl,
         BrowserProfileMode profileMode,
-        string? browserProfilePath = null)
+        string? browserProfilePath = null,
+        IProgress<string>? outputLog = null)
     {
         var resolvedProfilePath = ResolveProfilePath(browser, profileMode, browserProfilePath);
         var plan = BuildLaunchPlan(browser, overrideSet ?? _extensions.Installed, launchUrl, profileMode, resolvedProfilePath);
@@ -254,8 +257,16 @@ public sealed class BrowserLauncher
             FileName = browser.ExecutablePath,
             UseShellExecute = false,
         };
+        if (outputLog is not null)
+        {
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;
+        }
         foreach (var a in plan.Arguments) psi.ArgumentList.Add(a);
-        return new BrowserLaunchResult(Process.Start(psi), plan);
+        var process = Process.Start(psi);
+        if (outputLog is not null && process is not null)
+            BrowserProcessOutputCapture.Attach(process, browser.DisplayName, outputLog);
+        return new BrowserLaunchResult(process, plan);
     }
 
     public BrowserLaunchPlan BuildLaunchPlan(
@@ -507,3 +518,60 @@ public sealed class BrowserLaunchPlan
 }
 
 public sealed record BrowserLaunchResult(Process? Process, BrowserLaunchPlan Plan);
+
+internal static class BrowserProcessOutputCapture
+{
+    private static readonly object CapturedLock = new();
+    private static readonly Collection<Process> CapturedProcesses = [];
+
+    public static void Attach(Process process, string displayName, IProgress<string> log)
+    {
+        lock (CapturedLock)
+        {
+            CapturedProcesses.Add(process);
+        }
+
+        process.EnableRaisingEvents = true;
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (!string.IsNullOrWhiteSpace(e.Data))
+                log.Report($"Browser stdout ({displayName}): {e.Data}");
+        };
+        process.ErrorDataReceived += (_, e) =>
+        {
+            if (!string.IsNullOrWhiteSpace(e.Data))
+                log.Report($"! Browser stderr ({displayName}): {e.Data}");
+        };
+        process.Exited += (_, _) =>
+        {
+            try
+            {
+                var exitCode = process.ExitCode;
+                var prefix = exitCode == 0 ? "Browser process exited" : "! Browser process exited";
+                log.Report($"{prefix} ({displayName}) with code {exitCode}.");
+            }
+            catch (Exception ex)
+            {
+                log.Report($"! Browser process exit capture failed ({displayName}): {ex.Message}");
+            }
+            finally
+            {
+                lock (CapturedLock)
+                {
+                    CapturedProcesses.Remove(process);
+                }
+                process.Dispose();
+            }
+        };
+
+        try
+        {
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+        }
+        catch (Exception ex)
+        {
+            log.Report($"! Browser stdout/stderr capture failed ({displayName}): {ex.Message}");
+        }
+    }
+}

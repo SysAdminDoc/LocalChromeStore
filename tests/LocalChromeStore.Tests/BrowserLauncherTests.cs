@@ -141,6 +141,39 @@ public sealed class BrowserLauncherTests
         Assert.NotEmpty(plan.Warnings);
     }
 
+    [Fact]
+    public void BrowserProcessOutputCapture_StreamsStdoutStderrAndExitCode()
+    {
+        var powershell = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "WindowsPowerShell",
+            "v1.0",
+            "powershell.exe");
+        Assert.True(File.Exists(powershell));
+        var progress = new CollectingProgress();
+        var psi = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = powershell,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        psi.ArgumentList.Add("-NoProfile");
+        psi.ArgumentList.Add("-Command");
+        psi.ArgumentList.Add("[Console]::Out.WriteLine('out-line'); [Console]::Error.WriteLine('err-line'); exit 7");
+        var process = System.Diagnostics.Process.Start(psi) ?? throw new InvalidOperationException("Process did not start.");
+
+        BrowserProcessOutputCapture.Attach(process, "test browser", progress);
+
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < deadline && !progress.Lines.Any(l => l.Contains("code 7", StringComparison.Ordinal)))
+            Thread.Sleep(50);
+
+        Assert.Contains(progress.Lines, l => l.Contains("Browser stdout (test browser): out-line", StringComparison.Ordinal));
+        Assert.Contains(progress.Lines, l => l.Contains("! Browser stderr (test browser): err-line", StringComparison.Ordinal));
+        Assert.Contains(progress.Lines, l => l.Contains("! Browser process exited (test browser) with code 7.", StringComparison.Ordinal));
+    }
+
     private static InstalledExtension Installed(string owner, string repo, string path) => new()
     {
         RepoOwner = owner,
@@ -150,4 +183,29 @@ public sealed class BrowserLauncherTests
         ManifestPath = Path.Combine(path, "manifest.json"),
         InstalledAt = DateTimeOffset.UtcNow
     };
+
+    private sealed class CollectingProgress : IProgress<string>
+    {
+        private readonly object _lock = new();
+        private readonly List<string> _lines = [];
+
+        public IReadOnlyList<string> Lines
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _lines.ToList();
+                }
+            }
+        }
+
+        public void Report(string value)
+        {
+            lock (_lock)
+            {
+                _lines.Add(value);
+            }
+        }
+    }
 }

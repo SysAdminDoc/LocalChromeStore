@@ -6,7 +6,6 @@ Roadmap_Blocked.md.
 ## P2
 
 1. **Local/source-aware extension development**
-   - Capture browser stdout/stderr and policy/load errors into the activity log.
    - Add a local source-folder extension source.
    - Resolve framework build outputs such as `.output/chrome-mv3`, `build/chrome-mv3-prod`, `dist`, `extension`, and `public`.
    - Add a release-readiness checklist.

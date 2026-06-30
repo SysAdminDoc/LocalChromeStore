@@ -932,7 +932,7 @@ public sealed class MainViewModel : ViewModelBase
         _settingsService.Save(_settings);
 
         ApplyLaunchOutcome(await _launchManager.LaunchAsync(
-            SelectedBrowser, set, launchUrl, LaunchProfileMode, isSentinel, _selectedLoadSet?.Name));
+            SelectedBrowser, set, launchUrl, LaunchProfileMode, isSentinel, _selectedLoadSet?.Name, new Progress<string>(Log)));
     }
 
     private void ApplyLaunchOutcome(BrowserLaunchManager.Outcome outcome)

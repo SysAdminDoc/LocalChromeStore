@@ -98,9 +98,39 @@ public sealed class BrowserLaunchManager
         BrowserInfo browser,
         IReadOnlyList<InstalledExtension> set,
         string? launchUrl,
+        bool useTemporaryProfile,
+        bool isSentinel,
+        string? loadSetName,
+        IProgress<string>? liveLog,
+        CancellationToken ct = default)
+        => await LaunchAsync(
+            browser,
+            set,
+            launchUrl,
+            useTemporaryProfile ? BrowserProfileMode.Temporary : BrowserProfileMode.Default,
+            isSentinel,
+            loadSetName,
+            liveLog,
+            ct);
+
+    public async Task<Outcome> LaunchAsync(
+        BrowserInfo browser,
+        IReadOnlyList<InstalledExtension> set,
+        string? launchUrl,
         BrowserProfileMode profileMode,
         bool isSentinel,
         string? loadSetName,
+        CancellationToken ct = default)
+        => await LaunchAsync(browser, set, launchUrl, profileMode, isSentinel, loadSetName, liveLog: null, ct: ct);
+
+    public async Task<Outcome> LaunchAsync(
+        BrowserInfo browser,
+        IReadOnlyList<InstalledExtension> set,
+        string? launchUrl,
+        BrowserProfileMode profileMode,
+        bool isSentinel,
+        string? loadSetName,
+        IProgress<string>? liveLog,
         CancellationToken ct = default)
     {
         if (set.Count == 0) return EmptySet(isSentinel, loadSetName);
@@ -115,7 +145,7 @@ public sealed class BrowserLaunchManager
         if (plan.Strategy == LaunchStrategy.CdpLoadUnpacked)
             return await LaunchViaCdpAsync(plan, set, isSentinel, loadSetName, ct);
 
-        return LaunchViaCommandLine(browser, set, launchUrl, profileMode, profilePath, isSentinel, loadSetName);
+        return LaunchViaCommandLine(browser, set, launchUrl, profileMode, profilePath, isSentinel, loadSetName, liveLog);
     }
 
     private Outcome LaunchViaCommandLine(
@@ -125,7 +155,8 @@ public sealed class BrowserLaunchManager
         BrowserProfileMode profileMode,
         string? profilePath,
         bool isSentinel,
-        string? loadSetName)
+        string? loadSetName,
+        IProgress<string>? liveLog)
     {
         var log = new List<string>();
         try
@@ -134,9 +165,11 @@ public sealed class BrowserLaunchManager
                 log.Add($"! {browser.DisplayName} is already running. Chromium forwards arguments to the existing " +
                     "window and drops --load-extension, so the extensions may not load. Close it first or choose an isolated profile mode.");
 
-            var result = _launcher.Launch(browser, set, launchUrl, profileMode, profilePath);
+            var result = _launcher.Launch(browser, set, launchUrl, profileMode, profilePath, liveLog);
             var (status, describeLog) = DescribeLaunch(result.Plan, set.Count, isSentinel, loadSetName);
             log.AddRange(describeLog);
+            if (liveLog is not null)
+                log.Add($"Browser stdout/stderr capture enabled for {browser.DisplayName}; output will stream into the activity log.");
             return new Outcome(status, log, Launched: true);
         }
         catch (Exception ex)
