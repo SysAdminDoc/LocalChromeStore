@@ -496,15 +496,40 @@ public sealed class MainViewModel : ViewModelBase
     {
         get
         {
-            if (SelectedBrowser is null) return "Select a supported Chromium browser to preview launch arguments.";
-            var extensions = GetActiveLoadSetExtensions(_extensions.Installed);
-            var plan = BrowserLauncher.BuildLaunchPlan(
-                SelectedBrowser,
-                extensions,
-                NormalizeLaunchUrl(LaunchUrlInput),
-                LaunchProfileMode,
-                PreviewProfilePath(SelectedBrowser));
+            var plan = BuildCurrentLaunchPlan();
+            if (plan is null) return "Select a supported Chromium browser to preview launch arguments.";
             return BrowserLaunchManager.DisplayCommandForPlan(plan);
+        }
+    }
+    public string LaunchDebugBrowserPath => SelectedBrowser?.ExecutablePath ?? "(none)";
+    public string LaunchDebugProfilePath
+    {
+        get
+        {
+            var plan = BuildCurrentLaunchPlan();
+            if (plan is null) return "(none)";
+            return plan.ProfileMode == BrowserProfileMode.Default
+                ? "(default browser profile)"
+                : plan.ProfilePath ?? "(profile path unavailable)";
+        }
+    }
+    public string LaunchDebugLoadedExtensions
+    {
+        get
+        {
+            var extensions = GetActiveLoadSetExtensions(_extensions.Installed);
+            if (extensions.Count == 0) return "(none)";
+            return $"{extensions.Count}: {string.Join(", ", extensions.Select(e => $"{e.RepoOwner}/{e.RepoName}@{e.Version}"))}";
+        }
+    }
+    public string LaunchDebugStartupUrl => NormalizeLaunchUrl(LaunchUrlInput) ?? "(none)";
+    public string LaunchDebugArguments
+    {
+        get
+        {
+            var plan = BuildCurrentLaunchPlan();
+            if (plan is null || plan.Arguments.Count == 0) return "(none)";
+            return string.Join(" ", plan.Arguments.Select(QuoteDebugArgument));
         }
     }
     public bool ShowEmptyState => !Busy && VisibleCount == 0;
@@ -1880,6 +1905,23 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(LaunchProfileSummary));
         OnPropertyChanged(nameof(LaunchProfileModeToolTip));
         OnPropertyChanged(nameof(ActiveLoadSetLabel));
+        OnPropertyChanged(nameof(LaunchDebugBrowserPath));
+        OnPropertyChanged(nameof(LaunchDebugProfilePath));
+        OnPropertyChanged(nameof(LaunchDebugLoadedExtensions));
+        OnPropertyChanged(nameof(LaunchDebugStartupUrl));
+        OnPropertyChanged(nameof(LaunchDebugArguments));
+    }
+
+    private BrowserLaunchPlan? BuildCurrentLaunchPlan()
+    {
+        if (SelectedBrowser is null) return null;
+        var extensions = GetActiveLoadSetExtensions(_extensions.Installed);
+        return BrowserLauncher.BuildLaunchPlan(
+            SelectedBrowser,
+            extensions,
+            NormalizeLaunchUrl(LaunchUrlInput),
+            LaunchProfileMode,
+            PreviewProfilePath(SelectedBrowser));
     }
 
     private string? PreviewProfilePath(BrowserInfo browser)
@@ -1894,6 +1936,15 @@ public sealed class MainViewModel : ViewModelBase
             BrowserProfileMode.Temporary => null,
             _ => null
         };
+    }
+
+    private static string QuoteDebugArgument(string value)
+    {
+        if (string.IsNullOrEmpty(value)) return "\"\"";
+        var escaped = value.Replace("\"", "\\\"");
+        return escaped.Any(char.IsWhiteSpace) || escaped.Contains(',')
+            ? $"\"{escaped}\""
+            : escaped;
     }
 
     private static string DescribeCatalogChecksum(ExtensionInfo info)

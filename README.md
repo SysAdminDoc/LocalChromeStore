@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.9-cba6f7?style=for-the-badge" alt="Version" /></a>
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.3.10-cba6f7?style=for-the-badge" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
@@ -44,7 +44,7 @@ LocalChromeStore wraps path 2 with a real store UI today. It also wires path 3 f
 - **Chrome for Testing tooling** — detects cached Chrome for Testing builds and offers a **Get CfT** action that downloads the latest Stable Windows build into LocalChromeStore's cache for extension-load testing
 - **Browser loading conformance** — opt-in **Conformance** action creates a tiny MV3 fixture extension, launches every detected browser/Chrome for Testing build in an isolated profile, records strategy/arguments/CDP IDs or errors, and writes JSON/text reports into diagnostics logs
 - **Guided Enterprise Policy workflow** — per-card **Policy** / **Rollback** actions package CRX3 with RSA-2048, run local package-risk preflight checks, generate or copy self-hosted `update.xml`, map Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, write Edge `ExtensionSettings.override_update_url`, check policy/update/CRX health, and roll back registry entries without deleting packaged artifacts
-- **Auditable launch sessions** — optional startup URL, default/persistent/clean-temp browser profile modes, and a copyable launch command preview
+- **Auditable launch sessions** — optional startup URL, default/persistent/clean-temp browser profile modes, a copyable launch command preview, and a debug panel for browser path, profile path, loaded extensions, startup URL, and arguments
 - **Environment portability** — export/import installed extension targets and portable discovery settings as JSON
 - **Update workflow** — update-available badges, permission-change review, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
 - **Self-update check** — on launch, compares the running build to the latest GitHub release and shows a dismissible banner with a download link when a newer version is available (never auto-installs itself)
@@ -100,7 +100,7 @@ To load installed extensions into a browser:
 
 LocalChromeStore uses the best supported load strategy for the selected browser: plain `--load-extension` on older/pre-lockdown builds, the Chromium 137+ override where it still works, or CDP `Extensions.loadUnpacked` for branded Chrome builds that removed command-line extension loading. Command-line-loaded extensions can show the browser's standard developer-mode banner; that is normal and not a sign anything is wrong. The extensions persist for that browsing session; close the browser and they unload (which is exactly what you want during dev/test).
 
-Use **Copy args** to copy the exact command LocalChromeStore will run. This is useful when debugging extension load failures or reproducing a launch session outside the app.
+Use **Copy args** to copy the exact command LocalChromeStore will run. The launch debug panel shows the selected browser path, profile path, active extension set, startup URL, and resolved arguments before launch.
 
 To apply Enterprise Policy mode for a managed browser:
 
@@ -181,6 +181,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history.
 - **v0.3.7** — Release asset provenance on cards, inspect review, catalog/environment exports, and diagnostics, including GitHub asset IDs, upload/update timestamps, uploader/content type/downloads, checksum source, and changed-since-install status
 - **v0.3.8** — Persistent per-browser/load-set launch profiles with a Default/Persistent/Clean-temp selector, diagnostics/export persistence, and stable `--user-data-dir` preview/logging
 - **v0.3.9** — Optional Chrome for Testing downloader using the official latest-Stable metadata feed, LocalChromeStore cache extraction, browser auto-detection refresh, diagnostics path reporting, and installer unit tests
+- **v0.3.10** — Launch debug panel showing browser path, profile path, loaded extensions, startup URL, and resolved arguments from the same launch plan used by session launch/copy
 
 **Planned**
 
