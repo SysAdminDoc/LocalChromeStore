@@ -6,12 +6,9 @@ Roadmap_Blocked.md.
 ## P2
 
 1. **Local/source-aware extension development**
-   - Add a WPF UI smoke-test harness.
    - Validate an Octokit 14.x upgrade.
    - Plan the .NET 10 LTS migration before .NET 9 support ends.
    - Add a first-party source adapter interface for future source types.
-
-2. **Historical restore and policy update safety**
 
 ## P3
 
