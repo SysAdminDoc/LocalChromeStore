@@ -448,6 +448,16 @@
                             Visibility="{Binding HasBuildCommand, Converter={StaticResource BoolToVis}}"
                             ToolTip="{Binding BuildCommand}"
                             Margin="0,0,4,0" />
+                    <Button Content="Options"
+                            Style="{StaticResource LinkButton}"
+                            Visibility="{Binding HasOptionsPage, Converter={StaticResource BoolToVis}}"
+                            ToolTip="{Binding OptionsPageLabel}"
+                            Margin="0,0,4,0" />
+                    <Button Content="DevTools"
+                            Style="{StaticResource LinkButton}"
+                            Visibility="{Binding HasDevtoolsPage, Converter={StaticResource BoolToVis}}"
+                            ToolTip="{Binding DevtoolsPageLabel}"
+                            Margin="0,0,4,0" />
                     <Button Content="Why"
                             Style="{StaticResource LinkButton}"
                             ToolTipService.InitialShowDelay="200"

@@ -176,6 +176,10 @@ public sealed class ExtensionCardViewModel : ViewModelBase
                 sb.AppendLine("Manifest version: unknown (manifest could not be parsed).");
             if (HasBuildCommand)
                 sb.AppendLine($"Build command: {BuildCommand}");
+            if (HasOptionsPage)
+                sb.AppendLine($"Options page: {Info.OptionsPage}");
+            if (HasDevtoolsPage)
+                sb.AppendLine($"DevTools page: {Info.DevtoolsPage}");
             if (HasRepoManifest)
                 sb.AppendLine("Catalog manifest: localchromestore.json present.");
             if (!string.IsNullOrEmpty(Info.HomepageUrl))
@@ -295,6 +299,12 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     // F026: build command dry-run
     public string BuildCommand    => FrameworkLabels.BuildCommand(Info.Framework);
     public bool   HasBuildCommand => !string.IsNullOrEmpty(BuildCommand);
+
+    // DevTools/options quick links
+    public bool HasOptionsPage => !string.IsNullOrEmpty(Info.OptionsPage);
+    public string OptionsPageLabel => HasOptionsPage ? $"Options: {Info.OptionsPage}" : string.Empty;
+    public bool HasDevtoolsPage => !string.IsNullOrEmpty(Info.DevtoolsPage);
+    public string DevtoolsPageLabel => HasDevtoolsPage ? $"DevTools: {Info.DevtoolsPage}" : string.Empty;
 
     private void InspectAsync()
     {

@@ -6,8 +6,6 @@ Roadmap_Blocked.md.
 ## P2
 
 1. **Local/source-aware extension development**
-   - Add DevTools/options quick links for installed extensions.
-   - Add native browser policy-page quick links.
    - Add download retry/resume and a parallel-download limit.
    - Add offline cache mode for the last-known catalog and icons.
    - Add a WPF UI smoke-test harness.

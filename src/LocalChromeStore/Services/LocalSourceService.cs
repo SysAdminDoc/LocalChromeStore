@@ -18,6 +18,7 @@ public sealed class LocalSourceService
         ".output/chrome-mv3-dev/manifest.json",
         "build/chrome-mv3-prod/manifest.json",
         "build/chrome-mv3-dev/manifest.json",
+        "src/manifest.json",
         "dist/manifest.json",
         "extension/manifest.json",
         "public/manifest.json"
@@ -136,6 +137,14 @@ public sealed class LocalSourceService
         AppendStringArray(root, "optional_permissions", info.OptionalPermissions);
         AppendStringArray(root, "host_permissions", info.HostPermissions);
         AppendStringArray(root, "optional_host_permissions", info.OptionalHostPermissions);
+
+        if (root.TryGetProperty("options_page", out var optPage) && optPage.ValueKind == JsonValueKind.String)
+            info.OptionsPage = optPage.GetString();
+        else if (root.TryGetProperty("options_ui", out var optUi) && optUi.ValueKind == JsonValueKind.Object
+            && optUi.TryGetProperty("page", out var optUiPage) && optUiPage.ValueKind == JsonValueKind.String)
+            info.OptionsPage = optUiPage.GetString();
+        if (root.TryGetProperty("devtools_page", out var devtools) && devtools.ValueKind == JsonValueKind.String)
+            info.DevtoolsPage = devtools.GetString();
 
         if (info.ManifestVersionNumber == 2 && info.Permissions.Count > 0)
         {

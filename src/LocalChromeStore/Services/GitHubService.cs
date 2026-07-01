@@ -92,7 +92,7 @@ public sealed class GitHubService
     /// <summary>
     /// Discover candidate extensions across the configured user(s).
     /// A repo is considered an extension candidate if it has a manifest.json
-    /// at the root, or in a common subfolder (extension/, src/, dist/), OR its
+    /// at the root, in a common source/output subfolder, OR its
     /// latest release contains a .zip / .crx asset.
     /// </summary>
     public async Task<List<ExtensionInfo>> DiscoverAsync(AppSettings cfg, IProgress<string>? log = null, CancellationToken ct = default)
@@ -444,7 +444,21 @@ public sealed class GitHubService
         return info;
     }
 
-    private static readonly string[] CommonManifestPaths = ["manifest.json", "extension/manifest.json", "src/manifest.json", "dist/manifest.json", "public/manifest.json"];
+    private static readonly string[] CommonManifestPaths =
+    [
+        "manifest.json",
+        ".output/chrome-mv3/manifest.json",
+        ".output/chrome-mv3-prod/manifest.json",
+        ".output/chrome-mv3-dev/manifest.json",
+        "build/chrome-mv3-prod/manifest.json",
+        "build/chrome-mv3-dev/manifest.json",
+        "extension/manifest.json",
+        "src/manifest.json",
+        "dist/manifest.json",
+        "public/manifest.json"
+    ];
+
+    public static IReadOnlyList<string> ManifestProbePaths => CommonManifestPaths;
 
     /// <summary>
     /// Probes the common <c>manifest.json</c> locations via the repo content API exactly once and
@@ -511,6 +525,15 @@ public sealed class GitHubService
                     info.HostPermissions.Add(h);
             }
         }
+
+        // Options page (options_page or options_ui.page) and devtools_page
+        if (root.TryGetProperty("options_page", out var optPage) && optPage.ValueKind == JsonValueKind.String)
+            info.OptionsPage = optPage.GetString();
+        else if (root.TryGetProperty("options_ui", out var optUi) && optUi.ValueKind == JsonValueKind.Object
+            && optUi.TryGetProperty("page", out var optUiPage) && optUiPage.ValueKind == JsonValueKind.String)
+            info.OptionsPage = optUiPage.GetString();
+        if (root.TryGetProperty("devtools_page", out var devtools) && devtools.ValueKind == JsonValueKind.String)
+            info.DevtoolsPage = devtools.GetString();
 
         // Icon: pick the largest available
         if (root.TryGetProperty("icons", out var icons) && icons.ValueKind == JsonValueKind.Object)
