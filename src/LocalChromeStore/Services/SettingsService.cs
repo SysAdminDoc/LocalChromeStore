@@ -96,6 +96,7 @@ public sealed class SettingsService
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList(),
             HiddenRepos = settings.HiddenRepos.ToList(),
+            PinnedRepos = settings.PinnedRepos.ToList(),
             LaunchBrowserAfterInstall = settings.LaunchBrowserAfterInstall,
             AutoUpdateOnRefresh = settings.AutoUpdateOnRefresh,
             LaunchUrl = string.IsNullOrWhiteSpace(settings.LaunchUrl) ? null : settings.LaunchUrl.Trim(),

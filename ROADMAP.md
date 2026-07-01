@@ -3,21 +3,14 @@
 ROADMAP.md is actionable-only. Completed work is removed; blocked work lives in
 Roadmap_Blocked.md.
 
-## P2
-
-1. **Local/source-aware extension development**
-   - Plan the .NET 10 LTS migration before .NET 9 support ends.
-
 ## P3
 
 1. **Later polish and integrations**
    - Add GitHub Pages static update hosting.
    - Add advanced `ExtensionSettings` controls.
-   - Export machine-readable catalog JSON for other tools.
    - Add richer import diagnostics.
    - Add a custom update-feed source.
    - Add a local catalog-file source.
-   - Add pinned/favorite repos.
    - Add license badges.
    - Add release channel selection.
    - Add a GitHub draft-release helper.

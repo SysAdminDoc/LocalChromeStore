@@ -20,6 +20,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     private readonly Func<Task>? _afterInstall;
     private readonly Func<ExtensionCardViewModel, Task>? _applyPolicy;
     private readonly Func<ExtensionCardViewModel, Task>? _rollbackPolicy;
+    private readonly Func<ExtensionCardViewModel, bool>? _isPinned;
+    private readonly Action<ExtensionCardViewModel>? _togglePin;
 
     private bool _busy;
     private string? _busyMessage;
@@ -38,7 +40,9 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         Func<Task>? afterInstall,
         Func<ExtensionCardViewModel, Task>? applyPolicy,
         Func<ExtensionCardViewModel, Task>? rollbackPolicy,
-        Action<ExtensionCardViewModel> hideRepository)
+        Action<ExtensionCardViewModel> hideRepository,
+        Func<ExtensionCardViewModel, bool>? isPinned = null,
+        Action<ExtensionCardViewModel>? togglePin = null)
     {
         Info = info;
         _extensions = extensions;
@@ -49,6 +53,8 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         _afterInstall = afterInstall;
         _applyPolicy = applyPolicy;
         _rollbackPolicy = rollbackPolicy;
+        _isPinned = isPinned;
+        _togglePin = togglePin;
         _installed = extensions.Find(info.RepoOwner, info.RepoName);
 
         InstallCommand = new AsyncRelayCommand(InstallAsync, _ => CanInstall);
@@ -299,6 +305,16 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     // F026: build command dry-run
     public string BuildCommand    => FrameworkLabels.BuildCommand(Info.Framework);
     public bool   HasBuildCommand => !string.IsNullOrEmpty(BuildCommand);
+
+    // Pinned / favorite repos
+    public bool IsPinned => _isPinned?.Invoke(this) ?? false;
+    public string PinLabel => IsPinned ? "Unpin" : "Pin";
+    public ICommand TogglePinCommand => new RelayCommand(_ =>
+    {
+        _togglePin?.Invoke(this);
+        OnPropertyChanged(nameof(IsPinned));
+        OnPropertyChanged(nameof(PinLabel));
+    });
 
     // DevTools/options quick links
     public bool HasOptionsPage => !string.IsNullOrEmpty(Info.OptionsPage);

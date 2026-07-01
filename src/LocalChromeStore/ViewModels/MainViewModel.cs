@@ -132,7 +132,23 @@ public sealed class MainViewModel : ViewModelBase
 
         ExtensionsView = CollectionViewSource.GetDefaultView(Extensions);
         ExtensionsView.Filter = FilterExtension;
-        ExtensionsView.SortDescriptions.Add(new SortDescription(nameof(ExtensionCardViewModel.Title), ListSortDirection.Ascending));
+        if (ExtensionsView is ListCollectionView lcv)
+        {
+            lcv.CustomSort = Comparer<object>.Create((a, b) =>
+            {
+                var va = a as ExtensionCardViewModel;
+                var vb = b as ExtensionCardViewModel;
+                if (va is null || vb is null) return 0;
+                var pinA = va.IsPinned ? 0 : 1;
+                var pinB = vb.IsPinned ? 0 : 1;
+                var pinCmp = pinA.CompareTo(pinB);
+                return pinCmp != 0 ? pinCmp : string.Compare(va.Title, vb.Title, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+        else
+        {
+            ExtensionsView.SortDescriptions.Add(new SortDescription(nameof(ExtensionCardViewModel.Title), ListSortDirection.Ascending));
+        }
 
         RefreshCommand = new AsyncRelayCommand(_ => RefreshAsync(), _ => !Busy);
         UpdateAllCommand = new AsyncRelayCommand(
@@ -682,7 +698,9 @@ public sealed class MainViewModel : ViewModelBase
         OnExtensionInstalledAsync,
         ApplyPolicyInstallAsync,
         RollbackPolicyInstallAsync,
-        HideExtension);
+        HideExtension,
+        card => _settings.PinnedRepos.Contains(card.Repo, StringComparer.OrdinalIgnoreCase),
+        TogglePin);
 
     private void ApplyServiceState(GitHubServiceState state, int count)
     {
@@ -948,6 +966,23 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(ExtensionsPageLabel));
         OnPropertyChanged(nameof(PolicyPageLabel));
         RefreshLaunchPreviewProperties();
+    }
+
+    private void TogglePin(ExtensionCardViewModel card)
+    {
+        var repo = card.Repo;
+        if (_settings.PinnedRepos.Contains(repo, StringComparer.OrdinalIgnoreCase))
+        {
+            _settings.PinnedRepos.RemoveAll(r => r.Equals(repo, StringComparison.OrdinalIgnoreCase));
+            Log($"Unpinned {repo}.");
+        }
+        else
+        {
+            _settings.PinnedRepos.Add(repo);
+            Log($"Pinned {repo}.");
+        }
+        _settingsService.Save(_settings);
+        RefreshExtensionView();
     }
 
     private void HideExtension(ExtensionCardViewModel extension)

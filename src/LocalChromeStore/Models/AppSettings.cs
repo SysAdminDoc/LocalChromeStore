@@ -17,6 +17,7 @@ public sealed class AppSettings
     public List<string> ExtraOwners { get; set; } = new();
     public List<string> LocalSourceFolders { get; set; } = new();
     public List<string> HiddenRepos { get; set; } = new();
+    public List<string> PinnedRepos { get; set; } = new();
     public bool LaunchBrowserAfterInstall { get; set; } = false;
     public bool AutoUpdateOnRefresh { get; set; } = false;
     public string? LaunchUrl { get; set; }

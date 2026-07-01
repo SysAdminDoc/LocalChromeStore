@@ -472,6 +472,11 @@
                             </ToolTip>
                         </Button.ToolTip>
                     </Button>
+                    <Button Content="{Binding PinLabel}"
+                            Style="{StaticResource LinkButton}"
+                            Command="{Binding TogglePinCommand}"
+                            ToolTip="Pin or unpin this extension to keep it at the top of the catalog."
+                            Margin="0,0,4,0" />
                     <Button Content="Hide"
                             Style="{StaticResource LinkButton}"
                             Command="{Binding HideRepositoryCommand}"
