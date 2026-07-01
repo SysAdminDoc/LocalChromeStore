@@ -39,6 +39,18 @@ public sealed class WingetManifestExporterTests
     }
 
     [Fact]
+    public void Generate_EscapesYamlSpecialCharacters()
+    {
+        var yaml = WingetManifestExporter.Generate(
+            "Id", "1.0", "Pub: Corp", "App: Name", "Desc with # comment", "MIT",
+            "https://example.com/release", "https://example.com/asset.zip");
+
+        Assert.Contains("\"Pub: Corp\"", yaml);
+        Assert.Contains("\"App: Name\"", yaml);
+        Assert.Contains("\"Desc with # comment\"", yaml);
+    }
+
+    [Fact]
     public void GenerateForLocalChromeStore_ProducesCorrectId()
     {
         var yaml = WingetManifestExporter.GenerateForLocalChromeStore("0.4.0",

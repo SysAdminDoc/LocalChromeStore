@@ -6,6 +6,7 @@ namespace LocalChromeStore.Services;
 public sealed class UsageStatsService
 {
     private readonly string _path;
+    private readonly object _lock = new();
     private UsageStats _stats;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -20,50 +21,65 @@ public sealed class UsageStatsService
         _stats = Load();
     }
 
-    public UsageStats Current => _stats;
+    public UsageStats Current { get { lock (_lock) return _stats; } }
 
     public void RecordRefresh(int extensionCount)
     {
-        _stats.RefreshCount++;
-        _stats.LastRefreshAt = DateTime.UtcNow;
-        _stats.LastRefreshExtensionCount = extensionCount;
-        Save();
+        lock (_lock)
+        {
+            _stats.RefreshCount++;
+            _stats.LastRefreshAt = DateTime.UtcNow;
+            _stats.LastRefreshExtensionCount = extensionCount;
+            Save();
+        }
     }
 
     public void RecordInstall(string repoKey)
     {
-        _stats.InstallCount++;
-        _stats.LastInstallAt = DateTime.UtcNow;
-        _stats.PerExtension.TryGetValue(repoKey, out var ext);
-        ext.InstallCount++;
-        ext.LastInstalledAt = DateTime.UtcNow;
-        _stats.PerExtension[repoKey] = ext;
-        Save();
+        lock (_lock)
+        {
+            _stats.InstallCount++;
+            _stats.LastInstallAt = DateTime.UtcNow;
+            _stats.PerExtension.TryGetValue(repoKey, out var ext);
+            ext.InstallCount++;
+            ext.LastInstalledAt = DateTime.UtcNow;
+            _stats.PerExtension[repoKey] = ext;
+            Save();
+        }
     }
 
     public void RecordUninstall(string repoKey)
     {
-        _stats.UninstallCount++;
-        _stats.PerExtension.TryGetValue(repoKey, out var ext);
-        ext.UninstallCount++;
-        _stats.PerExtension[repoKey] = ext;
-        Save();
+        lock (_lock)
+        {
+            _stats.UninstallCount++;
+            _stats.PerExtension.TryGetValue(repoKey, out var ext);
+            ext.UninstallCount++;
+            _stats.PerExtension[repoKey] = ext;
+            Save();
+        }
     }
 
     public void RecordLaunch()
     {
-        _stats.LaunchCount++;
-        _stats.LastLaunchAt = DateTime.UtcNow;
-        Save();
+        lock (_lock)
+        {
+            _stats.LaunchCount++;
+            _stats.LastLaunchAt = DateTime.UtcNow;
+            Save();
+        }
     }
 
     public void RecordUpdate(string repoKey)
     {
-        _stats.UpdateCount++;
-        _stats.PerExtension.TryGetValue(repoKey, out var ext);
-        ext.UpdateCount++;
-        _stats.PerExtension[repoKey] = ext;
-        Save();
+        lock (_lock)
+        {
+            _stats.UpdateCount++;
+            _stats.PerExtension.TryGetValue(repoKey, out var ext);
+            ext.UpdateCount++;
+            _stats.PerExtension[repoKey] = ext;
+            Save();
+        }
     }
 
     private UsageStats Load()

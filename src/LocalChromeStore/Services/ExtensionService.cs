@@ -289,23 +289,28 @@ public sealed class ExtensionService
             throw new InvalidOperationException("Not a valid CRX file (magic mismatch).");
 
         int version = BitConverter.ToInt32(data, 4);
-        int zipStart;
+        long zipStart;
         if (version == 2)
         {
             int pubKeyLen = BitConverter.ToInt32(data, 8);
             int sigLen = BitConverter.ToInt32(data, 12);
-            zipStart = 16 + pubKeyLen + sigLen;
+            if (pubKeyLen < 0 || sigLen < 0)
+                throw new InvalidOperationException("CRX2 header contains negative lengths.");
+            zipStart = 16L + pubKeyLen + sigLen;
         }
         else if (version == 3)
         {
             int headerLen = BitConverter.ToInt32(data, 8);
-            zipStart = 12 + headerLen;
+            if (headerLen < 0)
+                throw new InvalidOperationException("CRX3 header contains a negative length.");
+            zipStart = 12L + headerLen;
         }
         else throw new InvalidOperationException($"Unsupported CRX version: {version}");
 
         if (zipStart >= data.Length) throw new InvalidOperationException("CRX header indicates zero-length payload.");
-        var zipBytes = new byte[data.Length - zipStart];
-        Buffer.BlockCopy(data, zipStart, zipBytes, 0, zipBytes.Length);
+        var zipOffset = (int)zipStart;
+        var zipBytes = new byte[data.Length - zipOffset];
+        Buffer.BlockCopy(data, zipOffset, zipBytes, 0, zipBytes.Length);
         ExtractZip(zipBytes, targetDir);
     }
 

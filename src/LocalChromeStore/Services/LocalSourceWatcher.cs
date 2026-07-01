@@ -16,26 +16,29 @@ public sealed class LocalSourceWatcher : IDisposable
 
     public void Watch(IEnumerable<string> folders)
     {
-        StopAll();
-        foreach (var folder in folders)
+        lock (_lock)
         {
-            if (!Directory.Exists(folder)) continue;
-            try
+            DisposeWatchers();
+            foreach (var folder in folders)
             {
-                var watcher = new FileSystemWatcher(folder)
+                if (!Directory.Exists(folder)) continue;
+                try
                 {
-                    NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
-                    Filter = "manifest.json",
-                    IncludeSubdirectories = true,
-                    EnableRaisingEvents = true
-                };
-                watcher.Changed += OnFileChanged;
-                watcher.Created += OnFileChanged;
-                _watchers.Add(watcher);
-            }
-            catch
-            {
-                // Some paths may not be watchable (network shares, etc.)
+                    var watcher = new FileSystemWatcher(folder)
+                    {
+                        NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite | NotifyFilters.Size,
+                        Filter = "manifest.json",
+                        IncludeSubdirectories = true,
+                        EnableRaisingEvents = true
+                    };
+                    watcher.Changed += OnFileChanged;
+                    watcher.Created += OnFileChanged;
+                    _watchers.Add(watcher);
+                }
+                catch
+                {
+                    // Some paths may not be watchable (network shares, etc.)
+                }
             }
         }
     }
@@ -51,15 +54,23 @@ public sealed class LocalSourceWatcher : IDisposable
         _onChanged($"Local source changed: {folder}. Click Refresh to reload the catalog.");
     }
 
-    public void StopAll()
+    private void DisposeWatchers()
     {
         foreach (var w in _watchers)
         {
             w.EnableRaisingEvents = false;
+            w.Changed -= OnFileChanged;
+            w.Created -= OnFileChanged;
             w.Dispose();
         }
         _watchers.Clear();
     }
 
-    public void Dispose() => StopAll();
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            DisposeWatchers();
+        }
+    }
 }

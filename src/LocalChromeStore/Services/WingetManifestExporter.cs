@@ -17,14 +17,14 @@ public static class WingetManifestExporter
     {
         var sb = new StringBuilder();
         sb.AppendLine("# yaml-language-server: $schema=https://aka.ms/winget-manifest.singleton.1.6.0.schema.json");
-        sb.AppendLine($"PackageIdentifier: {packageId}");
-        sb.AppendLine($"PackageVersion: {version}");
+        sb.AppendLine($"PackageIdentifier: {YamlSafe(packageId)}");
+        sb.AppendLine($"PackageVersion: {YamlSafe(version)}");
         sb.AppendLine($"PackageLocale: en-US");
-        sb.AppendLine($"Publisher: {publisher}");
-        sb.AppendLine($"PackageName: {packageName}");
-        sb.AppendLine($"ShortDescription: {TruncateTo(description, 256)}");
-        sb.AppendLine($"License: {license}");
-        sb.AppendLine($"PackageUrl: {releaseUrl}");
+        sb.AppendLine($"Publisher: {YamlSafe(publisher)}");
+        sb.AppendLine($"PackageName: {YamlSafe(packageName)}");
+        sb.AppendLine($"ShortDescription: {YamlSafe(TruncateTo(description, 256))}");
+        sb.AppendLine($"License: {YamlSafe(license)}");
+        sb.AppendLine($"PackageUrl: {YamlSafe(releaseUrl)}");
         sb.AppendLine("Installers:");
         sb.AppendLine("  - Architecture: x64");
         sb.AppendLine("    InstallerType: zip");
@@ -47,6 +47,13 @@ public static class WingetManifestExporter
             releaseUrl: $"https://github.com/SysAdminDoc/LocalChromeStore/releases/tag/v{version}",
             assetUrl: assetUrl,
             sha256: sha256);
+
+    private static string YamlSafe(string value)
+    {
+        if (value.IndexOfAny([':', '#', '{', '}', '[', ']', ',', '&', '*', '?', '|', '-', '<', '>', '=', '!', '%', '@', '`', '\n', '\r']) >= 0)
+            return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+        return value;
+    }
 
     private static string TruncateTo(string s, int max) =>
         s.Length <= max ? s : s[..(max - 3)] + "...";

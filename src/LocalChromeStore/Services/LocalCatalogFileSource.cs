@@ -26,6 +26,8 @@ public sealed class LocalCatalogFileSource : IExtensionSource
                     if (string.IsNullOrWhiteSpace(entry.Owner) || string.IsNullOrWhiteSpace(entry.Name))
                         continue;
 
+                    var assetUrl = ValidateAssetUrl(entry.AssetUrl);
+
                     results.Add(new ExtensionInfo
                     {
                         RepoOwner = entry.Owner,
@@ -35,11 +37,11 @@ public sealed class LocalCatalogFileSource : IExtensionSource
                         ManifestVersion = entry.Version,
                         ManifestDescription = entry.Description,
                         LatestVersion = entry.Version,
-                        AssetUrl = entry.AssetUrl,
+                        AssetUrl = assetUrl,
                         AssetName = entry.AssetName,
-                        DiscoverySource = DiscoverySource.LocalSourceFolder,
-                        AssetKind = !string.IsNullOrEmpty(entry.AssetUrl)
-                            ? (entry.AssetUrl.EndsWith(".crx", StringComparison.OrdinalIgnoreCase) ? AssetKind.Crx : AssetKind.Zip)
+                        DiscoverySource = DiscoverySource.RepoManifest,
+                        AssetKind = !string.IsNullOrEmpty(assetUrl)
+                            ? (assetUrl.EndsWith(".crx", StringComparison.OrdinalIgnoreCase) ? AssetKind.Crx : AssetKind.Zip)
                             : AssetKind.None,
                         Freshness = RepoFreshness.Unknown,
                     });
@@ -80,6 +82,14 @@ public sealed class LocalCatalogFileSource : IExtensionSource
         }
 
         return paths;
+    }
+
+    private static string? ValidateAssetUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return null;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
+        if (uri.Scheme != "https") return null;
+        return url;
     }
 
     private static readonly JsonSerializerOptions JsonOpts = new()

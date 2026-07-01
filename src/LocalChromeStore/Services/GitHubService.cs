@@ -50,18 +50,18 @@ public sealed class GitHubService : IExtensionSource
     private void EnsureProxy(string? proxyUrl)
     {
         if (string.Equals(_activeProxy, proxyUrl, StringComparison.OrdinalIgnoreCase)) return;
+        var old = _http;
         _http = CreateHttpClient(proxyUrl);
         _activeProxy = proxyUrl;
         _client = null;
         _activeToken = null;
+        old.Dispose();
     }
 
     private GitHubClient GetClient(AppSettings cfg)
     {
         EnsureProxy(cfg.ProxyUrl);
         if (_client != null && _activeToken == cfg.GitHubToken) return _client;
-        if (!string.IsNullOrWhiteSpace(cfg.ProxyUrl) && Uri.TryCreate(cfg.ProxyUrl, UriKind.Absolute, out var proxyUri))
-            HttpClient.DefaultProxy = new WebProxy(proxyUri);
         var product = new Octokit.ProductHeaderValue("LocalChromeStore", AppVersion);
         var c = new GitHubClient(product);
         if (!string.IsNullOrWhiteSpace(cfg.GitHubToken))

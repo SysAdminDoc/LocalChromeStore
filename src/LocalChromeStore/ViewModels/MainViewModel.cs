@@ -939,27 +939,20 @@ public sealed class MainViewModel : ViewModelBase
         StatusText = $"{operationName}: updating {installableCards.Count} extension(s)...";
         Log($"{operationName}: updating {installableCards.Count} extension(s).");
 
-        const int maxConcurrent = 3;
-        using var semaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
-        var tasks = installableCards.Select(card => Task.Run(async () =>
+        foreach (var card in installableCards)
         {
-            await semaphore.WaitAsync();
             try
             {
                 await _extensions.InstallAsync(card.Info, new Progress<string>(Log));
-                Interlocked.Increment(ref updated);
+                updated++;
+                _usageStats.RecordInstall(card.Repo);
             }
             catch (Exception ex)
             {
-                Interlocked.Increment(ref failed);
+                failed++;
                 Log($"! {operationName} failed for {card.Repo}: {ex.Message}");
             }
-            finally
-            {
-                semaphore.Release();
-            }
-        })).ToArray();
-        await Task.WhenAll(tasks);
+        }
 
         _extensions.Reload();
         RebuildExtensionCards(catalog);

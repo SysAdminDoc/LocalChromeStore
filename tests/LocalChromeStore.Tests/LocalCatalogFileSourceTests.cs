@@ -59,4 +59,20 @@ public sealed class LocalCatalogFileSourceTests : IDisposable
         var paths = LocalCatalogFileSource.FindCatalogFiles(new AppSettings());
         Assert.NotNull(paths);
     }
+
+    [Theory]
+    [InlineData("https://example.com/test.zip", "https://example.com/test.zip")]
+    [InlineData("http://example.com/test.zip", null)]
+    [InlineData("file:///C:/malicious.zip", null)]
+    [InlineData("ftp://example.com/test.zip", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    [InlineData("not-a-url", null)]
+    public void ValidateAssetUrl_OnlyAllowsHttps(string? input, string? expected)
+    {
+        var method = typeof(LocalCatalogFileSource).GetMethod("ValidateAssetUrl",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+        var result = (string?)method.Invoke(null, [input]);
+        Assert.Equal(expected, result);
+    }
 }
