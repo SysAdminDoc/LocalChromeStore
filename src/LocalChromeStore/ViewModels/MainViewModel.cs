@@ -29,6 +29,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly IDialogService _dialogs;
     private readonly CatalogCacheService _catalogCache;
     private readonly UsageStatsService _usageStats;
+    private readonly LocalSourceWatcher _sourceWatcher;
     private readonly Dispatcher_LogSink _logSink;
     private AppSettings _settings;
     private bool _busy;
@@ -119,6 +120,14 @@ public sealed class MainViewModel : ViewModelBase
         _policyInstaller = new PolicyInstallService();
         _catalogCache = new CatalogCacheService(_settingsService.CacheDir);
         _usageStats = new UsageStatsService(_settingsService.CacheDir);
+        _sourceWatcher = new LocalSourceWatcher(msg =>
+        {
+            Application.Current?.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                Log(msg);
+                StatusText = msg;
+            }));
+        });
         _settings = _settingsService.Load();
         _logSink = new Dispatcher_LogSink(LogLines, new JsonEventLog(_settingsService.LogsDir));
 
@@ -632,6 +641,7 @@ public sealed class MainViewModel : ViewModelBase
             var infos = await DiscoverCatalogAsync(logProgress);
             _catalogCache.Save(infos);
             _usageStats.RecordRefresh(infos.Count);
+            _sourceWatcher.Watch(_settings.LocalSourceFolders);
             RebuildExtensionCards(infos);
             ApplyServiceState(_github.LastState, infos.Count);
             if (_settings.AutoUpdateOnRefresh && HasInstallableUpdates)

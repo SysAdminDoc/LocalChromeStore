@@ -15,7 +15,6 @@ Roadmap_Blocked.md.
    - Add a GitHub draft-release helper.
    - Add remote-hosted-code/CSP package scanning.
    - Add a static package scanner for obfuscation, `eval`, remote imports, and secret leakage.
-   - Add a file watcher with manual reload prompt.
    - Add proxy support.
    - Add a high-contrast theme.
    - Add a light theme and accent picker.
