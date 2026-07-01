@@ -242,17 +242,20 @@
 
                 <Button Grid.Column="0"
                         Content="Open repo on GitHub"
-                        Command="{Binding OpenRepoCommand}" />
+                        Command="{Binding OpenRepoCommand}"
+                        AutomationProperties.Name="Open repository on GitHub" />
                 <Button Grid.Column="2"
                         Content="Install"
                         Style="{StaticResource AccentButton}"
                         Command="{Binding InstallCommand}"
                         IsEnabled="{Binding CanInstall}"
                         MinWidth="110"
-                        Margin="0,0,8,0" />
+                        Margin="0,0,8,0"
+                        AutomationProperties.Name="Install this extension" />
                 <Button Grid.Column="3"
                         Content="Close"
-                        Command="{Binding CloseCommand}" />
+                        Command="{Binding CloseCommand}"
+                        AutomationProperties.Name="Close review panel" />
             </Grid>
         </Border>
     </Grid>

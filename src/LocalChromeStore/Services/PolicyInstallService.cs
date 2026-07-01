@@ -190,7 +190,17 @@ public sealed class PolicyInstallService
         var valueName = existing ?? NextValueName(values.Keys);
 
         _registry.SetStringValue(target.RegistrySubKey, valueName, entry);
-        var edgeSettingsWritten = request.BrowserKind == BrowserKind.Edge && WriteEdgeExtensionSettings(request);
+        bool edgeSettingsWritten = false;
+        try
+        {
+            edgeSettingsWritten = request.BrowserKind == BrowserKind.Edge && WriteEdgeExtensionSettings(request);
+        }
+        catch
+        {
+            if (existing is null)
+                _registry.DeleteValue(target.RegistrySubKey, valueName);
+            throw;
+        }
         return new PolicyInstallResult(target, valueName, entry, edgeSettingsWritten);
     }
 

@@ -75,7 +75,11 @@ public partial class App : Application
         try
         {
             var hc = new ResourceDictionary { Source = new Uri("Themes/HighContrastTheme.xaml", UriKind.Relative) };
-            Resources.MergedDictionaries.Add(hc);
+            var dark = Resources.MergedDictionaries.FirstOrDefault(d =>
+                d.Source?.OriginalString?.Contains("DarkTheme", StringComparison.OrdinalIgnoreCase) == true);
+            if (dark != null)
+                Resources.MergedDictionaries.Remove(dark);
+            Resources.MergedDictionaries.Insert(0, hc);
         }
         catch { /* fall through to default dark theme */ }
     }

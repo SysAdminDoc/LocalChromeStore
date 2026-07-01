@@ -377,7 +377,8 @@
                              Grid.ColumnSpan="2"
                              IsIndeterminate="True"
                              Margin="0,8,0,0"
-                             Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
+                             Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}"
+                             AutomationProperties.Name="Extension operation progress" />
             </Grid>
 
             <TextBlock Grid.Row="5"

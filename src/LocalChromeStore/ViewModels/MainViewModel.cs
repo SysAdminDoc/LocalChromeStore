@@ -29,6 +29,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly IDialogService _dialogs;
     private readonly CatalogCacheService _catalogCache;
     private readonly UsageStatsService _usageStats;
+    private readonly LocalCatalogFileSource _catalogFileSource = new();
     private readonly LocalSourceWatcher _sourceWatcher;
     private readonly Dispatcher_LogSink _logSink;
     private AppSettings _settings;
@@ -698,7 +699,7 @@ public sealed class MainViewModel : ViewModelBase
             .ToList();
         infos.AddRange(localInfos);
 
-        var catalogFileSource = new LocalCatalogFileSource();
+        var catalogFileSource = _catalogFileSource;
         var catalogFileInfos = await catalogFileSource.DiscoverAsync(_settings, logProgress);
         var catalogFileFiltered = catalogFileInfos
             .Where(info => !hidden.Contains($"{info.RepoOwner}/{info.RepoName}"))

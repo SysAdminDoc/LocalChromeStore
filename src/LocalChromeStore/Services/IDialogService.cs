@@ -99,8 +99,10 @@ public sealed class DialogService : IDialogService
             SizeToContent = SizeToContent.Height;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.NoResize;
-            Background = new SolidColorBrush(Color.FromRgb(30, 30, 46));
-            Foreground = new SolidColorBrush(Color.FromRgb(205, 214, 244));
+            if (Application.Current?.TryFindResource("BaseBrush") is SolidColorBrush bg)
+                Background = bg;
+            if (Application.Current?.TryFindResource("TextBrush") is SolidColorBrush fg)
+                Foreground = fg;
 
             var panel = new Grid { Margin = new Thickness(18) };
             panel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });

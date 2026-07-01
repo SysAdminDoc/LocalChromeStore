@@ -399,7 +399,8 @@
                 <ProgressBar Grid.Row="6"
                              IsIndeterminate="True"
                              Margin="0,10,0,0"
-                             Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}" />
+                             Visibility="{Binding Busy, Converter={StaticResource BoolToVis}}"
+                             AutomationProperties.Name="Discovery progress" />
             </Grid>
         </Border>
 
@@ -990,7 +991,8 @@
                      FontFamily="Cascadia Mono, Consolas"
                      FontSize="11"
                      Foreground="{StaticResource SubtextBrush}"
-                     x:Name="LogList">
+                     x:Name="LogList"
+                     AutomationProperties.Name="Activity log">
                 <ListBox.ItemContainerStyle>
                     <Style TargetType="ListBoxItem">
                         <Setter Property="Background" Value="Transparent" />
