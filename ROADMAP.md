@@ -6,7 +6,6 @@ Roadmap_Blocked.md.
 ## P2
 
 1. **Local/source-aware extension development**
-   - Validate an Octokit 14.x upgrade.
    - Plan the .NET 10 LTS migration before .NET 9 support ends.
 
 ## P3
