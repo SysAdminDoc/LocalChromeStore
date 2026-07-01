@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "High Risk Extension",
+  "version": "3.0.0",
+  "description": "Exercises high-risk permission combinations.",
+  "permissions": ["debugger", "webRequest", "cookies", "management", "proxy", "privacy", "downloads"],
+  "host_permissions": ["<all_urls>"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'unsafe-eval'; object-src 'self'"
+  }
+}

@@ -16,9 +16,13 @@ public sealed class CatalogCacheServiceTests : IDisposable
 
     public void Dispose()
     {
-        var root = Path.GetDirectoryName(Path.GetDirectoryName(_dir))!;
-        if (Directory.Exists(root))
-            Directory.Delete(root, recursive: true);
+        try
+        {
+            var root = Path.GetDirectoryName(Path.GetDirectoryName(_dir))!;
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+        catch { /* temp dir cleanup is best-effort */ }
     }
 
     [Fact]

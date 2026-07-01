@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Full MV3 Extension",
+  "version": "2.1.0",
+  "description": "A complete MV3 manifest exercising all parsed fields.",
+  "permissions": ["storage", "tabs", "activeTab", "scripting", "alarms"],
+  "optional_permissions": ["history", "bookmarks"],
+  "host_permissions": ["https://*.example.com/*", "https://api.test.org/*"],
+  "optional_host_permissions": ["<all_urls>"],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "devtools_page": "devtools.html",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
+}

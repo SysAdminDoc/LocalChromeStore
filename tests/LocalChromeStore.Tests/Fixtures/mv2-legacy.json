@@ -1,0 +1,18 @@
+{
+  "manifest_version": 2,
+  "name": "Legacy MV2 Extension",
+  "version": "1.0.3",
+  "description": "An MV2 manifest with inline host permissions.",
+  "permissions": ["tabs", "storage", "https://*.example.com/*", "http://localhost/*"],
+  "optional_permissions": ["<all_urls>"],
+  "icons": {
+    "128": "icon.png"
+  },
+  "options_page": "options.html",
+  "browser_action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "scripts": ["background.js"]
+  }
+}
