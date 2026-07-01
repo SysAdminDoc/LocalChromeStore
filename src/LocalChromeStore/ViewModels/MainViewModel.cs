@@ -1632,20 +1632,43 @@ public sealed class MainViewModel : ViewModelBase
             }
 
             var resolvedCard = card!; // ImportAction.Install implies the card exists with an asset.
+            var installInfo = resolvedCard.Info;
             if (!resolvedCard.Version.Equals(target.Version, StringComparison.OrdinalIgnoreCase))
-                Log($"Import version note: {target.Key} requested {target.Version}; installing current catalog version {resolvedCard.Version}.");
+            {
+                var historical = await _github.TryFindReleaseByVersionAsync(target.RepoOwner, target.RepoName, target.Version);
+                if (historical is not null)
+                {
+                    Log($"Import restore: {target.Key} requested {target.Version}; found historical release asset {historical.AssetName}.");
+                    installInfo = new ExtensionInfo
+                    {
+                        RepoOwner = resolvedCard.Info.RepoOwner,
+                        RepoName = resolvedCard.Info.RepoName,
+                        RepoUrl = resolvedCard.Info.RepoUrl,
+                        AssetUrl = historical.AssetUrl,
+                        AssetName = historical.AssetName,
+                        AssetSizeBytes = historical.SizeBytes,
+                        LatestVersion = historical.Version,
+                        ManifestName = resolvedCard.Info.ManifestName,
+                        ManifestVersion = historical.Version,
+                    };
+                }
+                else
+                {
+                    Log($"Import version note: {target.Key} requested {target.Version}; historical release not found, installing current catalog version {resolvedCard.Version}.");
+                }
+            }
 
             var permissionDiff = existing is not null
-                ? PermissionDiff.Compare(existing, resolvedCard.Info)
-                : PermissionDiff.Compare(target, resolvedCard.Info);
+                ? PermissionDiff.Compare(existing, installInfo)
+                : PermissionDiff.Compare(target, installInfo);
             if (permissionDiff.HasAdditions && !ConfirmEnvironmentImportPermissionExpansion(target, resolvedCard, permissionDiff, existing is null))
             {
                 skippedForPermissionReview++;
-                Log($"Import skip: {target.Key} needs permission review before installing current catalog version {resolvedCard.Version}.");
+                Log($"Import skip: {target.Key} needs permission review before installing.");
                 continue;
             }
 
-            await _extensions.InstallAsync(resolvedCard.Info, new Progress<string>(Log));
+            await _extensions.InstallAsync(installInfo, new Progress<string>(Log));
             installed++;
         }
 

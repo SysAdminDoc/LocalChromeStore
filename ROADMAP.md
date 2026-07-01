@@ -12,7 +12,6 @@ Roadmap_Blocked.md.
    - Add a first-party source adapter interface for future source types.
 
 2. **Historical restore and policy update safety**
-   - Restore exact historical versions during environment import when the source asset still exists.
 
 ## P3
 

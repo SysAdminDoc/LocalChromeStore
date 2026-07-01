@@ -748,6 +748,31 @@ public sealed class GitHubService
             info.Warnings.Add("Latest GitHub release is over a year old.");
     }
 
+    public sealed record HistoricalReleaseAsset(string AssetUrl, string AssetName, long SizeBytes, string Version);
+
+    public async Task<HistoricalReleaseAsset?> TryFindReleaseByVersionAsync(string owner, string repo, string version, CancellationToken ct = default)
+    {
+        var client = _client ?? new GitHubClient(new Octokit.ProductHeaderValue("LocalChromeStore", AppVersion));
+        var tags = new[] { version, $"v{version}", $"V{version}" };
+        foreach (var tag in tags)
+        {
+            try
+            {
+                var release = await client.Repository.Release.Get(owner, repo, tag);
+                if (release is null) continue;
+                var asset = release.Assets
+                    .FirstOrDefault(a => a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                    ?? release.Assets
+                    .FirstOrDefault(a => a.Name.EndsWith(".crx", StringComparison.OrdinalIgnoreCase));
+                if (asset is null) continue;
+                return new HistoricalReleaseAsset(asset.BrowserDownloadUrl, asset.Name, asset.Size, release.TagName?.TrimStart('v', 'V') ?? version);
+            }
+            catch (NotFoundException) { }
+            catch { break; }
+        }
+        return null;
+    }
+
     // F071: 3 attempts with 2-4-8 s exponential back-off. Resets the progress indicator on each retry.
     public async Task<byte[]> DownloadAssetAsync(string url, IProgress<long>? progress = null, CancellationToken ct = default)
     {
