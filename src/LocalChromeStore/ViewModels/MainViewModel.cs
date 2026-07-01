@@ -1176,8 +1176,21 @@ public sealed class MainViewModel : ViewModelBase
                 return;
             }
 
+            var permissionDiffSection = string.Empty;
+            var policyPermDiff = PermissionDiff.Compare(installed, card.Info);
+            if (policyPermDiff.HasAdditions)
+            {
+                var severity = policyPermDiff.HasHighRiskAdditions ? "HIGH-RISK " : "";
+                permissionDiffSection =
+                    $"{Environment.NewLine}{Environment.NewLine}" +
+                    $"⚠ {severity}Permission changes since the installed version:{Environment.NewLine}" +
+                    policyPermDiff.FormatAddedForPrompt();
+                Log($"Policy permission diff for {card.Repo}: {policyPermDiff.AddedSummary}.");
+            }
+
             var enrollment = _policyEnrollment.DetectCurrent();
             var consentPrompt = PolicyInstallService.BuildConsentPrompt([request], enrollment) +
+                permissionDiffSection +
                 $"{Environment.NewLine}{Environment.NewLine}" +
                 _policyRiskScanner.FormatForPrompt(riskReport) +
                 $"{Environment.NewLine}{Environment.NewLine}" +

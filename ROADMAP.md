@@ -13,7 +13,6 @@ Roadmap_Blocked.md.
 
 2. **Historical restore and policy update safety**
    - Restore exact historical versions during environment import when the source asset still exists.
-   - Carry permission-diff checks into policy-hosted update flows.
 
 ## P3
 
