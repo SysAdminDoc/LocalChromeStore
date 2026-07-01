@@ -579,8 +579,8 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (AvailableCount == 0)
                 return HiddenRepoCount == 0
-                    ? "Refresh to scan the configured GitHub account for repos with a manifest.json or release ZIP/CRX."
-                    : "Refresh scans the configured GitHub account while keeping hidden repositories excluded.";
+                    ? "Refresh to scan the configured GitHub account and local source folders for extension manifests or release ZIP/CRX assets."
+                    : "Refresh scans the configured GitHub account and local source folders while keeping hidden repositories excluded.";
             if (ShowInstalledOnly)
                 return "Clear the installed-only filter or install an extension from the full catalog.";
             if (!string.IsNullOrWhiteSpace(SearchText))
@@ -853,20 +853,27 @@ public sealed class MainViewModel : ViewModelBase
         StatusText = $"{operationName}: updating {installableCards.Count} extension(s)...";
         Log($"{operationName}: updating {installableCards.Count} extension(s).");
 
-        foreach (var card in installableCards)
+        const int maxConcurrent = 3;
+        using var semaphore = new SemaphoreSlim(maxConcurrent, maxConcurrent);
+        var tasks = installableCards.Select(card => Task.Run(async () =>
         {
+            await semaphore.WaitAsync();
             try
             {
-                StatusText = $"Updating {card.Repo}...";
                 await _extensions.InstallAsync(card.Info, new Progress<string>(Log));
-                updated++;
+                Interlocked.Increment(ref updated);
             }
             catch (Exception ex)
             {
-                failed++;
+                Interlocked.Increment(ref failed);
                 Log($"! {operationName} failed for {card.Repo}: {ex.Message}");
             }
-        }
+            finally
+            {
+                semaphore.Release();
+            }
+        })).ToArray();
+        await Task.WhenAll(tasks);
 
         _extensions.Reload();
         RebuildExtensionCards(catalog);
@@ -1879,7 +1886,7 @@ public sealed class MainViewModel : ViewModelBase
         if (resolution is null)
         {
             StatusText = $"Local source folder has no manifest.json or known build output: {folder}";
-            Log($"! Local source not added: manifest.json not found in {folder}, .output/chrome-mv3, build/chrome-mv3-prod, dist, extension, or public.");
+            Log($"! Local source not added: manifest.json not found in {folder}, .output/chrome-mv3, build/chrome-mv3-prod, src, dist, extension, or public.");
             NewLocalSourceInput = string.Empty;
             return;
         }

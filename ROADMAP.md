@@ -6,7 +6,6 @@ Roadmap_Blocked.md.
 ## P2
 
 1. **Local/source-aware extension development**
-   - Add download retry/resume and a parallel-download limit.
    - Add offline cache mode for the last-known catalog and icons.
    - Add a WPF UI smoke-test harness.
    - Add Chrome extension sample fixtures for parser and permission regression tests.
