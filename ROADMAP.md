@@ -11,7 +11,6 @@ Roadmap_Blocked.md.
    - Add richer import diagnostics.
    - Add a custom update-feed source.
    - Add a local catalog-file source.
-   - Add license badges.
    - Add release channel selection.
    - Add a GitHub draft-release helper.
    - Add local-only usage stats.

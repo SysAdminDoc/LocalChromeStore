@@ -52,6 +52,7 @@ public sealed class ExtensionInfo
 
     public string? OptionsPage { get; set; }
     public string? DevtoolsPage { get; set; }
+    public string? LicenseSpdxId { get; set; }
 
     public string DisplayName => string.IsNullOrWhiteSpace(ManifestName) ? RepoName : ManifestName!;
     public string DisplayVersion => ManifestVersion ?? LatestVersion ?? "—";

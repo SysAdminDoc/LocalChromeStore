@@ -401,6 +401,7 @@ public sealed class GitHubService : IExtensionSource
             ManifestSourcePath = asset != null ? null : manifestSourcePath,
             RepoLastPushedAt = repo.PushedAt ?? repo.UpdatedAt,
             IsArchived = repo.Archived,
+            LicenseSpdxId = repo.License?.SpdxId,
             ChecksumUrl = checksum?.BrowserDownloadUrl,
             ChecksumName = checksum?.Name
         };

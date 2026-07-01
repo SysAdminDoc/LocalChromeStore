@@ -316,6 +316,10 @@ public sealed class ExtensionCardViewModel : ViewModelBase
         OnPropertyChanged(nameof(PinLabel));
     });
 
+    // License badge
+    public bool HasLicense => !string.IsNullOrEmpty(Info.LicenseSpdxId) && Info.LicenseSpdxId != "NOASSERTION";
+    public string LicenseBadge => Info.LicenseSpdxId ?? string.Empty;
+
     // DevTools/options quick links
     public bool HasOptionsPage => !string.IsNullOrEmpty(Info.OptionsPage);
     public string OptionsPageLabel => HasOptionsPage ? $"Options: {Info.OptionsPage}" : string.Empty;
