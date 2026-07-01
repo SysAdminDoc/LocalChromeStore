@@ -6,11 +6,8 @@ Roadmap_Blocked.md.
 ## P2
 
 1. **Local/source-aware extension development**
-   - Resolve framework build outputs such as `.output/chrome-mv3`, `build/chrome-mv3-prod`, `dist`, `extension`, and `public`.
-   - Add a release-readiness checklist.
    - Add DevTools/options quick links for installed extensions.
    - Add native browser policy-page quick links.
-   - Add a structured JSON event log.
    - Add download retry/resume and a parallel-download limit.
    - Add offline cache mode for the last-known catalog and icons.
    - Add a WPF UI smoke-test harness.

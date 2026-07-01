@@ -116,7 +116,7 @@ public sealed class MainViewModel : ViewModelBase
         _policyRiskScanner = new PolicyPackageRiskScanner(_settingsService);
         _policyInstaller = new PolicyInstallService();
         _settings = _settingsService.Load();
-        _logSink = new Dispatcher_LogSink(LogLines);
+        _logSink = new Dispatcher_LogSink(LogLines, new JsonEventLog(_settingsService.LogsDir));
 
         _githubUserInput = _settings.GitHubUser;
         _githubTokenInput = _settings.GitHubToken ?? string.Empty;
@@ -2118,12 +2118,22 @@ public sealed record LaunchProfileModeOption(BrowserProfileMode Mode, string Lab
 internal sealed class Dispatcher_LogSink
 {
     private readonly ObservableCollection<string> _sink;
+    private readonly JsonEventLog? _eventLog;
     private const int MaxLines = 500;
 
-    public Dispatcher_LogSink(ObservableCollection<string> sink) { _sink = sink; }
+    public Dispatcher_LogSink(ObservableCollection<string> sink, JsonEventLog? eventLog = null)
+    {
+        _sink = sink;
+        _eventLog = eventLog;
+    }
 
     public void Append(string line)
     {
+        var isWarn = line.StartsWith("! ", StringComparison.Ordinal);
+        var level = isWarn ? EventLevel.Warn : EventLevel.Info;
+        var category = JsonEventLog.ClassifyLogLine(line);
+        _eventLog?.Write(level, category, line);
+
         var stamped = $"[{DateTime.Now:HH:mm:ss}] {line}";
         if (Application.Current?.Dispatcher.CheckAccess() == true)
             DoAppend(stamped);

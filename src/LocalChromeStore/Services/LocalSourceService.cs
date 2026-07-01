@@ -105,7 +105,7 @@ public sealed class LocalSourceService
 
         foreach (var relativeManifest in CandidateManifestPaths)
         {
-            var manifestPath = Path.Combine(root, relativeManifest);
+            var manifestPath = Path.GetFullPath(Path.Combine(root, relativeManifest));
             if (!File.Exists(manifestPath)) continue;
 
             var extensionRoot = Path.GetDirectoryName(manifestPath)!;
