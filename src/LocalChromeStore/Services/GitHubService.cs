@@ -8,7 +8,7 @@ using Octokit;
 
 namespace LocalChromeStore.Services;
 
-public sealed class GitHubService
+public sealed class GitHubService : IExtensionSource
 {
     private const int MaxProbeConcurrency = 6;
 
@@ -17,6 +17,7 @@ public sealed class GitHubService
     private GitHubClient? _client;
     private string? _activeToken;
 
+    public string SourceName => "GitHub";
     public GitHubServiceState LastState { get; private set; } = new();
 
     /// <summary>App version (Major.Minor.Patch) read from the assembly, used for the GitHub User-Agent.</summary>
@@ -95,7 +96,7 @@ public sealed class GitHubService
     /// at the root, in a common source/output subfolder, OR its
     /// latest release contains a .zip / .crx asset.
     /// </summary>
-    public async Task<List<ExtensionInfo>> DiscoverAsync(AppSettings cfg, IProgress<string>? log = null, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ExtensionInfo>> DiscoverAsync(AppSettings cfg, IProgress<string>? log = null, CancellationToken ct = default)
     {
         var client = GetClient(cfg);
         var owners = new List<string>();

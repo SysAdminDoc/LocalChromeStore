@@ -8,8 +8,16 @@ namespace LocalChromeStore.Services;
 
 public sealed record LocalSourceResolution(string ConfiguredPath, string ExtensionRoot, string ManifestPath, string RelativePath);
 
-public sealed class LocalSourceService
+public sealed class LocalSourceService : IExtensionSource
 {
+    public string SourceName => "Local folders";
+
+    public Task<IReadOnlyList<ExtensionInfo>> DiscoverAsync(AppSettings settings, IProgress<string>? log = null, CancellationToken ct = default)
+    {
+        var results = Discover(settings.LocalSourceFolders, log);
+        return Task.FromResult(results);
+    }
+
     private static readonly string[] CandidateManifestPaths =
     [
         "manifest.json",
