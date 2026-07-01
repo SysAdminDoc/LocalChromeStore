@@ -28,6 +28,8 @@ public sealed class ManifestRiskViewModel : ViewModelBase
         get
         {
             var src = FrameworkLabels.DiscoveryLabel(Info.DiscoverySource);
+            if (Info.DiscoverySource == DiscoverySource.LocalSourceFolder && !string.IsNullOrEmpty(Info.ManifestSourcePath))
+                return $"Source: {src} ({Info.ManifestSourcePath})";
             if (Info.DiscoverySource == DiscoverySource.RepoManifest && !string.IsNullOrEmpty(Info.ManifestSourcePath))
                 return $"Source: {src} ({Info.ManifestSourcePath})";
             return $"Source: {src}";
@@ -42,6 +44,8 @@ public sealed class ManifestRiskViewModel : ViewModelBase
     {
         get
         {
+            if (!string.IsNullOrWhiteSpace(Info.LocalSourcePath))
+                return "Checksum: local source folder linked directly; no release-asset checksum applies.";
             if (!string.IsNullOrEmpty(Info.ChecksumUrl))
                 return $"Checksum: SHA256 sidecar present ({Info.ChecksumName}). Install will fail closed on mismatch.";
             return ExtensionService.TryParseSha256Digest(Info.AssetDigest, out _)
@@ -60,7 +64,7 @@ public sealed class ManifestRiskViewModel : ViewModelBase
     };
     public bool HasNoPermissions => Permissions.Count == 0 && HostPermissions.Count == 0;
 
-    public bool CanInstall => !string.IsNullOrEmpty(Info.AssetUrl);
+    public bool CanInstall => !string.IsNullOrEmpty(Info.AssetUrl) || !string.IsNullOrWhiteSpace(Info.LocalSourcePath);
     public bool _confirmed;
     public bool Confirmed
     {

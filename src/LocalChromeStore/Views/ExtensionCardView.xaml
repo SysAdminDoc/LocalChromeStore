@@ -273,6 +273,18 @@
                         </TextBlock.Style>
                     </TextBlock>
                 </Border>
+                <Border Visibility="{Binding IsPrerelease, Converter={StaticResource BoolToVis}}"
+                        ToolTip="This release is marked as a pre-release on GitHub.">
+                    <Border.Style>
+                        <Style TargetType="Border" BasedOn="{StaticResource MetaBadge}">
+                            <Setter Property="Background" Value="{StaticResource PeachBrush}" />
+                            <Setter Property="BorderBrush" Value="{StaticResource PeachBrush}" />
+                        </Style>
+                    </Border.Style>
+                    <TextBlock Text="Pre-release"
+                               Style="{StaticResource MetaBadgeText}"
+                               Foreground="{StaticResource CrustBrush}" />
+                </Border>
                 <Border Visibility="{Binding HasLicense, Converter={StaticResource BoolToVis}}"
                         ToolTip="Repository license from GitHub">
                     <Border.Style>

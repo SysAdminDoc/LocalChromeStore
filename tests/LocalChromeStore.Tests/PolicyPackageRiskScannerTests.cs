@@ -185,4 +185,100 @@ public sealed class PolicyPackageRiskScannerTests
             catch { }
         }
     }
+
+    [Fact]
+    public void Scan_ObfuscatedFromCharCode_WarnsAboutObfuscation()
+    {
+        using var temp = RiskPackage.Create(Mv3Manifest);
+        temp.Write("worker.js", "var s = String.fromCharCode(72,101,108,108,111,44,32,87,111,114,108,100);");
+        var scanner = new PolicyPackageRiskScanner([]);
+
+        var report = scanner.Scan(temp.Installed);
+
+        Assert.False(report.BlocksPolicyInstall);
+        Assert.Contains(report.Findings, f => f.Category == "Obfuscation" && f.Detail.Contains("fromCharCode"));
+    }
+
+    [Fact]
+    public void Scan_LargeAtobPayload_WarnsAboutObfuscation()
+    {
+        using var temp = RiskPackage.Create(Mv3Manifest);
+        var bigPayload = new string('A', 120);
+        temp.Write("worker.js", $"var x = atob('{bigPayload}');");
+        var scanner = new PolicyPackageRiskScanner([]);
+
+        var report = scanner.Scan(temp.Installed);
+
+        Assert.Contains(report.Findings, f => f.Category == "Obfuscation" && f.Detail.Contains("atob"));
+    }
+
+    [Fact]
+    public void Scan_HexEscapeChain_WarnsAboutObfuscation()
+    {
+        using var temp = RiskPackage.Create(Mv3Manifest);
+        temp.Write("worker.js", @"var s = ""\x48\x65\x6c\x6c\x6f\x2c\x20\x57\x6f\x72\x6c\x64\x21\x21\x21\x21\x21\x21"";");
+        var scanner = new PolicyPackageRiskScanner([]);
+
+        var report = scanner.Scan(temp.Installed);
+
+        Assert.Contains(report.Findings, f => f.Category == "Obfuscation" && f.Detail.Contains("hex-escape"));
+    }
+
+    [Fact]
+    public void Scan_HardcodedApiKey_WarnsAboutSecretLeakage()
+    {
+        using var temp = RiskPackage.Create(Mv3Manifest);
+        temp.Write("worker.js", "const api_key = 'AAAA1234567890abcdefghij';");
+        var scanner = new PolicyPackageRiskScanner([]);
+
+        var report = scanner.Scan(temp.Installed);
+
+        Assert.Contains(report.Findings, f => f.Category == "Secret leakage");
+    }
+
+    [Fact]
+    public void Scan_HardcodedPassword_WarnsAboutSecretLeakage()
+    {
+        using var temp = RiskPackage.Create(Mv3Manifest);
+        temp.Write("worker.js", "const password = 'hunter2isabadpassword';");
+        var scanner = new PolicyPackageRiskScanner([]);
+
+        var report = scanner.Scan(temp.Installed);
+
+        Assert.Contains(report.Findings, f => f.Category == "Secret leakage" && f.Detail.Contains("password"));
+    }
+
+    [Fact]
+    public void Scan_GoogleApiKey_WarnsAboutSecretLeakage()
+    {
+        using var temp = RiskPackage.Create(Mv3Manifest);
+        temp.Write("worker.js", "const key = 'AIzaSyAaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabb';");
+        var scanner = new PolicyPackageRiskScanner([]);
+
+        var report = scanner.Scan(temp.Installed);
+
+        Assert.Contains(report.Findings, f => f.Category == "Secret leakage" && f.Detail.Contains("Google"));
+    }
+
+    [Fact]
+    public void Scan_CleanExtension_NoObfuscationOrSecretFindings()
+    {
+        using var temp = RiskPackage.Create(Mv3Manifest);
+        temp.Write("worker.js", "chrome.runtime.onInstalled.addListener(() => console.log('ready'));");
+        var scanner = new PolicyPackageRiskScanner([]);
+
+        var report = scanner.Scan(temp.Installed);
+
+        Assert.DoesNotContain(report.Findings, f => f.Category == "Obfuscation");
+        Assert.DoesNotContain(report.Findings, f => f.Category == "Secret leakage");
+    }
+
+    private const string Mv3Manifest = """
+        {
+          "manifest_version": 3,
+          "name": "Test",
+          "version": "1.0.0",
+          "background": { "service_worker": "worker.js" }
+        }
+        """;
 }

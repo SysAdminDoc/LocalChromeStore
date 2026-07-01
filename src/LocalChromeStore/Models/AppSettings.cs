@@ -1,5 +1,11 @@
 namespace LocalChromeStore.Models;
 
+public enum ReleaseChannel
+{
+    Stable,
+    IncludePrereleases
+}
+
 public enum BrowserProfileMode
 {
     Default,
@@ -23,4 +29,6 @@ public sealed class AppSettings
     public string? LaunchUrl { get; set; }
     public BrowserProfileMode LaunchProfileMode { get; set; } = BrowserProfileMode.Default;
     public bool LaunchWithTemporaryProfile { get; set; } = false;
+    public string? ProxyUrl { get; set; }
+    public ReleaseChannel ReleaseChannel { get; set; } = ReleaseChannel.Stable;
 }

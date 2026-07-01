@@ -13,9 +13,10 @@ public sealed class GitHubService : IExtensionSource
     private const int MaxProbeConcurrency = 6;
 
     private readonly SettingsService _settings;
-    private readonly HttpClient _http;
+    private HttpClient _http;
     private GitHubClient? _client;
     private string? _activeToken;
+    private string? _activeProxy;
 
     public string SourceName => "GitHub";
     public GitHubServiceState LastState { get; private set; } = new();
@@ -27,13 +28,40 @@ public sealed class GitHubService : IExtensionSource
     public GitHubService(SettingsService settings)
     {
         _settings = settings;
-        _http = new HttpClient();
-        _http.DefaultRequestHeaders.UserAgent.ParseAdd($"LocalChromeStore/{AppVersion}");
+        _http = CreateHttpClient(null);
+    }
+
+    private static HttpClient CreateHttpClient(string? proxyUrl)
+    {
+        HttpClient client;
+        if (!string.IsNullOrWhiteSpace(proxyUrl) && Uri.TryCreate(proxyUrl, UriKind.Absolute, out var proxyUri))
+        {
+            var handler = new HttpClientHandler { Proxy = new WebProxy(proxyUri), UseProxy = true };
+            client = new HttpClient(handler);
+        }
+        else
+        {
+            client = new HttpClient();
+        }
+        client.DefaultRequestHeaders.UserAgent.ParseAdd($"LocalChromeStore/{AppVersion}");
+        return client;
+    }
+
+    private void EnsureProxy(string? proxyUrl)
+    {
+        if (string.Equals(_activeProxy, proxyUrl, StringComparison.OrdinalIgnoreCase)) return;
+        _http = CreateHttpClient(proxyUrl);
+        _activeProxy = proxyUrl;
+        _client = null;
+        _activeToken = null;
     }
 
     private GitHubClient GetClient(AppSettings cfg)
     {
+        EnsureProxy(cfg.ProxyUrl);
         if (_client != null && _activeToken == cfg.GitHubToken) return _client;
+        if (!string.IsNullOrWhiteSpace(cfg.ProxyUrl) && Uri.TryCreate(cfg.ProxyUrl, UriKind.Absolute, out var proxyUri))
+            HttpClient.DefaultProxy = new WebProxy(proxyUri);
         var product = new Octokit.ProductHeaderValue("LocalChromeStore", AppVersion);
         var c = new GitHubClient(product);
         if (!string.IsNullOrWhiteSpace(cfg.GitHubToken))
@@ -201,7 +229,7 @@ public sealed class GitHubService : IExtensionSource
                         if (topics is null || !topics.Any(t => t.Equals(cfg.TopicFilter, StringComparison.OrdinalIgnoreCase)))
                             return null;
                     }
-                    return await ProbeRepoAsync(client, repo, log, ct);
+                    return await ProbeRepoAsync(client, repo, cfg.ReleaseChannel, log, ct);
                 }
                 finally { gate.Release(); }
             });
@@ -342,10 +370,21 @@ public sealed class GitHubService : IExtensionSource
         catch { return null; }
     }
 
-    private async Task<ExtensionInfo?> ProbeRepoAsync(GitHubClient client, Repository repo, IProgress<string>? log, CancellationToken ct)
+    private async Task<ExtensionInfo?> ProbeRepoAsync(GitHubClient client, Repository repo, ReleaseChannel channel, IProgress<string>? log, CancellationToken ct)
     {
         Release? release = null;
-        try { release = await client.Repository.Release.GetLatest(repo.Owner.Login, repo.Name); }
+        try
+        {
+            if (channel == ReleaseChannel.IncludePrereleases)
+            {
+                var allReleases = await client.Repository.Release.GetAll(repo.Owner.Login, repo.Name);
+                release = allReleases.FirstOrDefault();
+            }
+            else
+            {
+                release = await client.Repository.Release.GetLatest(repo.Owner.Login, repo.Name);
+            }
+        }
         catch (NotFoundException) { /* no releases */ }
         catch (Exception ex) { log?.Report($"  ! release {repo.Name}: {ex.Message}"); }
 
@@ -402,6 +441,7 @@ public sealed class GitHubService : IExtensionSource
             RepoLastPushedAt = repo.PushedAt ?? repo.UpdatedAt,
             IsArchived = repo.Archived,
             LicenseSpdxId = repo.License?.SpdxId,
+            IsPrerelease = release?.Prerelease ?? false,
             ChecksumUrl = checksum?.BrowserDownloadUrl,
             ChecksumName = checksum?.Name
         };

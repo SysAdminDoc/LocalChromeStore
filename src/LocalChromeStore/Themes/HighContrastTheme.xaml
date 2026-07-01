@@ -1,0 +1,55 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- High-contrast override: maps the app's semantic tokens to system high-contrast colors.
+         Applied at startup when Windows high contrast is active or the user selects it in settings. -->
+    <Color x:Key="BaseColor">#000000</Color>
+    <Color x:Key="MantleColor">#000000</Color>
+    <Color x:Key="CrustColor">#000000</Color>
+    <Color x:Key="Surface0Color">#1a1a1a</Color>
+    <Color x:Key="Surface1Color">#333333</Color>
+    <Color x:Key="Surface2Color">#4d4d4d</Color>
+    <Color x:Key="OverlayColor">#999999</Color>
+    <Color x:Key="TextColor">#ffffff</Color>
+    <Color x:Key="SubtextColor">#ffffff</Color>
+    <Color x:Key="MuteColor">#cccccc</Color>
+    <Color x:Key="MauveColor">#ffff00</Color>
+    <Color x:Key="MauveSoftColor">#333300</Color>
+    <Color x:Key="SapphireColor">#00ffff</Color>
+    <Color x:Key="SapphireSoftColor">#003333</Color>
+    <Color x:Key="GreenColor">#00ff00</Color>
+    <Color x:Key="GreenSoftColor">#003300</Color>
+    <Color x:Key="RedColor">#ff0000</Color>
+    <Color x:Key="RedSoftColor">#330000</Color>
+    <Color x:Key="YellowColor">#ffff00</Color>
+    <Color x:Key="YellowSoftColor">#333300</Color>
+    <Color x:Key="PeachColor">#ffaa00</Color>
+    <Color x:Key="TealColor">#00ffcc</Color>
+    <Color x:Key="TealSoftColor">#003322</Color>
+
+    <SolidColorBrush x:Key="BaseBrush" Color="{StaticResource BaseColor}" />
+    <SolidColorBrush x:Key="MantleBrush" Color="{StaticResource MantleColor}" />
+    <SolidColorBrush x:Key="CrustBrush" Color="{StaticResource CrustColor}" />
+    <SolidColorBrush x:Key="Surface0Brush" Color="{StaticResource Surface0Color}" />
+    <SolidColorBrush x:Key="Surface1Brush" Color="{StaticResource Surface1Color}" />
+    <SolidColorBrush x:Key="Surface2Brush" Color="{StaticResource Surface2Color}" />
+    <SolidColorBrush x:Key="OverlayBrush" Color="{StaticResource OverlayColor}" />
+    <SolidColorBrush x:Key="TextBrush" Color="{StaticResource TextColor}" />
+    <SolidColorBrush x:Key="SubtextBrush" Color="{StaticResource SubtextColor}" />
+    <SolidColorBrush x:Key="MuteBrush" Color="{StaticResource MuteColor}" />
+    <SolidColorBrush x:Key="MauveBrush" Color="{StaticResource MauveColor}" />
+    <SolidColorBrush x:Key="MauveSoftBrush" Color="{StaticResource MauveSoftColor}" />
+    <SolidColorBrush x:Key="SapphireBrush" Color="{StaticResource SapphireColor}" />
+    <SolidColorBrush x:Key="SapphireSoftBrush" Color="{StaticResource SapphireSoftColor}" />
+    <SolidColorBrush x:Key="GreenBrush" Color="{StaticResource GreenColor}" />
+    <SolidColorBrush x:Key="GreenSoftBrush" Color="{StaticResource GreenSoftColor}" />
+    <SolidColorBrush x:Key="RedBrush" Color="{StaticResource RedColor}" />
+    <SolidColorBrush x:Key="RedSoftBrush" Color="{StaticResource RedSoftColor}" />
+    <SolidColorBrush x:Key="YellowBrush" Color="{StaticResource YellowColor}" />
+    <SolidColorBrush x:Key="YellowSoftBrush" Color="{StaticResource YellowSoftColor}" />
+    <SolidColorBrush x:Key="PeachBrush" Color="{StaticResource PeachColor}" />
+    <SolidColorBrush x:Key="TealBrush" Color="{StaticResource TealColor}" />
+    <SolidColorBrush x:Key="TealSoftBrush" Color="{StaticResource TealSoftColor}" />
+    <SolidColorBrush x:Key="FocusRingBrush" Color="#ffffff" />
+
+</ResourceDictionary>

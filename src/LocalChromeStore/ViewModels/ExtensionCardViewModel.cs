@@ -320,6 +320,9 @@ public sealed class ExtensionCardViewModel : ViewModelBase
     public bool HasLicense => !string.IsNullOrEmpty(Info.LicenseSpdxId) && Info.LicenseSpdxId != "NOASSERTION";
     public string LicenseBadge => Info.LicenseSpdxId ?? string.Empty;
 
+    // Pre-release badge
+    public bool IsPrerelease => Info.IsPrerelease;
+
     // DevTools/options quick links
     public bool HasOptionsPage => !string.IsNullOrEmpty(Info.OptionsPage);
     public string OptionsPageLabel => HasOptionsPage ? $"Options: {Info.OptionsPage}" : string.Empty;

@@ -469,6 +469,16 @@
                                    TextWrapping="Wrap"
                                    Margin="0,7,0,0" />
 
+                        <TextBlock Text="HTTP proxy URL"
+                                   Style="{StaticResource InputLabel}"
+                                   Margin="0,12,0,5" />
+                        <TextBox Text="{Binding ProxyUrlInput, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="HTTP proxy URL" />
+                        <TextBlock Text="Optional. Example: http://proxy.corp:8080. Leave blank to use system proxy settings."
+                                   Style="{StaticResource MuteText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,7,0,0" />
+
                         <TextBlock Text="Extra owners"
                                    Style="{StaticResource InputLabel}"
                                    Margin="0,16,0,5" />
@@ -561,6 +571,10 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Margin="0,0,16,0">
+                        <CheckBox Content="Include pre-releases"
+                                  IsChecked="{Binding IncludePrereleases}"
+                                  ToolTip="When enabled, discovery picks the newest release even if it is marked as a pre-release on GitHub."
+                                  Margin="0,0,0,8" />
                         <CheckBox Content="Filter by GitHub topic"
                                   IsChecked="{Binding UseTopicFilter}" />
                         <Grid Margin="0,8,0,0">
@@ -578,7 +592,7 @@
                         <TextBlock Style="{StaticResource MuteText}"
                                    TextWrapping="Wrap"
                                    Margin="0,8,0,0"
-                                   Text="When enabled, discovery only shows repos tagged with the selected topic. Otherwise any repo with a manifest.json or release ZIP/CRX can appear." />
+                                   Text="When enabled, GitHub discovery only shows repos tagged with the selected topic. Otherwise any repo with a manifest.json or release ZIP/CRX can appear. Local source folders are always included." />
 
                         <TextBlock Text="Local source folders"
                                    Style="{StaticResource InputLabel}"

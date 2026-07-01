@@ -95,7 +95,51 @@ public sealed class PolicyPackageRiskScanner
             "Dynamic code execution",
             PolicyPackageRiskSeverity.Fail,
             new Regex(@"\bset(?:Timeout|Interval)\s*\(\s*['""]", RegexOptions.Compiled | RegexOptions.CultureInvariant),
-            "Passes a string to setTimeout/setInterval, which is eval-like dynamic code execution.")
+            "Passes a string to setTimeout/setInterval, which is eval-like dynamic code execution."),
+
+        // Obfuscation heuristics
+        new(
+            "Obfuscation",
+            PolicyPackageRiskSeverity.Warning,
+            new Regex(@"String\.fromCharCode\s*\(\s*(?:\d+\s*,\s*){8,}", RegexOptions.Compiled | RegexOptions.CultureInvariant),
+            "Long String.fromCharCode() chain suggests obfuscated code."),
+        new(
+            "Obfuscation",
+            PolicyPackageRiskSeverity.Warning,
+            new Regex(@"\batob\s*\(\s*['""][A-Za-z0-9+/=]{100,}['""]", RegexOptions.Compiled | RegexOptions.CultureInvariant),
+            "atob() with a large base64 payload may contain obfuscated executable code."),
+        new(
+            "Obfuscation",
+            PolicyPackageRiskSeverity.Warning,
+            new Regex(@"(?:\\x[0-9a-fA-F]{2}){16,}", RegexOptions.Compiled | RegexOptions.CultureInvariant),
+            "Long hex-escape sequence suggests obfuscated strings."),
+        new(
+            "Obfuscation",
+            PolicyPackageRiskSeverity.Warning,
+            new Regex(@"(?:\\u[0-9a-fA-F]{4}){12,}", RegexOptions.Compiled | RegexOptions.CultureInvariant),
+            "Long unicode-escape sequence suggests obfuscated strings."),
+
+        // Secret leakage heuristics
+        new(
+            "Secret leakage",
+            PolicyPackageRiskSeverity.Warning,
+            new Regex(@"(?:api[_-]?key|apikey|api[_-]?secret)\s*[:=]\s*['""][A-Za-z0-9_\-]{20,}['""]", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+            "Possible hardcoded API key or secret."),
+        new(
+            "Secret leakage",
+            PolicyPackageRiskSeverity.Warning,
+            new Regex(@"(?:password|passwd|pwd)\s*[:=]\s*['""][^'""]{8,}['""]", RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant),
+            "Possible hardcoded password."),
+        new(
+            "Secret leakage",
+            PolicyPackageRiskSeverity.Warning,
+            new Regex(@"['""](?:sk|pk|rk)[-_](?:live|test|prod)[-_][A-Za-z0-9]{20,}['""]", RegexOptions.Compiled | RegexOptions.CultureInvariant),
+            "Possible hardcoded Stripe-style secret or publishable key."),
+        new(
+            "Secret leakage",
+            PolicyPackageRiskSeverity.Warning,
+            new Regex(@"['""]AIza[A-Za-z0-9_\\-]{35}['""]", RegexOptions.Compiled | RegexOptions.CultureInvariant),
+            "Possible hardcoded Google API key (AIza prefix).")
     ];
 
     private readonly IReadOnlyList<string> _maliciousIdFeedPaths;

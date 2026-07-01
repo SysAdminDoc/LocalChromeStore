@@ -8,7 +8,7 @@
 </h1>
 
 <p align="center">
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.4.0-cba6f7?style=for-the-badge" alt="Version" /></a>
+  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.4.1-cba6f7?style=for-the-badge" alt="Version" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
   <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
@@ -186,6 +186,7 @@ See [CHANGELOG.md](CHANGELOG.md) for full release history.
 - **v0.3.11** — Browser stdout/stderr and process-exit capture for command-line launch sessions, streamed into the activity log with tests around stdout, stderr, and nonzero exit reporting
 - **v0.3.12** — Local source-folder discovery/linking for unpacked extension development, including settings UI, environment import/export persistence, diagnostics, and regression tests
 - **v0.4.0** — Framework build output resolution, structured JSON event log, DevTools/options/license card badges, parallel batch downloads, offline catalog cache, pinned repos, local usage stats, file watcher for source folders, pluggable source adapter interface, Octokit 14.0.0 upgrade
+- **v0.4.1** — Static package scanner (obfuscation/secret heuristics), richer import diagnostics, high-contrast theme, HTTP proxy support, Winget manifest export, release channel selection with pre-release badges, local catalog-file source
 
 **Planned**
 

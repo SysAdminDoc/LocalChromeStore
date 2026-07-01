@@ -39,6 +39,7 @@ public sealed class MainViewModel : ViewModelBase
     private BrowserInfo? _selectedBrowser;
     private string _githubUserInput = "";
     private string _githubTokenInput = "";
+    private string _proxyUrlInput = "";
     private string _newOwnerInput = "";
     private string? _selectedExtraOwner;
     private string _newLocalSourceInput = "";
@@ -93,6 +94,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand ExportEnvironmentCommand { get; }
     public ICommand ImportEnvironmentCommand { get; }
     public ICommand ExportCatalogCommand { get; }
+    public ICommand ExportWingetManifestCommand { get; }
     public ICommand CopyLaunchArgumentsCommand { get; }
     public ICommand CreateLoadSetCommand { get; }
     public ICommand DeleteLoadSetCommand { get; }
@@ -133,6 +135,7 @@ public sealed class MainViewModel : ViewModelBase
 
         _githubUserInput = _settings.GitHubUser;
         _githubTokenInput = _settings.GitHubToken ?? string.Empty;
+        _proxyUrlInput = _settings.ProxyUrl ?? string.Empty;
         _launchUrlInput = _settings.LaunchUrl ?? string.Empty;
         _launchProfileMode = _settings.LaunchProfileMode;
         ReloadExtraOwnersFromSettings();
@@ -193,6 +196,7 @@ public sealed class MainViewModel : ViewModelBase
         ExportEnvironmentCommand = new RelayCommand(_ => ExportEnvironment());
         ImportEnvironmentCommand = new AsyncRelayCommand(_ => ImportEnvironmentAsync(), _ => !Busy);
         ExportCatalogCommand = new RelayCommand(_ => ExportCatalog());
+        ExportWingetManifestCommand = new RelayCommand(_ => ExportWingetManifest());
         CopyLaunchArgumentsCommand = new RelayCommand(_ => CopyLaunchArguments(), _ => SelectedBrowser != null);
         CreateLoadSetCommand = new RelayCommand(_ => CreateLoadSet(),
             _ => !string.IsNullOrWhiteSpace(NewLoadSetNameInput) && _extensions.Installed.Any());
@@ -323,6 +327,12 @@ public sealed class MainViewModel : ViewModelBase
     {
         get => _githubTokenInput;
         set => SetField(ref _githubTokenInput, value);
+    }
+
+    public string ProxyUrlInput
+    {
+        get => _proxyUrlInput;
+        set => SetField(ref _proxyUrlInput, value);
     }
 
     public string NewOwnerInput
@@ -462,6 +472,20 @@ public sealed class MainViewModel : ViewModelBase
             {
                 _settings.AutoUpdateOnRefresh = value;
                 _settingsService.Save(_settings);
+                OnPropertyChanged();
+            }
+        }
+    }
+
+    public bool IncludePrereleases
+    {
+        get => _settings.ReleaseChannel == ReleaseChannel.IncludePrereleases;
+        set
+        {
+            var channel = value ? ReleaseChannel.IncludePrereleases : ReleaseChannel.Stable;
+            if (_settings.ReleaseChannel != channel)
+            {
+                _settings.ReleaseChannel = channel;
                 OnPropertyChanged();
             }
         }
@@ -673,6 +697,16 @@ public sealed class MainViewModel : ViewModelBase
             .Where(info => !hidden.Contains($"{info.RepoOwner}/{info.RepoName}"))
             .ToList();
         infos.AddRange(localInfos);
+
+        var catalogFileSource = new LocalCatalogFileSource();
+        var catalogFileInfos = await catalogFileSource.DiscoverAsync(_settings, logProgress);
+        var catalogFileFiltered = catalogFileInfos
+            .Where(info => !hidden.Contains($"{info.RepoOwner}/{info.RepoName}"))
+            .Where(info => !infos.Any(existing => existing.RepoOwner.Equals(info.RepoOwner, StringComparison.OrdinalIgnoreCase)
+                && existing.RepoName.Equals(info.RepoName, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        infos.AddRange(catalogFileFiltered);
+
         return infos;
     }
 
@@ -823,6 +857,7 @@ public sealed class MainViewModel : ViewModelBase
 
         _settings.GitHubUser = user;
         _settings.GitHubToken = string.IsNullOrWhiteSpace(GitHubTokenInput) ? null : GitHubTokenInput.Trim();
+        _settings.ProxyUrl = string.IsNullOrWhiteSpace(ProxyUrlInput) ? null : ProxyUrlInput.Trim();
         _settings.TopicFilter = topic;
         _settings.LaunchUrl = NormalizeLaunchUrl(LaunchUrlInput);
         _settings.LaunchProfileMode = LaunchProfileMode;
@@ -1591,6 +1626,29 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    private void ExportWingetManifest()
+    {
+        var version = AssemblyVersion;
+        var defaultName = $"SysAdminDoc.LocalChromeStore-{version}.yaml";
+        var path = _dialogs.SaveFile("Export Winget manifest", "YAML (*.yaml)|*.yaml|All files (*.*)|*.*",
+            defaultName, _settingsService.SettingsDir, ".yaml");
+        if (path is null) return;
+
+        try
+        {
+            var assetUrl = $"https://github.com/SysAdminDoc/LocalChromeStore/releases/download/v{version}/LocalChromeStore-v{version}-win-x64.zip";
+            var yaml = WingetManifestExporter.GenerateForLocalChromeStore(version, assetUrl);
+            File.WriteAllText(path, yaml, Encoding.UTF8);
+            StatusText = $"Winget manifest exported to {path}.";
+            Log($"Exported Winget manifest for v{version} to {path}.");
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"Winget manifest export failed: {ex.Message}";
+            Log($"! Winget manifest export failed: {ex.Message}");
+        }
+    }
+
     private async Task ImportEnvironmentAsync()
     {
         var path = _dialogs.OpenFile("Import environment", "LocalChromeStore environment (*.json)|*.json|All files (*.*)|*.*",
@@ -1609,6 +1667,15 @@ public sealed class MainViewModel : ViewModelBase
             return;
         }
 
+        Log($"Import file: {path}");
+        Log($"Import source: {manifest.App} — exported {manifest.ExportedAt:yyyy-MM-dd HH:mm:ss zzz}");
+        Log($"Import targets: {manifest.Extensions.Count} extension(s), {manifest.Settings.ExtraOwners.Count} extra owner(s), {manifest.Settings.LocalSourceFolders.Count} local source folder(s).");
+        foreach (var ext in manifest.Extensions)
+        {
+            var detail = ext.ManifestVersionNumber.HasValue ? $"MV{ext.ManifestVersionNumber}" : "unknown MV";
+            Log($"  Target: {ext.Key}@{ext.Version} ({detail}, {ext.Framework})");
+        }
+
         var confirm = _dialogs.Confirm(
             $"Import {manifest.Extensions.Count} extension(s) from this environment manifest?\n\nLocalChromeStore will update discovery settings, refresh GitHub/local sources, and install any matching sources that are missing or outdated. Existing local installs are not removed.",
             "Import environment");
@@ -1618,12 +1685,21 @@ public sealed class MainViewModel : ViewModelBase
         try
         {
             StatusText = "Importing environment...";
+            var previousUser = _settings.GitHubUser;
+            var previousOwnerCount = _settings.ExtraOwners.Count;
+            var previousLocalCount = _settings.LocalSourceFolders.Count;
             _settings = EnvironmentManifestService.ApplySettings(_settings, manifest);
             _settingsService.Save(_settings);
             SyncSettingsInputs();
             ReloadExtraOwnersFromSettings();
             ReloadLocalSourceFoldersFromSettings();
             Log($"Imported environment settings from {path}.");
+            if (!previousUser.Equals(_settings.GitHubUser, StringComparison.OrdinalIgnoreCase))
+                Log($"  GitHub user changed: {previousUser} -> {_settings.GitHubUser}");
+            if (_settings.ExtraOwners.Count != previousOwnerCount)
+                Log($"  Extra owners: {previousOwnerCount} -> {_settings.ExtraOwners.Count}");
+            if (_settings.LocalSourceFolders.Count != previousLocalCount)
+                Log($"  Local source folders: {previousLocalCount} -> {_settings.LocalSourceFolders.Count}");
 
             await RefreshCatalogForImportAsync();
             await InstallEnvironmentTargetsAsync(manifest);
@@ -1657,6 +1733,7 @@ public sealed class MainViewModel : ViewModelBase
         var alreadyCurrent = 0;
         var skippedForPermissionReview = 0;
         var missing = 0;
+        var failed = 0;
         foreach (var target in manifest.Extensions)
         {
             var existing = _extensions.Find(target.RepoOwner, target.RepoName);
@@ -1717,12 +1794,22 @@ public sealed class MainViewModel : ViewModelBase
                 continue;
             }
 
-            await _extensions.InstallAsync(installInfo, new Progress<string>(Log));
-            installed++;
+            try
+            {
+                await _extensions.InstallAsync(installInfo, new Progress<string>(Log));
+                installed++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                Log($"! Import install failed for {target.Key}: {ex.Message}");
+            }
         }
 
         _extensions.Reload();
         var summary = $"Environment import summary: {installed} installed, {alreadyCurrent} already current, {missing} missing";
+        if (failed > 0)
+            summary += $", {failed} failed";
         if (skippedForPermissionReview > 0)
             summary += $", {skippedForPermissionReview} skipped for permission review";
         Log(summary + ".");
@@ -1778,6 +1865,7 @@ public sealed class MainViewModel : ViewModelBase
         sb.AppendLine($"  Status:        {GitHubStatusSummary}");
         sb.AppendLine($"  Rate limit:    {RateLimitSummary}");
         sb.AppendLine($"  Topic filter:  {(_settings.UseTopicFilter ? _settings.TopicFilter : "(disabled)")}");
+        sb.AppendLine($"  Proxy:         {(string.IsNullOrWhiteSpace(_settings.ProxyUrl) ? "(system default)" : _settings.ProxyUrl)}");
         sb.AppendLine($"  Hidden repos:  {_settings.HiddenRepos.Count}");
         sb.AppendLine($"  Auto-update on refresh: {_settings.AutoUpdateOnRefresh}");
         sb.AppendLine($"  Launch after install:   {_settings.LaunchBrowserAfterInstall}");
@@ -1929,6 +2017,7 @@ public sealed class MainViewModel : ViewModelBase
     {
         GitHubUserInput = _settings.GitHubUser;
         GitHubTokenInput = _settings.GitHubToken ?? string.Empty;
+        ProxyUrlInput = _settings.ProxyUrl ?? string.Empty;
         LaunchUrlInput = _settings.LaunchUrl ?? string.Empty;
         LaunchProfileMode = _settings.LaunchProfileMode;
         ReloadLocalSourceFoldersFromSettings();

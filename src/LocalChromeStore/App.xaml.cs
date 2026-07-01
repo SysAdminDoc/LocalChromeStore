@@ -43,6 +43,8 @@ public partial class App : Application
         ThreadPool.RegisterWaitForSingleObject(_activateEvent, (_, _) => Dispatcher.Invoke(SurfaceMainWindow),
             null, Timeout.Infinite, executeOnlyOnce: false);
 
+        ApplyHighContrastIfActive();
+
         DispatcherUnhandledException += OnUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
             CrashLog.Write(args.ExceptionObject as Exception);
@@ -65,6 +67,17 @@ public partial class App : Application
         _activateEvent?.Dispose();
         _instanceMutex?.Dispose();
         base.OnExit(e);
+    }
+
+    private void ApplyHighContrastIfActive()
+    {
+        if (!SystemParameters.HighContrast) return;
+        try
+        {
+            var hc = new ResourceDictionary { Source = new Uri("Themes/HighContrastTheme.xaml", UriKind.Relative) };
+            Resources.MergedDictionaries.Add(hc);
+        }
+        catch { /* fall through to default dark theme */ }
     }
 
     private void OnUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

@@ -28,6 +28,18 @@ public sealed class GitHubServiceTests
     }
 
     [Theory]
+    [InlineData("manifest.json")]
+    [InlineData(".output/chrome-mv3/manifest.json")]
+    [InlineData("build/chrome-mv3-prod/manifest.json")]
+    [InlineData("dist/manifest.json")]
+    [InlineData("extension/manifest.json")]
+    [InlineData("public/manifest.json")]
+    public void ManifestProbePaths_IncludeCommonFrameworkOutputs(string path)
+    {
+        Assert.Contains(path, GitHubService.ManifestProbePaths);
+    }
+
+    [Theory]
     [InlineData("0.3.0", "v0.4.0", true)]   // newer tag, leading v tolerated
     [InlineData("0.3.0", "0.4.0", true)]    // newer tag, no v
     [InlineData("0.3.0", "v0.3.0", false)]  // same version, format-insensitive

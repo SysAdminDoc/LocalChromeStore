@@ -101,7 +101,9 @@ public sealed class SettingsService
             AutoUpdateOnRefresh = settings.AutoUpdateOnRefresh,
             LaunchUrl = string.IsNullOrWhiteSpace(settings.LaunchUrl) ? null : settings.LaunchUrl.Trim(),
             LaunchProfileMode = settings.LaunchProfileMode,
-            LaunchWithTemporaryProfile = settings.LaunchProfileMode == BrowserProfileMode.Temporary
+            LaunchWithTemporaryProfile = settings.LaunchProfileMode == BrowserProfileMode.Temporary,
+            ProxyUrl = string.IsNullOrWhiteSpace(settings.ProxyUrl) ? null : settings.ProxyUrl.Trim(),
+            ReleaseChannel = settings.ReleaseChannel
         };
         var json = JsonSerializer.Serialize(copy, JsonOpts);
         WriteAtomic(SettingsPath, json);
