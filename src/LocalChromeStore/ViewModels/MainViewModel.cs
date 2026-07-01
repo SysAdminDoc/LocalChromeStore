@@ -28,6 +28,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly PolicyEnrollmentService _policyEnrollment = new();
     private readonly IDialogService _dialogs;
     private readonly CatalogCacheService _catalogCache;
+    private readonly UsageStatsService _usageStats;
     private readonly Dispatcher_LogSink _logSink;
     private AppSettings _settings;
     private bool _busy;
@@ -117,6 +118,7 @@ public sealed class MainViewModel : ViewModelBase
         _policyRiskScanner = new PolicyPackageRiskScanner(_settingsService);
         _policyInstaller = new PolicyInstallService();
         _catalogCache = new CatalogCacheService(_settingsService.CacheDir);
+        _usageStats = new UsageStatsService(_settingsService.CacheDir);
         _settings = _settingsService.Load();
         _logSink = new Dispatcher_LogSink(LogLines, new JsonEventLog(_settingsService.LogsDir));
 
@@ -629,6 +631,7 @@ public sealed class MainViewModel : ViewModelBase
             var logProgress = new Progress<string>(Log);
             var infos = await DiscoverCatalogAsync(logProgress);
             _catalogCache.Save(infos);
+            _usageStats.RecordRefresh(infos.Count);
             RebuildExtensionCards(infos);
             ApplyServiceState(_github.LastState, infos.Count);
             if (_settings.AutoUpdateOnRefresh && HasInstallableUpdates)
@@ -1040,6 +1043,7 @@ public sealed class MainViewModel : ViewModelBase
         _settings.LaunchWithTemporaryProfile = LaunchProfileMode == BrowserProfileMode.Temporary;
         _settingsService.Save(_settings);
 
+        _usageStats.RecordLaunch();
         ApplyLaunchOutcome(await _launchManager.LaunchAsync(
             SelectedBrowser, set, launchUrl, LaunchProfileMode, isSentinel, _selectedLoadSet?.Name, new Progress<string>(Log)));
     }
@@ -1856,6 +1860,19 @@ public sealed class MainViewModel : ViewModelBase
             if (info.Warnings.Count > 0)
                 sb.AppendLine($"    Warnings:     {string.Join(" | ", info.Warnings)}");
         }
+        sb.AppendLine();
+
+        sb.AppendLine("== Usage stats ==");
+        var stats = _usageStats.Current;
+        sb.AppendLine($"  Refreshes:   {stats.RefreshCount}");
+        sb.AppendLine($"  Installs:    {stats.InstallCount}");
+        sb.AppendLine($"  Uninstalls:  {stats.UninstallCount}");
+        sb.AppendLine($"  Updates:     {stats.UpdateCount}");
+        sb.AppendLine($"  Launches:    {stats.LaunchCount}");
+        if (stats.LastRefreshAt.HasValue)
+            sb.AppendLine($"  Last refresh: {stats.LastRefreshAt.Value:yyyy-MM-dd HH:mm:ss} ({stats.LastRefreshExtensionCount} extensions)");
+        if (stats.LastLaunchAt.HasValue)
+            sb.AppendLine($"  Last launch:  {stats.LastLaunchAt.Value:yyyy-MM-dd HH:mm:ss}");
         sb.AppendLine();
 
         sb.AppendLine("== Activity log ==");

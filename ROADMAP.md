@@ -13,7 +13,6 @@ Roadmap_Blocked.md.
    - Add a local catalog-file source.
    - Add release channel selection.
    - Add a GitHub draft-release helper.
-   - Add local-only usage stats.
    - Add remote-hosted-code/CSP package scanning.
    - Add a static package scanner for obfuscation, `eval`, remote imports, and secret leakage.
    - Add a file watcher with manual reload prompt.
