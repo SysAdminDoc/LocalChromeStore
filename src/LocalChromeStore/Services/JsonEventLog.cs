@@ -94,6 +94,11 @@ public sealed class JsonEventLog
             clean.Contains("CDP", StringComparison.OrdinalIgnoreCase))
             return EventCategory.Launch;
 
+        if (clean.Contains("self-update", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("newer version", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("newer LocalChromeStore", StringComparison.OrdinalIgnoreCase))
+            return EventCategory.SelfUpdate;
+
         if (clean.StartsWith("Update", StringComparison.OrdinalIgnoreCase) ||
             clean.Contains("update", StringComparison.OrdinalIgnoreCase))
             return EventCategory.Update;
@@ -118,10 +123,6 @@ public sealed class JsonEventLog
 
         if (clean.Contains("export", StringComparison.OrdinalIgnoreCase))
             return EventCategory.Export;
-
-        if (clean.Contains("self-update", StringComparison.OrdinalIgnoreCase) ||
-            clean.Contains("newer version", StringComparison.OrdinalIgnoreCase))
-            return EventCategory.SelfUpdate;
 
         return EventCategory.General;
     }

@@ -128,6 +128,7 @@ public sealed class JsonEventLogTests : IDisposable
     [InlineData("Environment import complete", EventCategory.Import)]
     [InlineData("Catalog export saved", EventCategory.Export)]
     [InlineData("A newer version is available", EventCategory.SelfUpdate)]
+    [InlineData("A newer LocalChromeStore release is available", EventCategory.SelfUpdate)]
     [InlineData("Something random", EventCategory.General)]
     public void ClassifyLogLine_CategorizesCorrectly(string line, EventCategory expected)
     {

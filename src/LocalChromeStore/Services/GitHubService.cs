@@ -526,8 +526,8 @@ public sealed class GitHubService : IExtensionSource
                 if (contents.Count > 0) return (path, null);
             }
             catch (NotFoundException) { /* try next */ }
-            catch (JsonException) { return (path, null); } // found but unparseable
-            catch { return (null, null); }
+            catch (JsonException) { return (path, null); }
+            catch { /* transient error — try next path */ }
         }
         return (null, null);
     }

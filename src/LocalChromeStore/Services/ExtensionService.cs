@@ -318,14 +318,20 @@ public sealed class ExtensionService
     {
         var direct = Path.Combine(root, "manifest.json");
         if (File.Exists(direct)) return direct;
-        // Search one level deep (handles ZIPs with single wrapper folder we didn't strip).
         foreach (var sub in Directory.EnumerateDirectories(root))
         {
             var nested = Path.Combine(sub, "manifest.json");
             if (File.Exists(nested)) return nested;
         }
-        // Fallback: deep search but bounded.
-        return Directory.EnumerateFiles(root, "manifest.json", SearchOption.AllDirectories).FirstOrDefault();
+        // Bounded fallback: search up to 3 levels deep.
+        try
+        {
+            foreach (var f in Directory.EnumerateFiles(root, "manifest.json", new EnumerationOptions
+                { RecurseSubdirectories = true, MaxRecursionDepth = 3, IgnoreInaccessible = true }))
+                return f;
+        }
+        catch { /* permission/access issues in deep scan */ }
+        return null;
     }
 
     private void PruneOldVersions(string owner, string repo, string keepVersion, IProgress<string>? log)
