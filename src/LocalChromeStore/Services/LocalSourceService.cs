@@ -6,8 +6,23 @@ using LocalChromeStore.Models;
 
 namespace LocalChromeStore.Services;
 
+public sealed record LocalSourceResolution(string ConfiguredPath, string ExtensionRoot, string ManifestPath, string RelativePath);
+
 public sealed class LocalSourceService
 {
+    private static readonly string[] CandidateManifestPaths =
+    [
+        "manifest.json",
+        ".output/chrome-mv3/manifest.json",
+        ".output/chrome-mv3-prod/manifest.json",
+        ".output/chrome-mv3-dev/manifest.json",
+        "build/chrome-mv3-prod/manifest.json",
+        "build/chrome-mv3-dev/manifest.json",
+        "dist/manifest.json",
+        "extension/manifest.json",
+        "public/manifest.json"
+    ];
+
     public IReadOnlyList<ExtensionInfo> Discover(IEnumerable<string> sourceFolders, IProgress<string>? log = null)
     {
         var results = new List<ExtensionInfo>();
@@ -20,11 +35,14 @@ public sealed class LocalSourceService
                 if (info is not null)
                 {
                     results.Add(info);
-                    log?.Report($"Local source discovered: {info.DisplayName} ({path})");
+                    var location = path.Equals(info.LocalSourcePath, StringComparison.OrdinalIgnoreCase)
+                        ? path
+                        : $"{path} -> {info.LocalSourcePath}";
+                    log?.Report($"Local source discovered: {info.DisplayName} ({location})");
                 }
                 else
                 {
-                    log?.Report($"! Local source skipped: manifest.json not found at {path}");
+                    log?.Report($"! Local source skipped: manifest.json not found at {path} or known build-output folders.");
                 }
             }
             catch (Exception ex)
@@ -38,11 +56,12 @@ public sealed class LocalSourceService
 
     public static ExtensionInfo? DiscoverOne(string sourceFolder)
     {
-        var root = NormalizePath(sourceFolder);
-        if (!Directory.Exists(root)) return null;
+        var resolution = ResolveSourceFolder(sourceFolder);
+        if (resolution is null) return null;
 
-        var manifestPath = Path.Combine(root, "manifest.json");
-        if (!File.Exists(manifestPath)) return null;
+        var root = resolution.ConfiguredPath;
+        var extensionRoot = resolution.ExtensionRoot;
+        var manifestPath = resolution.ManifestPath;
 
         using var doc = JsonDocument.Parse(
             File.ReadAllText(manifestPath),
@@ -55,22 +74,49 @@ public sealed class LocalSourceService
             RepoOwner = "local",
             RepoName = repoName,
             RepoUrl = root,
-            RepoDescription = "Local unpacked extension source folder.",
-            LocalSourcePath = root,
+            RepoDescription = resolution.RelativePath == "."
+                ? "Local unpacked extension source folder."
+                : $"Local unpacked extension build output ({resolution.RelativePath}).",
+            LocalSourcePath = extensionRoot,
             LatestVersion = ReadString(doc.RootElement, "version") ?? "0.0.0",
-            PublishedAt = Directory.GetLastWriteTimeUtc(root),
+            PublishedAt = Directory.GetLastWriteTimeUtc(extensionRoot),
             ManifestSourcePath = manifestPath,
             DiscoverySource = DiscoverySource.LocalSourceFolder,
             AssetKind = AssetKind.LocalFolder,
-            AssetName = dirName,
+            AssetName = resolution.RelativePath == "."
+                ? dirName
+                : $"{dirName} / {resolution.RelativePath.Replace('\\', '/')}",
             Topics = "local-source",
             Freshness = RepoFreshness.Fresh,
-            RepoLastPushedAt = Directory.GetLastWriteTimeUtc(root)
+            RepoLastPushedAt = Directory.GetLastWriteTimeUtc(extensionRoot)
         };
 
         EnrichFromManifest(info, doc.RootElement);
         DetectFramework(root, info);
+        if (info.Framework == ExtensionFramework.Unknown && !extensionRoot.Equals(root, StringComparison.OrdinalIgnoreCase))
+            DetectFramework(extensionRoot, info);
         return info;
+    }
+
+    public static LocalSourceResolution? ResolveSourceFolder(string sourceFolder)
+    {
+        var root = NormalizePath(sourceFolder);
+        if (!Directory.Exists(root)) return null;
+
+        foreach (var relativeManifest in CandidateManifestPaths)
+        {
+            var manifestPath = Path.Combine(root, relativeManifest);
+            if (!File.Exists(manifestPath)) continue;
+
+            var extensionRoot = Path.GetDirectoryName(manifestPath)!;
+            var relativeRoot = Path.GetDirectoryName(relativeManifest);
+            var relativeLabel = string.IsNullOrWhiteSpace(relativeRoot)
+                ? "."
+                : relativeRoot.Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+            return new LocalSourceResolution(root, extensionRoot, manifestPath, relativeLabel);
+        }
+
+        return null;
     }
 
     private static void EnrichFromManifest(ExtensionInfo info, JsonElement root)

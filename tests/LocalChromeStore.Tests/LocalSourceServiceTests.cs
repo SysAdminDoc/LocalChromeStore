@@ -48,4 +48,59 @@ public sealed class LocalSourceServiceTests
                 Directory.Delete(root, recursive: true);
         }
     }
+
+    [Theory]
+    [InlineData(".output/chrome-mv3")]
+    [InlineData("build/chrome-mv3-prod")]
+    [InlineData("dist")]
+    [InlineData("extension")]
+    [InlineData("public")]
+    public void DiscoverOne_ResolvesKnownFrameworkOutputFolder(string relativeOutput)
+    {
+        var root = Path.Combine(Path.GetTempPath(), "LocalChromeStore.Tests", Guid.NewGuid().ToString("N"));
+        var project = Path.Combine(root, "Wxt Project");
+        var output = Path.Combine(project, relativeOutput.Replace('/', Path.DirectorySeparatorChar));
+        try
+        {
+            Directory.CreateDirectory(output);
+            File.WriteAllText(Path.Combine(project, "package.json"),
+                """
+                {
+                  "devDependencies": {
+                    "wxt": "latest"
+                  }
+                }
+                """);
+            File.WriteAllText(Path.Combine(output, "manifest.json"),
+                """
+                {
+                  "manifest_version": 3,
+                  "name": "Built Extension",
+                  "version": "0.0.5"
+                }
+                """);
+
+            var resolution = LocalSourceService.ResolveSourceFolder(project);
+            var info = LocalSourceService.DiscoverOne(project);
+
+            Assert.NotNull(resolution);
+            Assert.Equal(Path.GetFullPath(project), resolution.ConfiguredPath);
+            Assert.Equal(Path.GetFullPath(output), resolution.ExtensionRoot);
+            Assert.Equal(relativeOutput.Replace('/', Path.DirectorySeparatorChar), resolution.RelativePath);
+            Assert.NotNull(info);
+            Assert.Equal(Path.GetFullPath(project), info.RepoUrl);
+            Assert.Equal(Path.GetFullPath(output), info.LocalSourcePath);
+            Assert.Equal(Path.Combine(Path.GetFullPath(output), "manifest.json"), info.ManifestSourcePath);
+            Assert.Equal("Built Extension", info.DisplayName);
+            Assert.Equal("0.0.5", info.DisplayVersion);
+            Assert.Equal(ExtensionFramework.Wxt, info.Framework);
+            Assert.Equal("package.json references WXT", info.FrameworkEvidence);
+            Assert.Equal($"Wxt Project / {relativeOutput}", info.AssetName);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+    }
 }

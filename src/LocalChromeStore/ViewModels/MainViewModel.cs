@@ -1875,10 +1875,11 @@ public sealed class MainViewModel : ViewModelBase
             return;
         }
 
-        if (!File.Exists(Path.Combine(folder, "manifest.json")))
+        var resolution = LocalSourceService.ResolveSourceFolder(folder);
+        if (resolution is null)
         {
-            StatusText = $"Local source folder has no manifest.json: {folder}";
-            Log($"! Local source not added: manifest.json not found in {folder}");
+            StatusText = $"Local source folder has no manifest.json or known build output: {folder}";
+            Log($"! Local source not added: manifest.json not found in {folder}, .output/chrome-mv3, build/chrome-mv3-prod, dist, extension, or public.");
             NewLocalSourceInput = string.Empty;
             return;
         }
@@ -1898,7 +1899,10 @@ public sealed class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(LocalSourceSummary));
         NewLocalSourceInput = string.Empty;
         StatusText = $"Added local source folder: {folder}";
-        Log($"Added local source folder '{folder}'. Run Refresh to link it into the catalog.");
+        var resolvedSuffix = resolution.RelativePath == "."
+            ? string.Empty
+            : $" (resolved output: {resolution.RelativePath})";
+        Log($"Added local source folder '{folder}'{resolvedSuffix}. Run Refresh to link it into the catalog.");
     }
 
     private void RemoveLocalSourceFolder(string? folder)
