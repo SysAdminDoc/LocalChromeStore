@@ -27,6 +27,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly PolicyInstallService _policyInstaller;
     private readonly PolicyEnrollmentService _policyEnrollment = new();
     private readonly IDialogService _dialogs;
+    private readonly CatalogCacheService _catalogCache;
     private readonly Dispatcher_LogSink _logSink;
     private AppSettings _settings;
     private bool _busy;
@@ -115,6 +116,7 @@ public sealed class MainViewModel : ViewModelBase
         _policyPackages = new PolicyPackageService(_settingsService);
         _policyRiskScanner = new PolicyPackageRiskScanner(_settingsService);
         _policyInstaller = new PolicyInstallService();
+        _catalogCache = new CatalogCacheService(_settingsService.CacheDir);
         _settings = _settingsService.Load();
         _logSink = new Dispatcher_LogSink(LogLines, new JsonEventLog(_settingsService.LogsDir));
 
@@ -126,6 +128,7 @@ public sealed class MainViewModel : ViewModelBase
         ReloadLocalSourceFoldersFromSettings();
         SyncHiddenReposCollection();
         ReloadLoadSetsFromService();
+        LoadCachedCatalog();
 
         ExtensionsView = CollectionViewSource.GetDefaultView(Extensions);
         ExtensionsView.Filter = FilterExtension;
@@ -609,6 +612,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             var logProgress = new Progress<string>(Log);
             var infos = await DiscoverCatalogAsync(logProgress);
+            _catalogCache.Save(infos);
             RebuildExtensionCards(infos);
             ApplyServiceState(_github.LastState, infos.Count);
             if (_settings.AutoUpdateOnRefresh && HasInstallableUpdates)
@@ -641,6 +645,22 @@ public sealed class MainViewModel : ViewModelBase
             .ToList();
         infos.AddRange(localInfos);
         return infos;
+    }
+
+    private void LoadCachedCatalog()
+    {
+        var snapshot = _catalogCache.Load();
+        if (snapshot is null) return;
+
+        var age = DateTime.UtcNow - snapshot.CachedAtUtc;
+        var label = age.TotalMinutes < 60
+            ? $"{(int)age.TotalMinutes}m ago"
+            : age.TotalHours < 24
+            ? $"{(int)age.TotalHours}h ago"
+            : $"{(int)age.TotalDays}d ago";
+        RebuildExtensionCards(snapshot.Extensions);
+        StatusText = $"Loaded {snapshot.Extensions.Count} cached extension(s) from {label}. Click Refresh to update.";
+        Log($"Catalog loaded from offline cache ({snapshot.Extensions.Count} extension(s), cached {label}).");
     }
 
     private void RebuildExtensionCards(IEnumerable<ExtensionInfo> infos)
