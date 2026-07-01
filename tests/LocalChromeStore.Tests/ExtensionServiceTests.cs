@@ -91,9 +91,9 @@ public sealed class ExtensionServiceTests
     }
 
     [Theory]
-    [InlineData(new byte[] { (byte)'C', (byte)'r', (byte)'2', (byte)'4', 2, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0x7F, 0xFF, 0xFF, 0xFF, 0x7F }, "negative")]
-    [InlineData(new byte[] { (byte)'C', (byte)'r', (byte)'2', (byte)'4', 3, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0x7F, 0, 0, 0, 0 }, "overflow")]
-    public void ExtractCrx_RejectsMaliciousHeaderLengths(byte[] header, string label)
+    [InlineData(new byte[] { (byte)'C', (byte)'r', (byte)'2', (byte)'4', 2, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0x7F, 0xFF, 0xFF, 0xFF, 0x7F })]
+    [InlineData(new byte[] { (byte)'C', (byte)'r', (byte)'2', (byte)'4', 3, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0x7F, 0, 0, 0, 0 })]
+    public void ExtractCrx_RejectsMaliciousHeaderLengths(byte[] header)
     {
         var data = new byte[header.Length + 4];
         Array.Copy(header, data, header.Length);
