@@ -44,7 +44,8 @@ public sealed class CatalogCacheService
             foreach (var candidate in new[] { _cachePath, _cachePath + ".bak" })
             {
                 if (!File.Exists(candidate)) continue;
-                var json = File.ReadAllText(candidate);
+                if (!JsonFileReader.TryRead(candidate, JsonFileLimits.CatalogCacheBytes, out var json))
+                    continue;
                 var snapshot = JsonSerializer.Deserialize<CatalogSnapshot>(json, JsonOpts);
                 if (snapshot?.Extensions is { Count: > 0 })
                     return snapshot;

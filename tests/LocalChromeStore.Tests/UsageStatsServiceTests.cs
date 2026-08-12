@@ -76,4 +76,17 @@ public sealed class UsageStatsServiceTests : IDisposable
         Assert.Equal(1, svc2.Current.InstallCount);
         Assert.True(svc2.Current.PerExtension.ContainsKey("a/b"));
     }
+
+    [Fact]
+    public void Load_RejectsOversizedStatsBeforeDeserialization()
+    {
+        var path = Path.Combine(_dir, "usage-stats.json");
+        using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+            stream.SetLength(JsonFileLimits.UsageStatsBytes + 1);
+
+        var stats = new UsageStatsService(_dir).Current;
+
+        Assert.Equal(0, stats.RefreshCount);
+        Assert.Empty(stats.PerExtension);
+    }
 }

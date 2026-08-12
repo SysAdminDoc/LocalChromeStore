@@ -95,4 +95,14 @@ public sealed class CatalogCacheServiceTests : IDisposable
         var age = DateTime.UtcNow - snapshot!.CachedAtUtc;
         Assert.True(age.TotalSeconds < 5);
     }
+
+    [Fact]
+    public void Load_RejectsOversizedCacheBeforeDeserialization()
+    {
+        var path = Path.Combine(_dir, "catalog-cache.json");
+        using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+            stream.SetLength(JsonFileLimits.CatalogCacheBytes + 1);
+
+        Assert.Null(new CatalogCacheService(_dir).Load());
+    }
 }

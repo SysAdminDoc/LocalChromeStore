@@ -113,6 +113,19 @@ public sealed class JsonEventLogTests : IDisposable
             Assert.True(IsValidJson(line));
     }
 
+    [Fact]
+    public void Write_RemovesEventsOlderThanRetention()
+    {
+        var oldPath = Path.Combine(_dir, $"events-{DateTime.UtcNow.AddDays(-8):yyyyMMdd}.jsonl");
+        Directory.CreateDirectory(_dir);
+        File.WriteAllText(oldPath, "old\n");
+
+        var log = new JsonEventLog(_dir, retentionDays: 7);
+        log.Info(EventCategory.General, "fresh");
+
+        Assert.False(File.Exists(oldPath));
+    }
+
     [Theory]
     [InlineData("Installed Foo v1.0", EventCategory.Install)]
     [InlineData("! Install failed for X", EventCategory.Install)]

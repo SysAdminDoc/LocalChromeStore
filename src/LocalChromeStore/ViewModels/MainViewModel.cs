@@ -133,6 +133,8 @@ public sealed class MainViewModel : ViewModelBase
         });
         _settings = _settingsService.Load();
         _logSink = new Dispatcher_LogSink(LogLines, new JsonEventLog(_settingsService.LogsDir));
+        if (_settingsService.LastSettingsLoadWarning is { } settingsWarning)
+            Log($"! Settings recovery: {settingsWarning}");
 
         _githubUserInput = _settings.GitHubUser;
         _githubTokenInput = _settings.GitHubToken ?? string.Empty;

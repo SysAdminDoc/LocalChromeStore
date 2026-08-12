@@ -4,11 +4,6 @@ Actionable work only. Historical and completed roadmap material is archived in C
 
 ## Actionable Items
 
-- [ ] **Audit-identified hardening**
-   - CatalogCacheService / UsageStatsService have no file-size limit on deserialization; a corrupted or malicious cache file could exhaust memory before the catch fires.
-   - SettingsService `ReadJsonWithBackup` silently resets settings if the JSON is valid but schema-mismatched; consider logging when the backup is used.
-   - JsonEventLog has no daily log file rotation or cleanup of old `events-*.jsonl` files.
-
 - [ ] **Later polish and integrations**
    - Add GitHub Pages static update hosting.
    - Add advanced `ExtensionSettings` controls.

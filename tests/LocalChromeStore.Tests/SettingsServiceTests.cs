@@ -59,6 +59,22 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void Load_ReportsSchemaMismatchAndRecoversFromBackup()
+    {
+        var root = NewRoot();
+        var svc = new SettingsService(appDataRoot: root, localAppDataRoot: root);
+        svc.Save(new AppSettings { GitHubUser = "alice" });
+        svc.Save(new AppSettings { GitHubUser = "bob" });
+        File.WriteAllText(svc.SettingsPath, "{\"unrelated\":true}");
+
+        var recovered = new SettingsService(appDataRoot: root, localAppDataRoot: root);
+        var loaded = recovered.Load();
+
+        Assert.Equal("alice", loaded.GitHubUser);
+        Assert.Contains("backup", recovered.LastSettingsLoadWarning, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void SaveManifest_RoundTrips_AndKeepsBackup()
     {
         var root = NewRoot();

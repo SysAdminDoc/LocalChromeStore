@@ -26,6 +26,9 @@ public sealed class SettingsService
     /// </summary>
     public bool TokenWasMigratedFromPlaintext { get; private set; }
 
+    /// <summary>Non-secret warning from the most recent settings load, such as backup recovery.</summary>
+    public string? LastSettingsLoadWarning { get; private set; }
+
     private const string DpapiPrefix = "dpapi:";
 
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -59,7 +62,12 @@ public sealed class SettingsService
 
     public AppSettings Load()
     {
-        var s = ReadJsonWithBackup(SettingsPath, () => new AppSettings());
+        LastSettingsLoadWarning = null;
+        var s = ReadJsonWithBackup(
+            SettingsPath,
+            () => new AppSettings(),
+            IsAppSettingsDocument,
+            warning => LastSettingsLoadWarning = warning);
         if (!string.IsNullOrEmpty(s.GitHubToken))
         {
             if (s.GitHubToken.StartsWith(DpapiPrefix, StringComparison.Ordinal))
@@ -163,21 +171,75 @@ public sealed class SettingsService
     /// <c>.bak</c> written by <see cref="WriteAtomic"/> if the primary file is missing or corrupt,
     /// and finally to <paramref name="fallback"/>.
     /// </summary>
-    private static T ReadJsonWithBackup<T>(string path, Func<T> fallback)
+    private T ReadJsonWithBackup<T>(
+        string path,
+        Func<T> fallback,
+        Func<JsonElement, bool>? schemaValidator = null,
+        Action<string>? warning = null)
     {
         foreach (var candidate in new[] { path, path + ".bak" })
         {
             if (!File.Exists(candidate)) continue;
+            if (!JsonFileReader.TryRead(candidate, JsonFileLimits.SettingsBytes, out var json))
+            {
+                if (candidate.Equals(path, StringComparison.OrdinalIgnoreCase))
+                    warning?.Invoke($"{Path.GetFileName(path)} is larger than the {JsonFileLimits.SettingsBytes / (1024 * 1024)} MB safety limit; trying the backup.");
+                continue;
+            }
+
             try
             {
-                var json = File.ReadAllText(candidate);
+                using var document = JsonDocument.Parse(json);
+                if (schemaValidator is not null && !schemaValidator(document.RootElement))
+                {
+                    if (candidate.Equals(path, StringComparison.OrdinalIgnoreCase))
+                        warning?.Invoke($"{Path.GetFileName(path)} does not match the expected settings schema; trying the backup.");
+                    continue;
+                }
+
                 var value = JsonSerializer.Deserialize<T>(json, JsonOpts);
-                if (value is not null) return value;
+                if (value is not null)
+                {
+                    if (!candidate.Equals(path, StringComparison.OrdinalIgnoreCase))
+                        warning?.Invoke($"Recovered {Path.GetFileName(path)} from its backup after the primary file could not be used.");
+                    return value;
+                }
             }
             catch { /* try the backup, then the fallback */ }
         }
         return fallback();
     }
+
+    private static bool IsAppSettingsDocument(JsonElement document)
+    {
+        if (document.ValueKind != JsonValueKind.Object) return false;
+
+        foreach (var property in document.EnumerateObject())
+        {
+            if (AppSettingsProperties.Contains(property.Name)) return true;
+        }
+        return false;
+    }
+
+    private static readonly HashSet<string> AppSettingsProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        nameof(AppSettings.GitHubUser),
+        nameof(AppSettings.GitHubToken),
+        nameof(AppSettings.PreferredBrowserPath),
+        nameof(AppSettings.UseTopicFilter),
+        nameof(AppSettings.TopicFilter),
+        nameof(AppSettings.ExtraOwners),
+        nameof(AppSettings.LocalSourceFolders),
+        nameof(AppSettings.HiddenRepos),
+        nameof(AppSettings.PinnedRepos),
+        nameof(AppSettings.LaunchBrowserAfterInstall),
+        nameof(AppSettings.AutoUpdateOnRefresh),
+        nameof(AppSettings.LaunchUrl),
+        nameof(AppSettings.LaunchProfileMode),
+        nameof(AppSettings.LaunchWithTemporaryProfile),
+        nameof(AppSettings.ProxyUrl),
+        nameof(AppSettings.ReleaseChannel)
+    };
 
     private static string Protect(string plaintext)
     {

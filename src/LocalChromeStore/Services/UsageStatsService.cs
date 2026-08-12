@@ -86,9 +86,9 @@ public sealed class UsageStatsService
     {
         try
         {
-            if (File.Exists(_path))
+            if (File.Exists(_path) &&
+                JsonFileReader.TryRead(_path, JsonFileLimits.UsageStatsBytes, out var json))
             {
-                var json = File.ReadAllText(_path);
                 return JsonSerializer.Deserialize<UsageStats>(json, JsonOpts) ?? new();
             }
         }

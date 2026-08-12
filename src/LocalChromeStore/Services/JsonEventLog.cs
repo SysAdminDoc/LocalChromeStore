@@ -1,4 +1,5 @@
 using System.IO;
+using System.Globalization;
 using System.Text.Json;
 
 namespace LocalChromeStore.Services;
@@ -24,15 +25,21 @@ public sealed class JsonEventLog
 {
     private readonly string _logsDir;
     private readonly object _writeLock = new();
+    private readonly int _retentionDays;
+    private DateOnly? _lastCleanupDate;
+
+    private const int DefaultRetentionDays = 30;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
     };
 
-    public JsonEventLog(string logsDir)
+    public JsonEventLog(string logsDir, int retentionDays = DefaultRetentionDays)
     {
+        if (retentionDays < 1) throw new ArgumentOutOfRangeException(nameof(retentionDays));
         _logsDir = logsDir;
+        _retentionDays = retentionDays;
         Directory.CreateDirectory(logsDir);
     }
 
@@ -49,19 +56,46 @@ public sealed class JsonEventLog
         if (metadata is { Count: > 0 })
             entry["meta"] = metadata;
 
+        var now = DateTime.UtcNow;
         var line = JsonSerializer.Serialize(entry, JsonOpts);
-        var path = Path.Combine(_logsDir, $"events-{DateTime.UtcNow:yyyyMMdd}.jsonl");
+        var path = Path.Combine(_logsDir, $"events-{now:yyyyMMdd}.jsonl");
 
         lock (_writeLock)
         {
             try
             {
                 File.AppendAllText(path, line + "\n");
+                CleanupOldEvents(now);
             }
             catch
             {
                 // Best-effort logging — never crash the app.
             }
+        }
+    }
+
+    private void CleanupOldEvents(DateTime utcNow)
+    {
+        var currentDate = DateOnly.FromDateTime(utcNow);
+        if (_lastCleanupDate == currentDate) return;
+        _lastCleanupDate = currentDate;
+
+        var cutoff = utcNow.Date.AddDays(-_retentionDays);
+        foreach (var path in Directory.EnumerateFiles(_logsDir, "events-*.jsonl", SearchOption.TopDirectoryOnly))
+        {
+            var name = Path.GetFileNameWithoutExtension(path);
+            if (!name.StartsWith("events-", StringComparison.Ordinal) ||
+                !DateTime.TryParseExact(
+                    name["events-".Length..],
+                    "yyyyMMdd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var fileDate) ||
+                fileDate.Date >= cutoff)
+                continue;
+
+            try { File.Delete(path); }
+            catch { /* best-effort retention cleanup */ }
         }
     }
 
