@@ -5,6 +5,7 @@ using Xunit;
 
 namespace LocalChromeStore.Tests;
 
+[Collection("Serialized temp file system")]
 public sealed class SettingsServiceTests
 {
     private static string NewRoot() =>

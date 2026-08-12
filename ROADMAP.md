@@ -4,10 +4,6 @@ Actionable work only. Historical and completed roadmap material is archived in C
 
 ## Actionable Items
 
-- [ ] **Audit-identified reliability**
-   - Fix flaky parallel test execution: `BrowserConformanceServiceTests`, `SettingsServiceTests`, `SmokeTests` have TOCTOU temp-dir races under xUnit parallel runs. Add `[Collection]` attributes or unique temp roots.
-   - CdpPipeProcess uses raw `IntPtr` for the process handle instead of `SafeProcessHandle`; a partially-failed Dispose can leak the handle.
-
 - [ ] **Audit-identified hardening**
    - CatalogCacheService / UsageStatsService have no file-size limit on deserialization; a corrupted or malicious cache file could exhaust memory before the catch fires.
    - SettingsService `ReadJsonWithBackup` silently resets settings if the JSON is valid but schema-mismatched; consider logging when the backup is used.

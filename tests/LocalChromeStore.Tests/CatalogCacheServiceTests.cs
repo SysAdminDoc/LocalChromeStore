@@ -4,6 +4,7 @@ using Xunit;
 
 namespace LocalChromeStore.Tests;
 
+[Collection("Serialized temp file system")]
 public sealed class CatalogCacheServiceTests : IDisposable
 {
     private readonly string _dir;
@@ -18,7 +19,7 @@ public sealed class CatalogCacheServiceTests : IDisposable
     {
         try
         {
-            var root = Path.GetDirectoryName(Path.GetDirectoryName(_dir))!;
+            var root = Path.GetDirectoryName(_dir)!;
             if (Directory.Exists(root))
                 Directory.Delete(root, recursive: true);
         }

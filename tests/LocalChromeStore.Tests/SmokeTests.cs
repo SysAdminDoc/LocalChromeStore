@@ -5,6 +5,7 @@ using Xunit;
 
 namespace LocalChromeStore.Tests;
 
+[Collection("Serialized temp file system")]
 public sealed class SmokeTests : IDisposable
 {
     private readonly string _root;

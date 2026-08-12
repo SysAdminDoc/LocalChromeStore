@@ -4,6 +4,7 @@ using Xunit;
 
 namespace LocalChromeStore.Tests;
 
+[Collection("Serialized temp file system")]
 public sealed class JsonEventLogTests : IDisposable
 {
     private readonly string _dir;

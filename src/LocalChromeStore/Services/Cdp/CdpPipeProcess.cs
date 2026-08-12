@@ -133,10 +133,10 @@ internal sealed class CdpPipeProcess : IDisposable
 
     public int ProcessId { get; }
 
-    private IntPtr _processHandle;
+    private SafeProcessHandle? _processHandle;
     private bool _disposed;
 
-    private CdpPipeProcess(Stream writer, Stream reader, IntPtr processHandle, int processId)
+    private CdpPipeProcess(Stream writer, Stream reader, SafeProcessHandle processHandle, int processId)
     {
         Writer = writer;
         Reader = reader;
@@ -161,6 +161,8 @@ internal sealed class CdpPipeProcess : IDisposable
 
         IntPtr cmdRead = default, cmdWrite = default, respRead = default, respWrite = default;
         var attrList = IntPtr.Zero;
+        PROCESS_INFORMATION processInfo = default;
+        SafeProcessHandle? processHandle = null;
         GCHandle pinnedBlock = default, pinnedHandles = default;
         var pinnedBlockSet = false;
         var pinnedHandlesSet = false;
@@ -200,10 +202,13 @@ internal sealed class CdpPipeProcess : IDisposable
                 exePath, cmdLine, IntPtr.Zero, IntPtr.Zero,
                 bInheritHandles: true,
                 dwCreationFlags: EXTENDED_STARTUPINFO_PRESENT,
-                IntPtr.Zero, null, ref siEx, out var pi);
+                IntPtr.Zero, null, ref siEx, out processInfo);
             if (!ok) ThrowLastError("CreateProcess");
 
-            CloseHandle(pi.hThread);
+            processHandle = new SafeProcessHandle(processInfo.hProcess, ownsHandle: true);
+            processInfo.hProcess = IntPtr.Zero;
+            CloseHandle(processInfo.hThread);
+            processInfo.hThread = IntPtr.Zero;
 
             // Transfer ownership of our ends to FileStreams; the child owns copies of the other two,
             // so close ours.
@@ -215,10 +220,15 @@ internal sealed class CdpPipeProcess : IDisposable
             CloseHandle(cmdRead); cmdRead = default;
             CloseHandle(respWrite); respWrite = default;
 
-            return new CdpPipeProcess(writer, reader, pi.hProcess, pi.dwProcessId);
+            return new CdpPipeProcess(writer, reader, processHandle, processInfo.dwProcessId);
         }
         catch
         {
+            processHandle?.Dispose();
+            if (processInfo.hProcess != IntPtr.Zero)
+                CloseHandle(processInfo.hProcess);
+            if (processInfo.hThread != IntPtr.Zero)
+                CloseHandle(processInfo.hThread);
             foreach (var h in new[] { cmdRead, cmdWrite, respRead, respWrite })
                 if (h != default && h != MsvcrtStdioBlock.InvalidHandle) CloseHandle(h);
             throw;
@@ -267,16 +277,13 @@ internal sealed class CdpPipeProcess : IDisposable
         _disposed = true;
         try { Writer.Dispose(); } catch { /* best-effort */ }
         try { Reader.Dispose(); } catch { /* best-effort */ }
-        if (_processHandle != IntPtr.Zero)
-        {
-            CloseHandle(_processHandle);
-            _processHandle = IntPtr.Zero;
-        }
+        _processHandle?.Dispose();
+        _processHandle = null;
     }
 
     public void Terminate()
     {
-        if (_processHandle == IntPtr.Zero) return;
+        if (_processHandle is not { IsInvalid: false, IsClosed: false }) return;
         TerminateProcess(_processHandle, 0);
     }
 
@@ -336,7 +343,7 @@ internal sealed class CdpPipeProcess : IDisposable
     private static extern bool CloseHandle(IntPtr hObject);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool TerminateProcess(IntPtr hProcess, uint uExitCode);
+    private static extern bool TerminateProcess(SafeProcessHandle hProcess, uint uExitCode);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     private static extern bool CreateProcess(
