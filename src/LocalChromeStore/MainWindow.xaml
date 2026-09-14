@@ -595,6 +595,16 @@
                                    Margin="0,8,0,0"
                                    Text="When enabled, GitHub discovery only shows repos tagged with the selected topic. Otherwise any repo with a manifest.json or release ZIP/CRX can appear. Local source folders are always included." />
 
+                        <TextBlock Text="Custom update-feed URL"
+                                   Style="{StaticResource InputLabel}"
+                                   Margin="0,16,0,5" />
+                        <TextBox Text="{Binding CustomUpdateFeedUrlInput, UpdateSourceTrigger=PropertyChanged}"
+                                 AutomationProperties.Name="Custom update-feed URL" />
+                        <TextBlock Style="{StaticResource MuteText}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,7,0,0"
+                                   Text="Optional HTTPS JSON feed. Entries are merged after GitHub, local folders, and bundled catalog files." />
+
                         <TextBlock Text="Local source folders"
                                    Style="{StaticResource InputLabel}"
                                    Margin="0,16,0,5" />

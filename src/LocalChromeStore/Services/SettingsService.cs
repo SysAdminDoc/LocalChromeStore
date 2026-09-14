@@ -111,7 +111,10 @@ public sealed class SettingsService
             LaunchProfileMode = settings.LaunchProfileMode,
             LaunchWithTemporaryProfile = settings.LaunchProfileMode == BrowserProfileMode.Temporary,
             ProxyUrl = string.IsNullOrWhiteSpace(settings.ProxyUrl) ? null : settings.ProxyUrl.Trim(),
-            ReleaseChannel = settings.ReleaseChannel
+            ReleaseChannel = settings.ReleaseChannel,
+            CustomUpdateFeedUrl = string.IsNullOrWhiteSpace(settings.CustomUpdateFeedUrl)
+                ? null
+                : settings.CustomUpdateFeedUrl.Trim()
         };
         var json = JsonSerializer.Serialize(copy, JsonOpts);
         WriteAtomic(SettingsPath, json);
@@ -238,7 +241,8 @@ public sealed class SettingsService
         nameof(AppSettings.LaunchProfileMode),
         nameof(AppSettings.LaunchWithTemporaryProfile),
         nameof(AppSettings.ProxyUrl),
-        nameof(AppSettings.ReleaseChannel)
+        nameof(AppSettings.ReleaseChannel),
+        nameof(AppSettings.CustomUpdateFeedUrl)
     };
 
     private static string Protect(string plaintext)

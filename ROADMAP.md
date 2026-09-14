@@ -5,9 +5,8 @@ Actionable work only. Historical and completed roadmap material is archived in C
 ## Actionable Items
 
 - [ ] **Later polish and integrations**
-   - Add GitHub Pages static update hosting.
+   - Expose static update-site publishing in the app UI.
    - Add advanced `ExtensionSettings` controls.
-   - Add a custom update-feed source.
    - Add a GitHub draft-release helper.
    - Add a light theme and accent picker.
    - Move UI strings to resource files for future localization.

@@ -31,4 +31,5 @@ public sealed class AppSettings
     public bool LaunchWithTemporaryProfile { get; set; } = false;
     public string? ProxyUrl { get; set; }
     public ReleaseChannel ReleaseChannel { get; set; } = ReleaseChannel.Stable;
+    public string? CustomUpdateFeedUrl { get; set; }
 }

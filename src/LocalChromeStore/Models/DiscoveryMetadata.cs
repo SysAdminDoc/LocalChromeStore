@@ -18,7 +18,9 @@ public enum DiscoverySource
     ReleaseZipAsset,
     ReleaseCrxAsset,
     RepoManifest,
-    LocalSourceFolder
+    LocalSourceFolder,
+    CustomUpdateFeed,
+    GitCatalog
 }
 
 public enum AssetKind
@@ -94,6 +96,8 @@ public static class FrameworkLabels
         DiscoverySource.ReleaseCrxAsset => "GitHub release CRX asset",
         DiscoverySource.RepoManifest => "manifest.json in repo source",
         DiscoverySource.LocalSourceFolder => "local source folder",
+        DiscoverySource.CustomUpdateFeed => "custom update feed",
+        DiscoverySource.GitCatalog => "shared Git catalog",
         _ => "Unknown"
     };
 

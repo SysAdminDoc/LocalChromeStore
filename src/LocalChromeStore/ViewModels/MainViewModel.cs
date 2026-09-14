@@ -30,6 +30,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly CatalogCacheService _catalogCache;
     private readonly UsageStatsService _usageStats;
     private readonly LocalCatalogFileSource _catalogFileSource = new();
+    private readonly CustomUpdateFeedSource _customUpdateFeedSource = new();
     private readonly LocalSourceWatcher _sourceWatcher;
     private readonly Dispatcher_LogSink _logSink;
     private AppSettings _settings;
@@ -41,6 +42,7 @@ public sealed class MainViewModel : ViewModelBase
     private string _githubUserInput = "";
     private string _githubTokenInput = "";
     private string _proxyUrlInput = "";
+    private string _customUpdateFeedUrlInput = "";
     private string _newOwnerInput = "";
     private string? _selectedExtraOwner;
     private string _newLocalSourceInput = "";
@@ -139,6 +141,7 @@ public sealed class MainViewModel : ViewModelBase
         _githubUserInput = _settings.GitHubUser;
         _githubTokenInput = _settings.GitHubToken ?? string.Empty;
         _proxyUrlInput = _settings.ProxyUrl ?? string.Empty;
+        _customUpdateFeedUrlInput = _settings.CustomUpdateFeedUrl ?? string.Empty;
         _launchUrlInput = _settings.LaunchUrl ?? string.Empty;
         _launchProfileMode = _settings.LaunchProfileMode;
         ReloadExtraOwnersFromSettings();
@@ -336,6 +339,12 @@ public sealed class MainViewModel : ViewModelBase
     {
         get => _proxyUrlInput;
         set => SetField(ref _proxyUrlInput, value);
+    }
+
+    public string CustomUpdateFeedUrlInput
+    {
+        get => _customUpdateFeedUrlInput;
+        set => SetField(ref _customUpdateFeedUrlInput, value);
     }
 
     public string NewOwnerInput
@@ -710,6 +719,14 @@ public sealed class MainViewModel : ViewModelBase
             .ToList();
         infos.AddRange(catalogFileFiltered);
 
+        var customFeedInfos = await _customUpdateFeedSource.DiscoverAsync(_settings, logProgress);
+        var customFeedFiltered = customFeedInfos
+            .Where(info => !hidden.Contains($"{info.RepoOwner}/{info.RepoName}"))
+            .Where(info => !infos.Any(existing => existing.RepoOwner.Equals(info.RepoOwner, StringComparison.OrdinalIgnoreCase)
+                && existing.RepoName.Equals(info.RepoName, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+        infos.AddRange(customFeedFiltered);
+
         return infos;
     }
 
@@ -861,6 +878,9 @@ public sealed class MainViewModel : ViewModelBase
         _settings.GitHubUser = user;
         _settings.GitHubToken = string.IsNullOrWhiteSpace(GitHubTokenInput) ? null : GitHubTokenInput.Trim();
         _settings.ProxyUrl = string.IsNullOrWhiteSpace(ProxyUrlInput) ? null : ProxyUrlInput.Trim();
+        _settings.CustomUpdateFeedUrl = string.IsNullOrWhiteSpace(CustomUpdateFeedUrlInput)
+            ? null
+            : CustomUpdateFeedUrlInput.Trim();
         _settings.TopicFilter = topic;
         _settings.LaunchUrl = NormalizeLaunchUrl(LaunchUrlInput);
         _settings.LaunchProfileMode = LaunchProfileMode;
@@ -2014,6 +2034,7 @@ public sealed class MainViewModel : ViewModelBase
         GitHubUserInput = _settings.GitHubUser;
         GitHubTokenInput = _settings.GitHubToken ?? string.Empty;
         ProxyUrlInput = _settings.ProxyUrl ?? string.Empty;
+        CustomUpdateFeedUrlInput = _settings.CustomUpdateFeedUrl ?? string.Empty;
         LaunchUrlInput = _settings.LaunchUrl ?? string.Empty;
         LaunchProfileMode = _settings.LaunchProfileMode;
         ReloadLocalSourceFoldersFromSettings();
