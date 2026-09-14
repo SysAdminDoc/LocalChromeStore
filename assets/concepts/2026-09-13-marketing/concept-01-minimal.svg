@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Minimal storefront extension mark</title>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M106 188V138c0-27 22-49 49-49h202c27 0 49 22 49 49v50" stroke="#111827" stroke-width="32"/>
+    <path d="M92 188h328l-29-73H121z" fill="#C084FC" stroke="#111827" stroke-width="18"/>
+    <path d="M153 188v-73M215 188v-73M277 188v-73M339 188v-73" stroke="#111827" stroke-width="15"/>
+    <path d="M110 204v193c0 14 11 25 25 25h242c14 0 25-11 25-25V204" stroke="#111827" stroke-width="32"/>
+    <path d="M202 271h42v-20c0-17 14-31 31-31s31 14 31 31v20h42v42h-20c-17 0-31 14-31 31s14 31 31 31h20v47H202v-47h20c17 0 31-14 31-31s-14-31-31-31h-20z" fill="#22D3EE" stroke="#111827" stroke-width="15"/>
+  </g>
+</svg>

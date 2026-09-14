@@ -4,7 +4,7 @@
         xmlns:vm="clr-namespace:LocalChromeStore.ViewModels"
         xmlns:views="clr-namespace:LocalChromeStore.Views"
         xmlns:conv="clr-namespace:LocalChromeStore.Converters"
-        Title="LocalChromeStore" Height="820" Width="1280"
+        Title="LocalChromeStore" Icon="Assets/app.ico" Height="820" Width="1280"
         MinWidth="920" MinHeight="640"
         WindowStartupLocation="CenterScreen">
     <Window.DataContext>
@@ -78,11 +78,11 @@
                         BorderBrush="{StaticResource MauveBrush}"
                         BorderThickness="1"
                         Margin="0,0,14,0">
-                    <TextBlock Text="LCS"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource MauveBrush}" />
+                    <Image Source="/LocalChromeStore;component/Assets/icon-64.png"
+                           Width="40"
+                           Height="40"
+                           Stretch="Uniform"
+                           AutomationProperties.Name="LocalChromeStore logo" />
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center">

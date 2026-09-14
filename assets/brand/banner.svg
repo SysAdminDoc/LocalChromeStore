@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 360" role="img" aria-labelledby="title desc">
+  <title id="title">LocalChromeStore</title>
+  <desc id="desc">A private Windows catalog for Chromium extensions</desc>
+  <defs>
+    <radialGradient id="glow" cx="18%" cy="48%" r="82%">
+      <stop offset="0" stop-color="#312E81" stop-opacity=".78"/>
+      <stop offset=".48" stop-color="#111827" stop-opacity=".2"/>
+      <stop offset="1" stop-color="#090B14" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1600" height="360" rx="42" fill="#090B14"/>
+  <rect width="1600" height="360" rx="42" fill="url(#glow)"/>
+  <rect x="28" y="28" width="304" height="304" rx="74" fill="#11131F" stroke="#45475A" stroke-width="6"/>
+  <rect x="70" y="75" width="220" height="210" rx="32" fill="#181A2A" stroke="#585B70" stroke-width="5"/>
+  <path d="M80 139h200l-14-34H94z" fill="#89B4FA" stroke="#0F172A" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M120 139v-34M160 139v-34M200 139v-34M240 139v-34" stroke="#0F172A" stroke-width="5"/>
+  <path d="M80 139h40v19c0 12-9 21-20 21s-20-9-20-21zm40 0h40v19c0 12-9 21-20 21s-20-9-20-21zm40 0h40v19c0 12-9 21-20 21s-20-9-20-21zm40 0h40v19c0 12-9 21-20 21s-20-9-20-21zm40 0h40v19c0 12-9 21-20 21s-20-9-20-21z" fill="#CBA6F7" stroke="#0F172A" stroke-width="4"/>
+  <path d="M140 210h26v-11c0-12 9-21 21-21s21 9 21 21v11h26v26h-11c-12 0-21 9-21 21s9 21 21 21h11v7h-94v-7h11c12 0 21-9 21-21s-9-21-21-21h-11z" fill="#22D3EE"/>
+  <text x="390" y="176" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="112" font-weight="760" letter-spacing="-6">
+    <tspan fill="#F8FAFC">Local</tspan><tspan fill="#CBA6F7">Chrome</tspan><tspan fill="#89DCEB">Store</tspan>
+  </text>
+  <text x="396" y="241" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="34" font-weight="520" fill="#BAC2DE">A private Windows catalog for the Chromium extensions you build.</text>
+  <path d="M398 284h690" stroke="#45475A" stroke-width="2"/>
+  <circle cx="402" cy="302" r="5" fill="#A6E3A1"/>
+  <text x="420" y="311" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="23" font-weight="650" letter-spacing="2" fill="#A6E3A1">LOCAL-FIRST</text>
+  <circle cx="633" cy="302" r="5" fill="#89B4FA"/>
+  <text x="651" y="311" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="23" font-weight="650" letter-spacing="2" fill="#89B4FA">RELEASE-AWARE</text>
+  <circle cx="926" cy="302" r="5" fill="#CBA6F7"/>
+  <text x="944" y="311" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="23" font-weight="650" letter-spacing="2" fill="#CBA6F7">PRIVATE CATALOGS</text>
+  <circle cx="1222" cy="302" r="5" fill="#F9E2AF"/>
+  <text x="1240" y="311" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="23" font-weight="650" letter-spacing="2" fill="#F9E2AF">POLICY READY</text>
+</svg>

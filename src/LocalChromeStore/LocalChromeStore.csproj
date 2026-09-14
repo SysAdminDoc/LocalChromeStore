@@ -9,6 +9,7 @@
     <LangVersion>latest</LangVersion>
     <AssemblyName>LocalChromeStore</AssemblyName>
     <RootNamespace>LocalChromeStore</RootNamespace>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <Version>0.4.2</Version>
     <FileVersion>0.4.2.0</FileVersion>
     <AssemblyVersion>0.4.2.0</AssemblyVersion>
@@ -16,6 +17,11 @@
     <Company>SysAdminDoc</Company>
     <Copyright>Copyright (c) 2026 SysAdminDoc. MIT License.</Copyright>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
+    <Resource Include="Assets\icon-64.png" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Octokit" Version="14.0.0" />

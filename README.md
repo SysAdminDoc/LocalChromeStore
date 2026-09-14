@@ -1,217 +1,159 @@
-<p align="center">
-  <img src="banner.png" alt="LocalChromeStore" />
-</p>
+![LocalChromeStore hero](assets/marketing/hero.png)
 
-<h1 align="center">
-  <img src="logo.png" alt="" width="36" align="center" />
-  &nbsp;LocalChromeStore
-</h1>
+[![Version](https://img.shields.io/badge/version-0.4.2-cba6f7?style=flat-square)](https://github.com/SysAdminDoc/LocalChromeStore/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-a6e3a1?style=flat-square)](LICENSE)
+[![Windows](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-74c7ec?style=flat-square)](https://github.com/SysAdminDoc/LocalChromeStore/releases/latest)
+[![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=flat-square)](https://dotnet.microsoft.com/download/dotnet/9.0)
 
-<p align="center">
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore/releases"><img src="https://img.shields.io/badge/version-0.4.2-cba6f7?style=for-the-badge" alt="Version" /></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a6e3a1?style=for-the-badge" alt="License" /></a>
-  <a href="https://github.com/SysAdminDoc/LocalChromeStore"><img src="https://img.shields.io/badge/platform-Windows%2010%2F11-74c7ec?style=for-the-badge" alt="Platform" /></a>
-  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge" alt=".NET" /></a>
-</p>
+# LocalChromeStore
 
-<p align="center">
-  <a href="https://ko-fi.com/X8K126YVER">
-    <img height="42" src="https://storage.ko-fi.com/cdn/kofi2.png?v=3" alt="Buy me a coffee on Ko-fi" />
-  </a>
-</p>
+LocalChromeStore turns the Chromium extensions you control into a private Windows catalog. Pull builds from GitHub Releases, link unpacked folders while you work, or share a small HTTPS feed with your team. Every install keeps its source, permissions, checksum status, and update state visible.
 
-<p align="center">
-  <sub><em>If this project helps you, a coffee helps me keep working on it.</em></sub>
-</p>
+[Download LocalChromeStore for Windows](https://github.com/SysAdminDoc/LocalChromeStore/releases/latest/download/LocalChromeStore-v0.4.2-win-x64.zip) | [SHA-256 checksum](https://github.com/SysAdminDoc/LocalChromeStore/releases/latest/download/LocalChromeStore-v0.4.2-win-x64.zip.sha256.txt) | [Release notes](https://github.com/SysAdminDoc/LocalChromeStore/releases/latest)
 
-> **A personal store for the Chromium extensions you build yourself.**
-> Lists every extension across your GitHub repos and local source folders, downloads or links the latest install source, and loads them into Chrome / Brave / Edge with a single click. Install. Uninstall. Move on.
+The release is a portable ZIP and requires the [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0).
 
-LocalChromeStore exists for one reason: when you build a lot of Chrome extensions, "Load unpacked" gets old fast. This is a native Windows store UI for your own extensions — sourced from your GitHub releases or local unpacked folders, with proper install / uninstall semantics.
+## See the app
 
----
+![LocalChromeStore extension catalog with sample entries](assets/screenshots/catalog.png)
+
+*Real application capture using clearly marked sample catalog data.*
+
+![LocalChromeStore discovery settings with sample values](assets/screenshots/settings.png)
+
+*Real application capture. The owner, feed, and local folder values are examples.*
 
 ## Why it exists
 
-Chromium 75+ blocks drag-and-drop install of self-signed CRX files with `CRX_REQUIRED_PROOF_MISSING` — even with developer mode on, even with a valid signing key. The official paths are:
+Chromium development still makes you choose between repeated file picker work, a public store submission, or managed browser policy. LocalChromeStore gives extension makers one place to discover builds, inspect what changed, and launch a useful test session.
 
-1. **Chrome Web Store** — useful for shipping, awful for testing your own dogfood
-2. **Load unpacked** — works, but clicking through the file picker for ten extensions every browser reset is friction
-3. **Enterprise Policy `ExtensionInstallForcelist`** — the only self-host path that actually works on managed Chrome / Brave / Edge machines
+It is built for personal extension libraries, test machines, and small internal catalogs. Nothing requires a hosted account.
 
-LocalChromeStore wraps path 2 with a real store UI today. It also wires path 3 for managed machines: package/sign CRX3, generate or copy `update.xml`, write browser policy with consent, health-check the feed, and roll back only matching registry entries.
+## What it handles
 
----
+| Job | What you get |
+| --- | --- |
+| Find builds | GitHub discovery, local source folders, local catalog files, and one optional HTTPS JSON feed |
+| Review trust | SHA-256 verification, release provenance, package risk checks, and permission change review |
+| Install and update | Managed ZIP or CRX extraction, linked development folders, per-item updates, and Update all |
+| Launch browsers | Chrome, Edge, Brave, Vivaldi, Opera, Chromium, and cached Chrome for Testing builds |
+| Reuse environments | Named load sets plus JSON import and export without your GitHub token |
+| Manage policy | CRX3 packaging, `update.xml`, browser policy health checks, and targeted rollback |
 
-## Features
-
-- **Custom HTTPS catalog** lets a team merge extensions from a small JSON feed without depending on GitHub discovery
-
-- **GitHub-sourced discovery** — lists every repo with a `manifest.json` or a release ZIP / CRX asset for any user or org
-- **Local source folders** — link unpacked extension folders with a root `manifest.json` directly into the catalog for active development
-- **Store-style cards** — extension logo, name, version, description, install / uninstall buttons, link to repo
-- **One-click install/link** — downloads the latest release ZIP, extracts to a managed folder, or links a configured local source folder without copying it
-- **Integrity verification** — fails closed on SHA-256 sidecars, and falls back to GitHub release asset `sha256:` API digests when no sidecar exists
-- **One-click uninstall** — wipes the local copy and removes it from the load list
-- **Browser launcher** — fires Chrome / Brave / Edge / Vivaldi / Opera / Chromium with every installed extension, version-gating the load strategy (plain `--load-extension`, the Chromium 137+ `--disable-features` override, or CDP `Extensions.loadUnpacked` over `--remote-debugging-pipe` for branded Chrome 142+, which removed command-line extension loading)
-- **Chrome for Testing tooling** — detects cached Chrome for Testing builds and offers a **Get CfT** action that downloads the latest Stable Windows build into LocalChromeStore's cache for extension-load testing
-- **Browser loading conformance** — opt-in **Conformance** action creates a tiny MV3 fixture extension, launches every detected browser/Chrome for Testing build in an isolated profile, records strategy/arguments/CDP IDs or errors, and writes JSON/text reports into diagnostics logs
-- **Guided Enterprise Policy workflow** — per-card **Policy** / **Rollback** actions package CRX3 with RSA-2048, run local package-risk preflight checks, generate or copy self-hosted `update.xml`, map Chrome / Edge / Brave / Chromium `ExtensionInstallForcelist` registry targets, write Edge `ExtensionSettings.override_update_url`, check policy/update/CRX health, and roll back registry entries without deleting packaged artifacts
-- **Auditable launch sessions** — optional startup URL, default/persistent/clean-temp browser profile modes, a copyable launch command preview, a debug panel for browser path/profile/extensions/arguments, and live browser stdout/stderr/exit capture in the activity log
-- **Environment portability** — export/import installed extension targets, local source folders, and portable discovery settings as JSON
-- **Update workflow** — update-available badges, permission-change review, manual **Update all**, optional auto-update on refresh, and optional launch-after-install
-- **Self-update check** — on launch, compares the running build to the latest GitHub release and shows a dismissible banner with a download link when a newer version is available (never auto-installs itself)
-- **Search and filter** — by name, repo, description, or local source path; toggle to show only installed
-- **Topic filter (optional)** — restrict discovery to repos tagged with a specific GitHub topic (default `chrome-extension`)
-- **Optional GitHub PAT** — unauthenticated GitHub API caps at 60 req/h; a personal access token raises that to 5,000/h, unlocks private repos, and is stored with Windows DPAPI
-- **Catppuccin Mocha dark theme** — easy on the eyes; light theme planned
-- **Activity log + crash log** — every install / uninstall / launch is logged in-app and to disk
-- **Async** — every API call, download, and extraction runs off the UI thread
-
----
+LocalChromeStore also keeps an in-app activity log, writes crash reports to disk, and performs network and extraction work away from the UI thread.
 
 ## Install
 
-### From release (recommended)
+1. Download `LocalChromeStore-v0.4.2-win-x64.zip` from the [latest release](https://github.com/SysAdminDoc/LocalChromeStore/releases/latest).
+2. Download the published SHA-256 file if you want an independent package check.
+3. Extract the ZIP to a folder you control.
+4. Run `LocalChromeStore.exe`.
 
-1. Grab the latest `LocalChromeStore-vX.Y.Z.zip` from the [Releases page](https://github.com/SysAdminDoc/LocalChromeStore/releases)
-2. Extract anywhere
-3. Run `LocalChromeStore.exe`
+Open **Settings**, enter a GitHub user or organization, then select **Refresh**. A token is optional for public repositories. Adding one raises the GitHub API limit and lets the app read repositories the token can access. It is protected with Windows DPAPI before it is saved.
 
-Requires the .NET 9 Desktop Runtime (the installer prompts if missing).
+## Catalog sources
 
-### From source
+Sources are merged into a single set of cards. Duplicate entries are resolved by repository and version.
 
-```bash
-git clone https://github.com/SysAdminDoc/LocalChromeStore.git
-cd LocalChromeStore
-dotnet build src/LocalChromeStore/LocalChromeStore.csproj -c Release
-dotnet test LocalChromeStore.sln -c Release
-./src/LocalChromeStore/bin/Release/net9.0-windows/LocalChromeStore.exe
+### GitHub Releases
+
+The app checks the configured owners for a release ZIP or CRX. When no release asset is available, it can inspect common locations for `manifest.json`. Archived repositories and projects without a useful extension source stay out of the catalog.
+
+The optional topic filter defaults to `chrome-extension`.
+
+### Local development folders
+
+Add a folder that contains `manifest.json` to link an unpacked build directly. The source stays in place, so edits are available on the next launch without copying another package. A file watcher reports local changes.
+
+### Local catalog files
+
+Put JSON files in either location:
+
+```text
+%APPDATA%\LocalChromeStore\catalogs\
+<application folder>\catalogs\
 ```
 
----
+A catalog entry can provide the owner, repository name, display name, version, description, project URL, and HTTPS asset URL.
 
-## Usage
+### Custom HTTPS feed
 
-1. **Click Settings** in the top right
-2. Set **GitHub user / org** to your handle (defaults to `SysAdminDoc`)
-3. *(Optional)* Paste a GitHub personal access token to raise rate limits and surface private repos
-4. *(Optional)* Enable **Filter by topic** if you want to limit to repos tagged with `chrome-extension`
-5. Click **Save settings**, then click **Refresh**
+Set **Custom update-feed URL** to merge a shared JSON catalog after GitHub and local sources. The endpoint must use HTTPS. Feed size is limited to 16 MB, and package URLs are validated before they become install targets.
 
-Every qualifying repo appears as a card. Click **Install** on a card — LocalChromeStore downloads the latest release ZIP/CRX, extracts it to `%LOCALAPPDATA%\LocalChromeStore\extensions\<owner>\<repo>\<version>\`, and registers it.
+```json
+{
+  "schemaVersion": 1,
+  "extensions": [
+    {
+      "owner": "example-team",
+      "name": "tab-tool",
+      "displayName": "Tab Tool",
+      "version": "2.4.0",
+      "description": "A private extension build.",
+      "url": "https://github.com/example-team/tab-tool",
+      "assetUrl": "https://downloads.example.com/tab-tool-2.4.0.zip",
+      "assetName": "tab-tool-2.4.0.zip",
+      "assetDigest": "sha256:YOUR_HEX_DIGEST"
+    }
+  ]
+}
+```
 
-When installed extensions have newer catalog versions, their cards show **Update available**. Use the card's update button for one extension, or **Update all** to replace every installable outdated local copy. If an update adds required permissions, optional permissions, host access, or optional host access, LocalChromeStore shows the diff and asks for approval first. **Auto-update on refresh** skips permission-expanding updates so new extension access is not accepted silently.
+## Installing and updating
 
-To load installed extensions into a browser:
+Select **Install** on a card. Release packages are downloaded to a managed version folder. Local sources are linked instead. The card records whether the build came from GitHub, a local folder, a catalog file, or your HTTPS feed.
 
-1. Pick the browser from the dropdown, or click **Get CfT** to download/select the latest Stable Chrome for Testing build
-2. *(Optional)* Enter a startup URL to open after the extensions load
-3. Pick a **Browser profile mode**: **Default** uses the browser's normal profile, **Persistent** reuses a LocalChromeStore profile for the selected browser/load set, and **Clean temp** creates a fresh isolated profile under `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\`
-4. Click **Launch session**
+When a newer build appears, LocalChromeStore compares its manifest with the installed copy. Permission expansions require review. Optional automatic updates skip builds that request additional access.
 
-LocalChromeStore uses the best supported load strategy for the selected browser: plain `--load-extension` on older/pre-lockdown builds, the Chromium 137+ override where it still works, or CDP `Extensions.loadUnpacked` for branded Chrome builds that removed command-line extension loading. Command-line-loaded extensions can show the browser's standard developer-mode banner; that is normal and not a sign anything is wrong. The extensions persist for that browsing session; close the browser and they unload (which is exactly what you want during dev/test).
+## Browser sessions
 
-Use **Copy args** to copy the exact command LocalChromeStore will run. The launch debug panel shows the selected browser path, profile path, active extension set, startup URL, and resolved arguments before launch. Command-line browser launches stream stdout, stderr, and process exit codes into the activity log so load/startup errors are visible after launch.
+Choose a detected browser, pick a profile mode, then select **Launch session**.
 
-To apply Enterprise Policy mode for a managed browser:
+- **Default** uses the browser's normal profile.
+- **Persistent** reuses a LocalChromeStore profile for that browser and load set.
+- **Clean temp** creates a fresh profile for the session.
 
-1. Install an extension locally, then select Chrome / Edge / Brave / Chromium in the browser dropdown
-2. Click **Policy** on that extension card
-3. Enter the hosted CRX URL and hosted `update.xml` URL you will publish
-4. Generate `update.xml` from the local package, or copy an existing file into the policy package folder
-5. Confirm the HKLM browser-policy impact; LocalChromeStore writes the force-install policy and runs health checks
+The launch plan adapts to the browser version. Older Chromium builds accept `--load-extension`. Newer branded Chrome builds can use the DevTools `Extensions.loadUnpacked` path. The debug panel shows the resolved executable, profile, active extensions, startup URL, and arguments before launch.
 
-Use **Rollback** on the same card to remove only that extension's browser-policy registry entries. Local CRX/update artifacts and signing keys stay on disk.
+**Get CfT** downloads the latest stable Chrome for Testing build to the local cache. The conformance check can probe detected browsers with a small MV3 fixture and save a report for troubleshooting.
 
-Use **Export environment** to save the installed extension set, manifest trust snapshot, GitHub owner list, topic filter, local source folders, and launch options as a portable JSON file. Use **Import environment** on another machine to apply those discovery settings, refresh GitHub/local sources, and install matching ZIP/CRX release assets or linked source folders. If the current catalog source adds permissions compared with the exported snapshot or local installed copy, import asks for approval before installing it. GitHub tokens are never written to the export file.
+## Trust and policy controls
 
----
+Checksum sidecars and GitHub release asset digests are checked when available. A mismatch stops the install. The package scanner flags Manifest V2 packages, remote executable code, dynamic evaluation patterns, risky content security policy, possible embedded secrets, and known malicious extension IDs.
 
-## How discovery works
+Managed Windows machines can use the policy workflow to package CRX3, create or copy `update.xml`, and write matching browser policy entries after review. The health check covers the update feed and package. **Rollback** removes only the selected extension's registry entries and leaves local artifacts intact.
 
-For each user/org you've configured, LocalChromeStore:
+## Local data
 
-1. Lists their repos via the GitHub API
-2. For each repo, checks for a latest release with a `.zip` or `.crx` asset
-3. If no release asset, probes for `manifest.json` at common paths (root, `extension/`, `src/`, `dist/`, `public/`)
-4. If the manifest is found (in the ZIP or repo), reads `name`, `version`, `description`, and `icons` to enrich the card
-5. Caches the icon to `%LOCALAPPDATA%\LocalChromeStore\cache\icons\`
-
-Repos with no manifest and no release ZIP/CRX are skipped — they won't clutter the store. Archived repos are skipped too.
-
----
-
-## Where things live
-
-| Path | Purpose |
+| Location | Contents |
 | --- | --- |
-| `%APPDATA%\LocalChromeStore\settings.json` | User settings (GitHub user, DPAPI-protected token, preferred browser, launch/update options) |
-| `%APPDATA%\LocalChromeStore\installed.json` | Installed-extension manifest |
-| `%APPDATA%\LocalChromeStore\policy-keys\` | Persistent CRX3 signing keys for policy packages |
-| `%LOCALAPPDATA%\LocalChromeStore\extensions\<owner>\<repo>\<version>\` | Extracted extension files |
-| `%LOCALAPPDATA%\LocalChromeStore\policy-packages\<owner>\<repo>\<version>\` | Generated CRX/update.xml policy artifacts |
-| `%LOCALAPPDATA%\LocalChromeStore\profiles\persistent\` | Reusable browser profiles for persistent launch sessions |
-| `%LOCALAPPDATA%\LocalChromeStore\profiles\temp\` | Clean temporary Chromium profiles created for launch sessions |
-| `%LOCALAPPDATA%\LocalChromeStore\cache\chrome-for-testing\` | Downloaded Chrome for Testing builds |
-| `%LOCALAPPDATA%\LocalChromeStore\cache\icons\` | Cached extension icons |
-| `%LOCALAPPDATA%\LocalChromeStore\cache\policy-risk\malicious-extension-ids.txt` | Optional local malicious-extension ID feed for policy preflight |
-| `%LOCALAPPDATA%\LocalChromeStore\logs\` | Crash logs, diagnostics exports, and browser conformance reports |
+| `%APPDATA%\LocalChromeStore\` | Settings, installed records, load sets, policy keys, and local catalogs |
+| `%LOCALAPPDATA%\LocalChromeStore\extensions\` | Managed extension versions |
+| `%LOCALAPPDATA%\LocalChromeStore\profiles\` | Persistent and temporary browser profiles |
+| `%LOCALAPPDATA%\LocalChromeStore\cache\` | Icons, Chrome for Testing, and policy risk data |
+| `%LOCALAPPDATA%\LocalChromeStore\logs\` | Activity, crash, diagnostics, and conformance reports |
 
-To start fresh, just delete the two folders.
+Set `LOCALCHROMESTORE_DATA_ROOT` to redirect roaming and local state under one isolated folder. This is useful for test rigs and portable validation. Set `LOCALCHROMESTORE_SOFTWARE_RENDERING=1` only when an offscreen WPF environment needs software rendering.
 
----
+## Build from source
 
-## Architecture
+```powershell
+git clone https://github.com/SysAdminDoc/LocalChromeStore.git
+cd LocalChromeStore
+dotnet restore LocalChromeStore.sln
+dotnet build LocalChromeStore.sln -c Release --no-restore
+dotnet test LocalChromeStore.sln -c Release --no-build
+dotnet run --project src/LocalChromeStore/LocalChromeStore.csproj -c Release
+```
 
-WPF on .NET 9 — MVVM, no third-party MVVM toolkit.
+The app uses WPF on .NET 9 with MVVM. Octokit handles GitHub API access. Tests cover discovery, installs, browser loading, policy packaging, persistence, catalog feeds, and startup with cached data.
 
-- `Models/` — plain data records (`ExtensionInfo`, `InstalledExtension`, `BrowserInfo`, `AppSettings`)
-- `Services/` — `GitHubService` (Octokit wrapper, discovery), `ExtensionService` (download, ZIP / CRX extract, install state), `BrowserLauncher` (browser detection + launch-plan construction), `ChromeForTestingInstaller` (latest Stable CfT metadata/download/extract), `SettingsService` (JSON persistence + DPAPI token protection)
-- `ViewModels/` — `MainViewModel` orchestrates everything; `ExtensionCardViewModel` per-card state
-- `Views/` — `ExtensionCardView` user control, plus the main window
-- `Themes/` — Catppuccin Mocha resource dictionary
+## Roadmap and help
 
-CRX files are unpacked by stripping the CRX2/CRX3 header and extracting the inner ZIP — Chrome / Brave / Edge re-sign the unpacked tree on load anyway, so we don't need to verify the signature ourselves.
+Current work is listed in [ROADMAP.md](ROADMAP.md). For a bug or feature request, [open an issue](https://github.com/SysAdminDoc/LocalChromeStore/issues).
 
----
-
-## Roadmap
-
-See [CHANGELOG.md](CHANGELOG.md) for full release history.
-
-**Shipped**
-
-- **v0.2.0** — Named load sets, per-repo hidden-repo restore, accessibility sweep, broader unit tests
-- **v0.3.0** — `localchromestore.json` repo manifest + validator, framework build-command dry-run, teal accent token
-- **v0.3.1** — CRX3 RSA signing primitives, deterministic extension ID derivation, self-hosted `update.xml` generation, Enterprise Policy registry writer/rollback, policy health checks, version-gated launch strategy, CDP loader groundwork, self-update checks, and hardened local state persistence
-- **v0.3.2** — Branded-Chrome launch now wires the CDP `Extensions.loadUnpacked` path, logs returned extension IDs or exact CDP errors, and shows the actual pipe/debug launch command
-- **v0.3.3** — Guided Enterprise Policy workflow: per-card package/apply/rollback, generated or selected `update.xml`, Edge `override_update_url`, and post-write health checks
-- **v0.3.4** — GitHub release asset API `sha256:` digest verification, with sidecar/API/unverified trust details in risk review, diagnostics, and catalog export
-- **v0.3.5** — Browser loading conformance harness with MV3 fixture generation, Chrome for Testing detection, isolated profile probes, CDP result capture, and JSON/text reports linked from diagnostics
-- **v0.3.6** — Policy package-risk preflight blocks MV2, remote executable code, dynamic eval/CSP hazards, and known malicious extension IDs before HKLM policy writes
-- **v0.3.7** — Release asset provenance on cards, inspect review, catalog/environment exports, and diagnostics, including GitHub asset IDs, upload/update timestamps, uploader/content type/downloads, checksum source, and changed-since-install status
-- **v0.3.8** — Persistent per-browser/load-set launch profiles with a Default/Persistent/Clean-temp selector, diagnostics/export persistence, and stable `--user-data-dir` preview/logging
-- **v0.3.9** — Optional Chrome for Testing downloader using the official latest-Stable metadata feed, LocalChromeStore cache extraction, browser auto-detection refresh, diagnostics path reporting, and installer unit tests
-- **v0.3.10** — Launch debug panel showing browser path, profile path, loaded extensions, startup URL, and resolved arguments from the same launch plan used by session launch/copy
-- **v0.3.11** — Browser stdout/stderr and process-exit capture for command-line launch sessions, streamed into the activity log with tests around stdout, stderr, and nonzero exit reporting
-- **v0.3.12** — Local source-folder discovery/linking for unpacked extension development, including settings UI, environment import/export persistence, diagnostics, and regression tests
-- **v0.4.0** — Framework build output resolution, structured JSON event log, DevTools/options/license card badges, parallel batch downloads, offline catalog cache, pinned repos, local usage stats, file watcher for source folders, pluggable source adapter interface, Octokit 14.0.0 upgrade
-- **v0.4.1** — Static package scanner (obfuscation/secret heuristics), richer import diagnostics, high-contrast theme, HTTP proxy support, Winget manifest export, release channel selection with pre-release badges, local catalog-file source
-
-**Planned**
-
-- Static update hosting automation, custom update-feed source, light theme + accent picker
-
----
-
-## Contributing
-
-This is built primarily for personal dev/test workflow, but PRs are welcome. Open an issue first if it's a bigger change.
-
----
+If LocalChromeStore saves you time, you can [support continued work on Ko-fi](https://ko-fi.com/X8K126YVER).
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE)

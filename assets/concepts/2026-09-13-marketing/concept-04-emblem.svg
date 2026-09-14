@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">LocalChromeStore emblem</title>
+  <circle cx="256" cy="256" r="226" fill="#11131F" stroke="#89B4FA" stroke-width="16"/>
+  <circle cx="256" cy="256" r="188" fill="none" stroke="#45475A" stroke-width="4"/>
+  <path d="M126 219h260l-24-76H150z" fill="#CBA6F7" stroke="#F8FAFC" stroke-width="10" stroke-linejoin="round"/>
+  <path d="M126 219h52v24c0 18-12 32-26 32s-26-14-26-32zm52 0h52v24c0 18-12 32-26 32s-26-14-26-32zm52 0h52v24c0 18-12 32-26 32s-26-14-26-32zm52 0h52v24c0 18-12 32-26 32s-26-14-26-32zm52 0h52v24c0 18-12 32-26 32s-26-14-26-32z" fill="#89DCEB" stroke="#11131F" stroke-width="6"/>
+  <path d="M187 294h45v-18c0-15 12-27 27-27s27 12 27 27v18h45v45h-18c-15 0-27 12-27 27s12 27 27 27h18v22H187v-22h18c15 0 27-12 27-27s-12-27-27-27h-18z" fill="#F8FAFC"/>
+</svg>

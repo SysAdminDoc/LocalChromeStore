@@ -1,0 +1,13 @@
+LocalChromeStore identity review, 2026-09-13
+
+Selected: concept 02, app icon.
+
+Why it won:
+- The storefront and extension-piece silhouette explain the product without using Chrome's trademarked browser mark.
+- The dark tile matches the Windows app and keeps its shape on light or dark surfaces.
+- Broad color blocks stay recognizable at taskbar size.
+- The geometry feels deliberate and avoids the soft, generic 3D treatment in the original asset.
+
+Concept 01 was clear but looked more like a generic marketplace. Concept 03 remains useful as a wordmark study. Concept 04 felt too much like a badge. Concept 05 was compact but lost the store idea.
+
+The original logo, original banner, all five directions, the rendered comparison sheet, and the selected production sources are retained in this folder or the adjacent brand folder.

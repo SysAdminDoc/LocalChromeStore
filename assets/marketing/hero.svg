@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">LocalChromeStore</title>
+  <desc id="desc">A private Windows catalog for Chromium extensions with a real application capture using sample data</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#070A12"/>
+      <stop offset=".55" stop-color="#0E1324"/>
+      <stop offset="1" stop-color="#090B14"/>
+    </linearGradient>
+    <radialGradient id="mauveGlow" cx="14%" cy="24%" r="65%">
+      <stop offset="0" stop-color="#7C3AED" stop-opacity=".34"/>
+      <stop offset="1" stop-color="#7C3AED" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="cyanGlow" cx="88%" cy="70%" r="55%">
+      <stop offset="0" stop-color="#0891B2" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#0891B2" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000000" flood-opacity=".52"/>
+    </filter>
+    <clipPath id="shot"><rect x="690" y="130" width="850" height="514" rx="18"/></clipPath>
+  </defs>
+  <rect width="1600" height="900" fill="url(#background)"/>
+  <rect width="1600" height="900" fill="url(#mauveGlow)"/>
+  <rect width="1600" height="900" fill="url(#cyanGlow)"/>
+  <path d="M0 770C330 650 540 855 850 756s485-54 750 35v109H0z" fill="#111827" opacity=".7"/>
+
+  <image href="../brand/icon.svg" x="76" y="66" width="88" height="88"/>
+  <text x="184" y="101" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="19" font-weight="750" letter-spacing="3" fill="#89DCEB">WINDOWS DESKTOP APP</text>
+  <text x="184" y="139" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="31" font-weight="760" fill="#F8FAFC">LocalChromeStore</text>
+
+  <text x="76" y="260" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="69" font-weight="780" letter-spacing="-2" fill="#F8FAFC">
+    <tspan x="76" dy="0">Your Chromium</tspan>
+    <tspan x="76" dy="78">extensions.</tspan>
+    <tspan x="76" dy="78" fill="#CBA6F7">One private catalog.</tspan>
+  </text>
+  <text x="80" y="525" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="27" font-weight="430" fill="#BAC2DE">
+    <tspan x="80" dy="0">Install from GitHub releases, local folders,</tspan>
+    <tspan x="80" dy="40">or your own team feed. Review trust and</tspan>
+    <tspan x="80" dy="40">permissions before anything launches.</tspan>
+  </text>
+
+  <g font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="1.1">
+    <rect x="78" y="675" width="186" height="46" rx="23" fill="#111827" stroke="#A6E3A1"/>
+    <text x="111" y="704" fill="#A6E3A1">LOCAL-FIRST</text>
+    <rect x="278" y="675" width="215" height="46" rx="23" fill="#111827" stroke="#89B4FA"/>
+    <text x="309" y="704" fill="#89B4FA">HASH VERIFIED</text>
+    <rect x="78" y="737" width="222" height="46" rx="23" fill="#111827" stroke="#89DCEB"/>
+    <text x="110" y="766" fill="#89DCEB">MULTI-BROWSER</text>
+    <rect x="315" y="737" width="178" height="46" rx="23" fill="#111827" stroke="#CBA6F7"/>
+    <text x="346" y="766" fill="#CBA6F7">POLICY TOOLS</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <image href="../screenshots/catalog-app.png" x="690" y="130" width="850" height="514" clip-path="url(#shot)" preserveAspectRatio="xMidYMid meet"/>
+    <rect x="690" y="130" width="850" height="514" rx="18" fill="none" stroke="#585B70" stroke-width="2"/>
+  </g>
+  <rect x="716" y="658" width="279" height="38" rx="19" fill="#111827" stroke="#22D3EE"/>
+  <circle cx="739" cy="677" r="5" fill="#22D3EE"/>
+  <text x="755" y="684" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" letter-spacing="1.2" fill="#CFFAFE">REAL APP / SAMPLE CATALOG</text>
+
+  <g transform="translate(704 730)">
+    <rect width="378" height="92" rx="20" fill="#111827" stroke="#313244"/>
+    <text x="24" y="35" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#A6E3A1">RELEASE-AWARE</text>
+    <text x="24" y="64" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" fill="#CDD6F4">ZIP, CRX, and local build folders</text>
+  </g>
+  <g transform="translate(1100 730)">
+    <rect width="440" height="92" rx="20" fill="#111827" stroke="#313244"/>
+    <text x="24" y="35" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="17" font-weight="700" fill="#CBA6F7">CHECK BEFORE INSTALL</text>
+    <text x="24" y="64" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" fill="#CDD6F4">Permissions, provenance, and SHA-256</text>
+  </g>
+
+  <text x="80" y="854" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="20" font-weight="520" fill="#7DD3FC">github.com/SysAdminDoc/LocalChromeStore</text>
+</svg>

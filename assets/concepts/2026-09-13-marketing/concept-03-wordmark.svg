@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 400" role="img" aria-labelledby="title">
+  <title id="title">LocalChromeStore wordmark</title>
+  <g transform="translate(38 28) scale(.67)">
+    <rect x="24" y="24" width="464" height="464" rx="112" fill="#11131F" stroke="#313244" stroke-width="8"/>
+    <rect x="88" y="96" width="336" height="320" rx="48" fill="#181A2A" stroke="#45475A" stroke-width="8"/>
+    <path d="M104 191h304l-20-51H124z" fill="#89B4FA" stroke="#0F172A" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M165 191v-51M226 191v-51M287 191v-51M348 191v-51" stroke="#0F172A" stroke-width="8"/>
+    <path d="M104 191h61v28c0 18-14 32-31 32s-30-14-30-32zm61 0h61v28c0 18-14 32-31 32s-30-14-30-32zm61 0h61v28c0 18-14 32-31 32s-30-14-30-32zm61 0h61v28c0 18-14 32-31 32s-30-14-30-32zm61 0h60v28c0 18-13 32-30 32s-30-14-30-32z" fill="#CBA6F7" stroke="#0F172A" stroke-width="7"/>
+    <path d="M194 296h39v-17c0-17 14-31 31-31s31 14 31 31v17h39v39h-17c-17 0-31 14-31 31s14 31 31 31h17v19H194v-19h17c17 0 31-14 31-31s-14-31-31-31h-17z" fill="#22D3EE"/>
+  </g>
+  <text x="420" y="244" font-family="Segoe UI Variable, Segoe UI, Arial, sans-serif" font-size="178" font-weight="720" letter-spacing="-8" paint-order="stroke" stroke="#F8FAFC" stroke-width="12" stroke-linejoin="round">
+    <tspan fill="#111827">Local</tspan><tspan fill="#7C3AED">Chrome</tspan><tspan fill="#0891B2">Store</tspan>
+  </text>
+  <text x="430" y="314" font-family="Segoe UI Variable, Segoe UI, Arial, sans-serif" font-size="39" font-weight="600" letter-spacing="5" fill="#475569">YOUR EXTENSIONS, READY TO LAUNCH</text>
+</svg>

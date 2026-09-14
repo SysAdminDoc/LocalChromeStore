@@ -32,14 +32,14 @@ LocalChromeStore is a Windows WPF/.NET 9 personal catalog for Chromium extension
 - `GitHubService` should model release-asset provenance more completely: digest, uploader, asset ID, content type, and update timestamp. This enables digest verification and clearer diagnostics without another GitHub call.
 - The current `MainWindow.xaml` surface is dense and functional, but policy install, CDP load results, and CfT management need dedicated panels or dialogs rather than more toolbar buttons.
 - Tests are strong at the service level, but missing live or fixture-backed conformance for CDP launch, policy workflow orchestration, GitHub asset digests, and package-risk scanning. Keep live-browser tests opt-in so normal `dotnet test` remains stable.
-- Documentation is current for v0.3.1 in README/CHANGELOG, but `ROADMAP.md` is local-only and broad. New implementation items should keep acceptance criteria precise so future agents do not redo this research.
+- Documentation is current for v0.3.1 in README/CHANGELOG, but `ROADMAP.md` is local-only and broad. New implementation items should keep acceptance criteria precise so future work does not repeat this research.
 
 ## Rejected Ideas
 - Add a mobile version to this repo: rejected because the Windows WPF app's core value is managing local browser profiles, registry policy, CDP pipes, and Windows filesystem state. Source: current code architecture and companion prompts in `docs/companion-prompts.md`.
 - Replace the app with a browser extension: rejected because Chrome extension APIs cannot write HKLM policy, launch browsers, manage local extension directories, or inspect arbitrary local packages. Source: Chrome extension platform docs.
 - Upload private packages to third-party scanners by default: rejected because it contradicts the private-store/privacy model. Prefer local static scanning plus offline threat feeds. Source: README privacy posture, MalExt/chrome-mal-ids feeds.
 - Bundle Chrome for Testing by default: rejected because CfT is large and already has JSON endpoints. Offer managed opt-in download/cache instead. Source: Chrome for Testing availability docs.
-- Depend on Puppeteer/Selenium/Playwright for CDP: rejected for now because the project intentionally keeps runtime dependencies minimal and already has a small pipe client. Reconsider only if live CDP validation shows protocol maintenance is too costly. Source: `CdpProtocol.cs`, `CdpPipeProcess.cs`, Octokit-only philosophy in `CLAUDE.md`.
+- Depend on Puppeteer/Selenium/Playwright for CDP: rejected for now because the project intentionally keeps runtime dependencies minimal and already has a small pipe client. Reconsider only if live CDP validation shows protocol maintenance is too costly. Source: `CdpProtocol.cs`, `CdpPipeProcess.cs`, and the existing Octokit-only approach.
 - Promise unmanaged consumer policy force-install: rejected because Chrome policy docs require domain/management context for non-Web-Store automatic installs. The app already detects this; the UI must keep it explicit. Source: Chrome Enterprise policy docs and `PolicyEnrollmentService.cs`.
 
 ## Sources

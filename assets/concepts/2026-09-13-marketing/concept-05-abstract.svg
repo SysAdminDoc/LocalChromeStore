@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Abstract local extension catalog mark</title>
+  <rect x="74" y="84" width="292" height="292" rx="70" fill="#7C3AED" transform="rotate(-9 220 230)"/>
+  <rect x="146" y="136" width="292" height="292" rx="70" fill="#0EA5E9" stroke="#111827" stroke-width="12"/>
+  <path d="M201 225h49v-21c0-18 15-33 33-33s33 15 33 33v21h49v49h-21c-18 0-33 15-33 33s15 33 33 33h21v49H201v-49h21c18 0 33-15 33-33s-15-33-33-33h-21z" fill="#F8FAFC" stroke="#111827" stroke-width="9" stroke-linejoin="round"/>
+</svg>
