@@ -148,7 +148,6 @@ public sealed class MainViewModel : ViewModelBase
         ReloadLocalSourceFoldersFromSettings();
         SyncHiddenReposCollection();
         ReloadLoadSetsFromService();
-        LoadCachedCatalog();
 
         ExtensionsView = CollectionViewSource.GetDefaultView(Extensions);
         ExtensionsView.Filter = FilterExtension;
@@ -169,6 +168,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             ExtensionsView.SortDescriptions.Add(new SortDescription(nameof(ExtensionCardViewModel.Title), ListSortDirection.Ascending));
         }
+        LoadCachedCatalog();
 
         RefreshCommand = new AsyncRelayCommand(_ => RefreshAsync(), _ => !Busy);
         UpdateAllCommand = new AsyncRelayCommand(

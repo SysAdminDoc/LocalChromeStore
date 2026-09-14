@@ -8,6 +8,8 @@ namespace LocalChromeStore.Services;
 
 public sealed class SettingsService
 {
+    public const string DataRootEnvironmentVariable = "LOCALCHROMESTORE_DATA_ROOT";
+
     public string SettingsDir { get; }
     public string SettingsPath { get; }
     public string ExtensionsRoot { get; }
@@ -39,8 +41,20 @@ public sealed class SettingsService
 
     public SettingsService(string? appDataRoot = null, string? localAppDataRoot = null)
     {
-        var appData = appDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-        var localAppData = localAppDataRoot ?? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var isolatedRoot = appDataRoot is null && localAppDataRoot is null
+            ? Environment.GetEnvironmentVariable(DataRootEnvironmentVariable)
+            : null;
+        var normalizedIsolatedRoot = string.IsNullOrWhiteSpace(isolatedRoot)
+            ? null
+            : Path.GetFullPath(isolatedRoot.Trim());
+        var appData = appDataRoot
+            ?? (normalizedIsolatedRoot is null
+                ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+                : Path.Combine(normalizedIsolatedRoot, "Roaming"));
+        var localAppData = localAppDataRoot
+            ?? (normalizedIsolatedRoot is null
+                ? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
+                : Path.Combine(normalizedIsolatedRoot, "Local"));
         SettingsDir = Path.Combine(appData, "LocalChromeStore");
         SettingsPath = Path.Combine(SettingsDir, "settings.json");
         ExtensionsRoot = Path.Combine(localAppData, "LocalChromeStore", "extensions");

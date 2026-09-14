@@ -1,6 +1,8 @@
 using System.IO;
 using System.Threading;
 using System.Windows;
+using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace LocalChromeStore;
@@ -12,12 +14,21 @@ public partial class App : Application
     // lets the second instance ask the first to surface its window instead.
     private const string InstanceMutexName = @"Local\LocalChromeStore.SingleInstance";
     private const string ActivateEventName = @"Local\LocalChromeStore.Activate";
+    private const string SoftwareRenderingEnvironmentVariable = "LOCALCHROMESTORE_SOFTWARE_RENDERING";
 
     private Mutex? _instanceMutex;
     private EventWaitHandle? _activateEvent;
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        if (string.Equals(
+                Environment.GetEnvironmentVariable(SoftwareRenderingEnvironmentVariable),
+                "1",
+                StringComparison.Ordinal))
+        {
+            RenderOptions.ProcessRenderMode = RenderMode.SoftwareOnly;
+        }
+
         _instanceMutex = new Mutex(initiallyOwned: true, InstanceMutexName, out var isNew);
         if (!isNew)
         {

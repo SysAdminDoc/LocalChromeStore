@@ -27,6 +27,27 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void Constructor_UsesIsolatedDataRootFromEnvironment()
+    {
+        var root = NewRoot();
+        var previous = Environment.GetEnvironmentVariable(SettingsService.DataRootEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(SettingsService.DataRootEnvironmentVariable, root);
+
+            var service = new SettingsService();
+
+            Assert.Equal(Path.Combine(root, "Roaming", "LocalChromeStore"), service.SettingsDir);
+            Assert.Equal(Path.Combine(root, "Local", "LocalChromeStore", "cache"), service.CacheDir);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(SettingsService.DataRootEnvironmentVariable, previous);
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
     public void WriteAtomic_KeepsPriorContentInBackup_OnOverwrite()
     {
         var dir = NewRoot();

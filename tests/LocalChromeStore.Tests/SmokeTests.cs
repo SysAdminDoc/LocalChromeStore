@@ -85,6 +85,38 @@ public sealed class SmokeTests : IDisposable
     }
 
     [Fact]
+    public void MainViewModel_LoadsCachedCatalogDuringStartup()
+    {
+        var root = Path.Combine(_root, "view-model-data");
+        var previous = Environment.GetEnvironmentVariable(SettingsService.DataRootEnvironmentVariable);
+        try
+        {
+            Environment.SetEnvironmentVariable(SettingsService.DataRootEnvironmentVariable, root);
+            var settings = new SettingsService();
+            new CatalogCacheService(settings.CacheDir).Save(
+            [
+                new ExtensionInfo
+                {
+                    RepoOwner = "sample",
+                    RepoName = "cached-extension",
+                    RepoUrl = "https://example.invalid/sample/cached-extension",
+                    ManifestName = "Cached Extension"
+                }
+            ]);
+
+            var viewModel = new MainViewModel(_dialogs);
+
+            Assert.Single(viewModel.Extensions);
+            Assert.Equal("Cached Extension", viewModel.Extensions[0].Title);
+            Assert.Equal(1, viewModel.VisibleCount);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(SettingsService.DataRootEnvironmentVariable, previous);
+        }
+    }
+
+    [Fact]
     public void JsonEventLog_IntegrationWithSettings()
     {
         var log = new JsonEventLog(_settings.LogsDir);
